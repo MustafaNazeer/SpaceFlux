@@ -13,6 +13,10 @@ import (
 
 var ErrHalted = errors.New("poller halted")
 
+// ErrUnchanged is returned by Fetch when the provider reports the data has not
+// changed since the last fetch; the poller waits a full interval.
+var ErrUnchanged = errors.New("unchanged since last fetch")
+
 type Poller struct {
 	Interval time.Duration
 	Backoff  backoff.Policy
@@ -51,6 +55,12 @@ func (p *Poller) Run(ctx context.Context) error {
 			switch {
 			case ctx.Err() != nil:
 				return ctx.Err()
+			case errors.Is(err, ErrUnchanged):
+				attempt = 0
+				if err := sleep(ctx, p.Interval); err != nil {
+					return err
+				}
+				continue
 			case err != nil && p.IsHalt(err):
 				return fmt.Errorf("%w: %w", ErrHalted, err)
 			case err != nil && p.IsBadBody(err):

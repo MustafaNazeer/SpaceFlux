@@ -1,0 +1,17 @@
+HTTP/2 304 
+date: Sun, 27 Sep 2026 16:30:45 GMT
+server: Apache
+access-control-allow-origin: *
+access-control-allow-headers: origin, x-requested-with, content-type
+access-control-allow-methods: PUT, GET, POST, DELETE, OPTIONS
+strict-transport-security: max-age=31536000
+cache-control: max-age=60
+expires: Sun, 27 Sep 2026 16:31:26 GMT
+etag: "ea34-65c796ee76656"
+vary: Accept-Encoding
+x-cache: Hit from cloudfront
+via: 1.1 9b26fbfef5a709db6d3d3d640ed982ee.cloudfront.net (CloudFront)
+x-amz-cf-pop: REDACTED
+x-amz-cf-id: REDACTED
+age: 19
+

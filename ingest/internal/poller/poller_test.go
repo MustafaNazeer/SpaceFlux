@@ -247,3 +247,16 @@ func TestRejectFailureRetriesRejectWithoutRefetch(t *testing.T) {
 		t.Fatalf("sleeps = %v", h.sleeps)
 	}
 }
+
+func TestUnchangedSkipsProcessAndWaitsInterval(t *testing.T) {
+	h := &harness{fetches: []fetchResult{{err: ErrUnchanged}, {body: []byte("new")}}, stopAfter: 2}
+	if err := run(t, h); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run = %v", err)
+	}
+	if len(h.processed) != 1 || string(h.processed[0]) != "new" {
+		t.Fatalf("processed = %q, want only the changed body", h.processed)
+	}
+	if h.sleeps[0] != 2*time.Hour {
+		t.Fatalf("slept %v after a not modified reply, want the full interval", h.sleeps[0])
+	}
+}

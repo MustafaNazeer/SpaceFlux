@@ -5,47 +5,33 @@ package gpfeed
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/MustafaNazeer/SpaceFlux/ingest/internal/dedupe"
+	"github.com/MustafaNazeer/SpaceFlux/ingest/internal/events"
 	"github.com/MustafaNazeer/SpaceFlux/ingest/internal/schema"
 )
 
 const (
 	TopicRawGP    = "raw.gp"
 	TopicRawGPDLQ = "raw.gp.dlq"
-	service       = "ingest"
 	epochLayout   = "2006-01-02T15:04:05.999999999"
 
-	// kafkaMaxRecordBytes is franz-go's default producer batch limit, which a
-	// single record may not exceed (kgo.ProducerBatchMaxBytes, 1000012).
-	kafkaMaxRecordBytes = 1000012
+	kafkaMaxRecordBytes = events.KafkaMaxRecordBytes
+	maxDLQPayload       = events.MaxDLQPayload
 	// maxEventBytes bounds one raw.gp record, far above a real GP record
-	// (about 420 bytes) and well under kafkaMaxRecordBytes.
+	// (about 420 bytes) and well under the Kafka record limit.
 	maxEventBytes = 512 << 10
-	// maxDLQPayload bounds the payload copied into a dead letter. JSON escaping
-	// can grow text up to sixfold, so a dead letter over maxDLQRecord falls back
-	// to base64, which grows it by only a third.
-	maxDLQPayload = 256 << 10
-	maxDLQRecord  = 900_000
-	maxDLQReason  = 4 << 10
 )
 
-type Message struct {
-	Topic string
-	Key   []byte
-	Value []byte
-}
-
-type Publisher interface {
-	Publish(ctx context.Context, msgs []Message) error
-}
+type (
+	Message   = events.Message
+	Publisher = events.Publisher
+)
 
 type Processor struct {
 	Events     *schema.Validator
@@ -62,20 +48,6 @@ type envelope struct {
 	FetchedAt     string          `json:"fetched_at"`
 	SourceURL     string          `json:"source_url"`
 	GP            json.RawMessage `json:"gp"`
-}
-
-type deadLetter struct {
-	SchemaVersion   int    `json:"schema_version"`
-	SourceTopic     string `json:"source_topic"`
-	Service         string `json:"service"`
-	Stage           string `json:"stage"`
-	Reason          string `json:"reason"`
-	FailedAt        string `json:"failed_at"`
-	SourceURL       string `json:"source_url,omitempty"`
-	Payload         string `json:"payload"`
-	PayloadEncoding string `json:"payload_encoding"`
-	PayloadBytes    int    `json:"payload_bytes"`
-	PayloadTrunc    bool   `json:"payload_truncated,omitempty"`
 }
 
 type recordID struct {
@@ -110,6 +82,12 @@ func (p *Processor) Process(ctx context.Context, body []byte, fetchedAt time.Tim
 
 	for _, rec := range records {
 		key := bestEffortKey(rec)
+		if !utf8.Valid(rec) {
+			if err := add(key, "validate", "record is not valid UTF-8", rec); err != nil {
+				return err
+			}
+			continue
+		}
 		if len(rec) > maxEventBytes {
 			if err := add(key, "validate", fmt.Sprintf("record of %d bytes exceeds the %d byte limit", len(rec), maxEventBytes), rec); err != nil {
 				return err
@@ -167,7 +145,7 @@ func (p *Processor) RejectBody(ctx context.Context, reason string, prefix []byte
 // envelope wraps a record without re-encoding it, so the gp object carries
 // CelesTrak's bytes unchanged (json.Marshal would HTML escape them).
 func (p *Processor) envelope(rec json.RawMessage, fetchedAt time.Time) ([]byte, error) {
-	return marshalNoEscape(envelope{
+	return events.MarshalNoEscape(envelope{
 		SchemaVersion: 1,
 		Source:        "celestrak",
 		FetchedAt:     fetchedAt.UTC().Format(time.RFC3339Nano),
@@ -176,56 +154,8 @@ func (p *Processor) envelope(rec json.RawMessage, fetchedAt time.Time) ([]byte, 
 	})
 }
 
-// deadLetter builds a dead letter validated against its own schema, so a
-// broken dead letter surfaces as an error rather than being published.
-// incomplete marks payloads that are partial even when total == len(payload).
 func (p *Processor) deadLetter(key []byte, stage, reason string, payload []byte, total int, incomplete bool) (Message, error) {
-	if len(payload) > maxDLQPayload {
-		cut := maxDLQPayload
-		for cut > maxDLQPayload-utf8.UTFMax && !utf8.RuneStart(payload[cut]) {
-			cut--
-		}
-		payload = payload[:cut]
-	}
-	if len(reason) > maxDLQReason {
-		reason = strings.ToValidUTF8(reason[:maxDLQReason], "")
-	}
-	d := deadLetter{
-		SchemaVersion:   1,
-		SourceTopic:     TopicRawGP,
-		Service:         service,
-		Stage:           stage,
-		Reason:          reason,
-		FailedAt:        p.Now().UTC().Format(time.RFC3339Nano),
-		SourceURL:       p.SourceURL,
-		Payload:         string(payload),
-		PayloadEncoding: "utf-8",
-		PayloadBytes:    total,
-		PayloadTrunc:    incomplete || len(payload) < total,
-	}
-	value, err := marshalNoEscape(d)
-	if err == nil && (!utf8.Valid(payload) || len(value) > maxDLQRecord) {
-		d.Payload = base64.StdEncoding.EncodeToString(payload)
-		d.PayloadEncoding = "base64"
-		value, err = marshalNoEscape(d)
-	}
-	if err == nil {
-		err = p.DeadLetter.Validate(value)
-	}
-	if err != nil {
-		return Message{}, fmt.Errorf("build dead letter: %w", err)
-	}
-	return Message{Topic: TopicRawGPDLQ, Key: key, Value: value}, nil
-}
-
-func marshalNoEscape(v any) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(v); err != nil {
-		return nil, err
-	}
-	return bytes.TrimRight(buf.Bytes(), "\n"), nil
+	return events.DeadLetter(p.DeadLetter, p.Now(), TopicRawGP, p.SourceURL, key, stage, reason, payload, total, incomplete)
 }
 
 // identity returns the dedupe key. EPOCH is normalized through time parsing so

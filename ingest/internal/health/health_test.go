@@ -19,7 +19,7 @@ func get(t *testing.T, h http.Handler, path string) (int, map[string]any) {
 }
 
 func TestReadyWhenBrokerUpAndFeedRunning(t *testing.T) {
-	s := New(func(context.Context) error { return nil })
+	s := New(func(context.Context) error { return nil }, "celestrak", "swpc.kp")
 	code, body := get(t, s.Handler(), "/readyz")
 	if code != http.StatusOK || body["celestrak"] != "running" {
 		t.Fatalf("readyz = %d %v", code, body)
@@ -27,7 +27,7 @@ func TestReadyWhenBrokerUpAndFeedRunning(t *testing.T) {
 }
 
 func TestNotReadyWhenBrokerDown(t *testing.T) {
-	s := New(func(context.Context) error { return errors.New("dial refused") })
+	s := New(func(context.Context) error { return errors.New("dial refused") }, "celestrak")
 	code, body := get(t, s.Handler(), "/readyz")
 	if code != http.StatusServiceUnavailable || body["kafka"] != "dial refused" {
 		t.Fatalf("readyz = %d %v", code, body)
@@ -35,11 +35,11 @@ func TestNotReadyWhenBrokerDown(t *testing.T) {
 }
 
 func TestHaltedFeedFailsReadinessButNotLiveness(t *testing.T) {
-	s := New(func(context.Context) error { return nil })
-	s.SetHalted(errors.New("celestrak: HTTP 403: blocked"))
+	s := New(func(context.Context) error { return nil }, "celestrak", "swpc.kp")
+	s.SetHalted("celestrak", errors.New("HTTP 403: blocked"))
 
 	code, body := get(t, s.Handler(), "/readyz")
-	if code != http.StatusServiceUnavailable || body["celestrak"] != "halted: celestrak: HTTP 403: blocked" {
+	if code != http.StatusServiceUnavailable || body["celestrak"] != "halted: HTTP 403: blocked" || body["swpc.kp"] != "running" {
 		t.Fatalf("readyz = %d %v", code, body)
 	}
 	if code, _ := get(t, s.Handler(), "/healthz"); code != http.StatusOK {
@@ -48,23 +48,24 @@ func TestHaltedFeedFailsReadinessButNotLiveness(t *testing.T) {
 }
 
 func TestPublishFailureStreakFailsReadinessUntilSuccess(t *testing.T) {
-	s := New(func(context.Context) error { return nil })
-	s.PublishFailed(errors.New("record delivery timeout"))
-	s.PublishFailed(errors.New("record delivery timeout"))
+	s := New(func(context.Context) error { return nil }, "celestrak", "swpc.kp")
+	s.PublishFailed("celestrak", errors.New("record delivery timeout"))
+	s.PublishFailed("celestrak", errors.New("record delivery timeout"))
+	s.PublishSucceeded("swpc.kp")
 
 	code, body := get(t, s.Handler(), "/readyz")
-	if code != http.StatusServiceUnavailable || body["publish"] != "2 consecutive failures: record delivery timeout" {
+	if code != http.StatusServiceUnavailable || body["publish"] != "celestrak: 2 consecutive failures: record delivery timeout" {
 		t.Fatalf("readyz = %d %v", code, body)
 	}
 
-	s.PublishSucceeded()
+	s.PublishSucceeded("celestrak")
 	if code, body := get(t, s.Handler(), "/readyz"); code != http.StatusOK || body["publish"] != "ok" {
 		t.Fatalf("readyz after success = %d %v", code, body)
 	}
 }
 
 func TestResponsesAreNotSniffed(t *testing.T) {
-	s := New(func(context.Context) error { return nil })
+	s := New(func(context.Context) error { return nil }, "celestrak", "swpc.kp")
 	rec := httptest.NewRecorder()
 	s.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
 	if rec.Header().Get("X-Content-Type-Options") != "nosniff" {

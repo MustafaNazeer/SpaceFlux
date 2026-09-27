@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -15,33 +16,34 @@ import (
 type State struct {
 	ping           func(context.Context) error
 	mu             sync.Mutex
-	halted         error
-	publishFails   int
-	lastPublishErr error
+	feeds          []string
+	halted         map[string]error
+	publishFails   map[string]int
+	lastPublishErr map[string]error
 }
 
-func New(ping func(context.Context) error) *State {
-	return &State{ping: ping}
+func New(ping func(context.Context) error, feeds ...string) *State {
+	return &State{ping: ping, feeds: feeds, halted: map[string]error{}, publishFails: map[string]int{}, lastPublishErr: map[string]error{}}
 }
 
-func (s *State) SetHalted(err error) {
+func (s *State) SetHalted(feed string, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.halted = err
+	s.halted[feed] = err
 }
 
-func (s *State) PublishFailed(err error) {
+func (s *State) PublishFailed(feed string, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.publishFails++
-	s.lastPublishErr = err
+	s.publishFails[feed]++
+	s.lastPublishErr[feed] = err
 }
 
-func (s *State) PublishSucceeded() {
+func (s *State) PublishSucceeded(feed string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.publishFails = 0
-	s.lastPublishErr = nil
+	delete(s.publishFails, feed)
+	delete(s.lastPublishErr, feed)
 }
 
 func (s *State) Handler() http.Handler {
@@ -56,19 +58,28 @@ func (s *State) Handler() http.Handler {
 func (s *State) ready(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
-	body := map[string]string{"kafka": "ok", "celestrak": "running", "publish": "ok"}
+	body := map[string]string{"kafka": "ok", "publish": "ok"}
 	code := http.StatusOK
 	if err := s.ping(ctx); err != nil {
 		body["kafka"] = err.Error()
 		code = http.StatusServiceUnavailable
 	}
 	s.mu.Lock()
-	if s.halted != nil {
-		body["celestrak"] = "halted: " + s.halted.Error()
-		code = http.StatusServiceUnavailable
+	for _, f := range s.feeds {
+		body[f] = "running"
+		if err := s.halted[f]; err != nil {
+			body[f] = "halted: " + err.Error()
+			code = http.StatusServiceUnavailable
+		}
 	}
-	if s.publishFails > 0 {
-		body["publish"] = fmt.Sprintf("%d consecutive failures: %v", s.publishFails, s.lastPublishErr)
+	var failing []string
+	for _, f := range s.feeds {
+		if n := s.publishFails[f]; n > 0 {
+			failing = append(failing, fmt.Sprintf("%s: %d consecutive failures: %v", f, n, s.lastPublishErr[f]))
+		}
+	}
+	if len(failing) > 0 {
+		body["publish"] = strings.Join(failing, "; ")
 		code = http.StatusServiceUnavailable
 	}
 	s.mu.Unlock()

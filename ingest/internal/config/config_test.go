@@ -30,6 +30,9 @@ func TestLoadDefaults(t *testing.T) {
 	if c.HTTPAddr != "127.0.0.1:8080" {
 		t.Errorf("http addr = %q", c.HTTPAddr)
 	}
+	if c.SWPCInterval != 5*time.Minute || c.SWPCBaseURL != "https://services.swpc.noaa.gov" {
+		t.Errorf("swpc = %v %q", c.SWPCInterval, c.SWPCBaseURL)
+	}
 	if c.SchemasDir != "schemas" {
 		t.Errorf("schemas dir = %q", c.SchemasDir)
 	}
@@ -47,6 +50,10 @@ func TestLoadErrors(t *testing.T) {
 		{"brokers only separators", map[string]string{"KAFKA_BROKERS": " , "}, "KAFKA_BROKERS"},
 		{"plain http base URL", map[string]string{"KAFKA_BROKERS": "k:9092", "CELESTRAK_BASE_URL": "http://celestrak.org"}, "CELESTRAK_BASE_URL"},
 		{"other host", map[string]string{"KAFKA_BROKERS": "k:9092", "CELESTRAK_BASE_URL": "https://celestrak.com"}, "CELESTRAK_BASE_URL"},
+		{"swpc interval below one minute", map[string]string{"KAFKA_BROKERS": "k:9092", "SWPC_INTERVAL": "59s"}, "at least 1m"},
+		{"feeds list empty", map[string]string{"KAFKA_BROKERS": "k:9092", "INGEST_FEEDS": ","}, "names no feed"},
+		{"swpc other host", map[string]string{"KAFKA_BROKERS": "k:9092", "SWPC_BASE_URL": "https://example.com"}, "SWPC_BASE_URL"},
+		{"swpc plain http", map[string]string{"KAFKA_BROKERS": "k:9092", "SWPC_BASE_URL": "http://services.swpc.noaa.gov"}, "SWPC_BASE_URL"},
 		{"path on base URL", map[string]string{"KAFKA_BROKERS": "k:9092", "CELESTRAK_BASE_URL": "https://celestrak.org/NORAD"}, "CELESTRAK_BASE_URL"},
 	}
 	for _, tc := range tests {
@@ -73,5 +80,19 @@ func TestLoadOverrides(t *testing.T) {
 	}
 	if len(c.KafkaBrokers) != 2 || c.KafkaBrokers[1] != "b:9092" {
 		t.Fatalf("brokers = %v", c.KafkaBrokers)
+	}
+}
+
+func TestFeedsSelection(t *testing.T) {
+	c, err := Load(env(map[string]string{"KAFKA_BROKERS": "k:9092"}))
+	if err != nil || !c.FeedEnabled("celestrak") || !c.FeedEnabled("swpc") {
+		t.Fatalf("default feeds: err=%v %v", err, c.Feeds)
+	}
+	c, err = Load(env(map[string]string{"KAFKA_BROKERS": "k:9092", "INGEST_FEEDS": " swpc "}))
+	if err != nil || c.FeedEnabled("celestrak") || !c.FeedEnabled("swpc") {
+		t.Fatalf("swpc only: err=%v %v", err, c.Feeds)
+	}
+	if _, err := Load(env(map[string]string{"KAFKA_BROKERS": "k:9092", "INGEST_FEEDS": "swpc,donki"})); err == nil || !strings.Contains(err.Error(), "donki") {
+		t.Fatalf("unknown feed accepted: %v", err)
 	}
 }

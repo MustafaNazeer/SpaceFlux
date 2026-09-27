@@ -7,7 +7,7 @@ import (
 
 	"github.com/twmb/franz-go/pkg/kgo"
 
-	"github.com/MustafaNazeer/SpaceFlux/ingest/internal/gpfeed"
+	"github.com/MustafaNazeer/SpaceFlux/ingest/internal/events"
 )
 
 type Publisher struct {
@@ -32,7 +32,7 @@ func New(brokers []string, deliveryTimeout time.Duration) (*Publisher, error) {
 	return &Publisher{client: cl, timeout: deliveryTimeout}, nil
 }
 
-func (p *Publisher) Publish(ctx context.Context, msgs []gpfeed.Message) error {
+func (p *Publisher) Publish(ctx context.Context, msgs []events.Message) error {
 	recs := make([]*kgo.Record, len(msgs))
 	for i, m := range msgs {
 		recs[i] = &kgo.Record{Topic: m.Topic, Key: m.Key, Value: m.Value}

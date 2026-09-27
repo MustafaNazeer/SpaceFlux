@@ -39,3 +39,25 @@ func TestDelayStaysWithinBounds(t *testing.T) {
 		}
 	}
 }
+
+// Jitter spreads over [Min, ceiling) so pollers retrying a shared outage do not
+// all land on the floor together.
+func TestDelayNeverBelowMin(t *testing.T) {
+	p := Policy{Min: time.Minute, Base: time.Minute, Max: 5 * time.Minute}
+	tests := []struct {
+		attempt int
+		rnd     float64
+		want    time.Duration
+	}{
+		{0, 0, time.Minute},
+		{0, 0.5, time.Minute},
+		{2, 0, time.Minute},
+		{2, 0.5, 150 * time.Second},
+		{9, 0.9, 276 * time.Second},
+	}
+	for _, tc := range tests {
+		if got := p.Delay(tc.attempt, func() float64 { return tc.rnd }); got != tc.want {
+			t.Fatalf("Delay(%d, %v) = %v, want %v", tc.attempt, tc.rnd, got, tc.want)
+		}
+	}
+}

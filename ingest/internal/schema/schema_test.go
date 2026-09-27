@@ -12,6 +12,10 @@ func TestValidExamplesPass(t *testing.T) {
 	tests := []struct{ schema, example string }{
 		{"raw.gp/v1.schema.json", "raw.gp/examples/valid-iss.json"},
 		{"dlq/v1.schema.json", "dlq/examples/truncated-body.json"},
+		{"raw.swpc/v1.schema.json", "raw.swpc/examples/valid-kp.json"},
+		{"raw.swpc/v1.schema.json", "raw.swpc/examples/valid-goes-xrays.json"},
+		{"raw.swpc/v1.schema.json", "raw.swpc/examples/valid-goes-protons.json"},
+		{"raw.swpc/v1.schema.json", "raw.swpc/examples/valid-alert.json"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.example, func(t *testing.T) {

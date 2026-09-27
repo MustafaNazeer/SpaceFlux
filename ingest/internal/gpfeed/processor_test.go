@@ -418,3 +418,15 @@ func TestRejectBodyAlwaysMarksPayloadTruncated(t *testing.T) {
 		t.Fatalf("a body that failed in transit is incomplete by definition: %+v", e)
 	}
 }
+
+func TestInvalidUTF8RecordGoesToDLQ(t *testing.T) {
+	rec := strings.Replace(issRecord(t), `"ISS (ZARYA)"`, "\"ISS \xff\"", 1)
+	pub := processOne(t, "["+rec+"]")
+	dlq := pub.byTopic(TopicRawGPDLQ)
+	if len(dlq) != 1 || len(pub.byTopic(TopicRawGP)) != 0 {
+		t.Fatalf("dlq=%d raw.gp=%d, want 1 and 0", len(dlq), len(pub.byTopic(TopicRawGP)))
+	}
+	if e := decodeDLQ(t, dlq[0]); !strings.Contains(e.Reason, "UTF-8") || e.PayloadEncoding != "base64" {
+		t.Fatalf("dlq event = %+v", e)
+	}
+}
