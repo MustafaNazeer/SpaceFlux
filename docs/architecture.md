@@ -41,7 +41,7 @@ Each service is bounded by a different resource, which is the reason they are sp
 
 The archiver starts inside `query-api` to keep the local memory footprint small. Splitting it into its own deployable is a decision to revisit only if measured consumer lag justifies it.
 
-The repository layout and the Maven multi-module build for the Java services are described in [ADR 0001](adr/0001-repo-layout-and-build-tool.md). Language, framework, and broker versions are pinned when each component is introduced, after checking current stable releases.
+The repository layout and the Maven multi-module build for the Java services are described in [ADR 0001](adr/0001-repo-layout-and-build-tool.md). Language, framework, and broker versions are pinned when each component is introduced, after checking current stable releases; the Go Kafka client, the JSON Schema draft, and the broker image are recorded in [ADR 0003](adr/0003-go-kafka-client-and-schema-validator.md).
 
 ## Topics and contracts
 
