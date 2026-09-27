@@ -1,0 +1,9 @@
+HTTP/2 200 
+content-type: application/x-zip-compressed
+last-modified: Wed, 10 May 2023 23:17:06 GMT
+accept-ranges: bytes
+etag: "867397899583d91:0"
+server: Microsoft-IIS/10.0
+date: Sun, 27 Sep 2026 21:01:38 GMT
+content-length: 1248284
+

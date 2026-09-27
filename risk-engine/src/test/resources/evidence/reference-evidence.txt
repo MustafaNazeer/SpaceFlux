@@ -1,0 +1,33 @@
+23599 vs AFSPC rows: largest position 963.99 m at 460 min; smallest from 420 min 260.36 m at 620 min; largest velocity 0.3892 m/s at 620 min
+33333 at 0 min: Orekit differs by 0.000 km
+33333 at 5 min: Orekit differs by 49.855 km
+33333 at 10 min: Orekit differs by 104.072 km
+33333 at 15 min: Orekit differs by 163.154 km
+33333 at 20 min: Orekit differs by 3398.272 km
+33335: Orekit differs by 44.2 m at epoch, 50.6 m at most
+20413 second entry at 1844000 min: Orekit differs by 27924 km
+22312 at 494.2028672 min (reference error step): Orekit radius 6449.0 km, altitude 70.8 km
+28350 at 1560.0 min (reference error step): Orekit radius 6431.2 km, altitude 53.1 km
+28872 at 55.0 min (reference error step): Orekit radius 6353.6 km, altitude -24.5 km
+29141 at 440.0 min (reference error step): Orekit radius 6354.2 km, altitude -23.9 km
+33334 every 5 min from 0 to 1440 min: Orekit position NaN at every step true
+28350 at 1080 min: Orekit altitude 81.03 km
+11801 blank designator: launch year 2000 from text, 0 from GP JSON
+88888 blank designator: launch year 2000 from text, 0 from GP JSON
+largest row error over the 28 agreeing cases: 1.974 mm, 26900 at 9360.0 min
+33333 at 25 min: Orekit position NaN true
+16925 published rows: lowest 155.3 km at 840.0 min; last row 1440.0 min at 1424.9 km
+22312 published rows: lowest 70.5 km at 474.2028672 min; last row 474.2028672 min at 70.5 km
+22674 published rows: lowest 260.3 km at 2160.0 min; last row 2880.0 min at 1466.3 km
+23599 published rows: lowest 175.8 km at 620.0 min; last row 720.0 min at 15510.3 km
+28350 published rows: lowest 59.6 km at 1320.0 min; last row 1440.0 min at 65.7 km
+28872 published rows: lowest 13.6 km at 50.0 min; last row 50.0 min at 13.6 km
+29141 published rows: lowest 4.5 km at 420.0 min; last row 420.0 min at 4.5 km
+29238 published rows: lowest 204.5 km at 480.0 min; last row 1440.0 min at 480.7 km
+88888 published rows: lowest 195.6 km at 960.0 min; last row 1440.0 min at 299.5 km
+16925 sampled every 10 s: lowest 94.6 km at 255.3 min, first below 100 km at 254.7 min
+22312 sampled every 10 s: first below 80 km at 459.8 min
+28350 sampled every 10 s: first below 80 km at 1050.2 min
+28872 sampled every 10 s: first below 80 km at 44.2 min
+29141 sampled every 10 s: first below 80 km at 377.2 min
+lowest sampled altitude of the other run to end cases: 123.5 km (28623)
