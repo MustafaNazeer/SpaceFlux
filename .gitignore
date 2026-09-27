@@ -1,0 +1,46 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Java (Maven and Gradle)
+target/
+build/
+.gradle/
+*.class
+*.log
+hs_err_pid*
+
+# Go
+/bin/
+*.test
+*.out
+coverage.txt
+
+# Node and Angular
+node_modules/
+dist/
+.angular/
+coverage/
+npm-debug.log*
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+.terraform.lock.hcl.bak
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
