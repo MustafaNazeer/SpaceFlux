@@ -1,0 +1,9 @@
+*
+!ingest/
+!schemas/
+ingest/testdata/
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/.envrc

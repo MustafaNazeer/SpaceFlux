@@ -1,0 +1,8 @@
+HTTP/2 200 
+content-type: application/json; charset=UTF-8
+server: Microsoft-IIS/10.0
+x-powered-by: PHP/8.2.20
+content-disposition: filename="stations.json"
+date: Sun, 27 Sep 2026 08:57:39 GMT
+content-length: 9279
+
