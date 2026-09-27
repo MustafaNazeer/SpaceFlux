@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/MustafaNazeer/SpaceFlux/schemas/raw.gp/v1.schema.json",
+  "title": "raw.gp event, version 1",
+  "description": "One CelesTrak GP (general perturbations) element set, as published by ingest to the raw.gp topic. The Kafka record key is gp.NORAD_CAT_ID. See docs/data/topics.md.",
+  "type": "object",
+  "required": ["schema_version", "source", "fetched_at", "source_url", "gp"],
+  "properties": {
+    "schema_version": {
+      "description": "Major version of this contract. Always 1 for events written against this file.",
+      "type": "integer",
+      "const": 1
+    },
+    "source": {
+      "description": "Provider the record came from.",
+      "type": "string",
+      "const": "celestrak"
+    },
+    "fetched_at": {
+      "description": "RFC 3339 UTC time at which ingest received the HTTP response carrying this record. Always ends in Z. The pattern enforces the shape because format is only an annotation by default in draft 2020-12.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
+    },
+    "source_url": {
+      "description": "The exact URL ingest requested.",
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "gp": {
+      "description": "The CelesTrak JSON record, with CelesTrak's own key names and JSON types, copied without transformation. Keywords and units follow CCSDS 502.0-B-3 (OMM) Tables 4-2 and 4-3. Ranges below come from the CCSDS NDM/XML 3.0.0 OMM schema; fields without a range have none in that schema and are left unconstrained. Additional properties are allowed so that a new keyword added by CelesTrak does not dead letter every record.",
+      "type": "object",
+      "required": [
+        "EPOCH",
+        "MEAN_MOTION",
+        "ECCENTRICITY",
+        "INCLINATION",
+        "RA_OF_ASC_NODE",
+        "ARG_OF_PERICENTER",
+        "MEAN_ANOMALY",
+        "EPHEMERIS_TYPE",
+        "CLASSIFICATION_TYPE",
+        "NORAD_CAT_ID",
+        "ELEMENT_SET_NO",
+        "REV_AT_EPOCH",
+        "BSTAR",
+        "MEAN_MOTION_DOT",
+        "MEAN_MOTION_DDOT"
+      ],
+      "properties": {
+        "OBJECT_NAME": {
+          "description": "Object name.",
+          "type": "string"
+        },
+        "OBJECT_ID": {
+          "description": "International designator, for example 1998-067A.",
+          "type": "string"
+        },
+        "EPOCH": {
+          "description": "Epoch of the mean elements, UTC. CelesTrak sends the CCSDS calendar form without the optional Z terminator, observed with six fractional digits. The pattern accepts any number of fractional digits, or none, as CCSDS 502.0-B-3 section 7.5.10 allows.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?$"
+        },
+        "MEAN_MOTION": {
+          "description": "Mean motion, rev/day.",
+          "type": "number"
+        },
+        "ECCENTRICITY": {
+          "description": "Eccentricity, dimensionless. Lower bound from the OMM schema type nonNegativeDouble, which sets no upper bound.",
+          "type": "number",
+          "minimum": 0
+        },
+        "INCLINATION": {
+          "description": "Inclination, deg. Range from the OMM schema type inclinationRange.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 180
+        },
+        "RA_OF_ASC_NODE": {
+          "description": "Right ascension of the ascending node, deg. Range from the OMM schema type angleRange.",
+          "type": "number",
+          "minimum": -180,
+          "exclusiveMaximum": 360
+        },
+        "ARG_OF_PERICENTER": {
+          "description": "Argument of pericenter, deg. Range from the OMM schema type angleRange.",
+          "type": "number",
+          "minimum": -180,
+          "exclusiveMaximum": 360
+        },
+        "MEAN_ANOMALY": {
+          "description": "Mean anomaly, deg. Range from the OMM schema type angleRange.",
+          "type": "number",
+          "minimum": -180,
+          "exclusiveMaximum": 360
+        },
+        "EPHEMERIS_TYPE": {
+          "description": "Ephemeris type. CCSDS gives a default of 0 and only a suggested coding, so no enumeration is enforced.",
+          "type": "integer"
+        },
+        "CLASSIFICATION_TYPE": {
+          "description": "Classification. CCSDS gives a default of U and only a suggested coding, so no enumeration is enforced.",
+          "type": "string"
+        },
+        "NORAD_CAT_ID": {
+          "description": "NORAD catalog number. CCSDS defines it as an integer of up to nine digits; values above 99999 occur in current data.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 999999999
+        },
+        "ELEMENT_SET_NO": {
+          "description": "Element set number. Range from the OMM schema type elementSetNoType. Not used as an identity key.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9999
+        },
+        "REV_AT_EPOCH": {
+          "description": "Revolution number at epoch. The OMM schema types it as nonNegativeInteger.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "BSTAR": {
+          "description": "SGP4 drag term, 1/Earth radii.",
+          "type": "number"
+        },
+        "MEAN_MOTION_DOT": {
+          "description": "First time derivative of mean motion, rev/day**2. See CCSDS 502.0-B-3 section 4.2.4.7 on the TLE scaling convention before using it.",
+          "type": "number"
+        },
+        "MEAN_MOTION_DDOT": {
+          "description": "Second time derivative of mean motion, rev/day**3. CelesTrak often sends the bare integer 0, which is a valid JSON number. See CCSDS 502.0-B-3 section 4.2.4.7 on the TLE scaling convention before using it.",
+          "type": "number"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

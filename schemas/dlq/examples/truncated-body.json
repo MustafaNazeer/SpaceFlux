@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "source_topic": "raw.gp",
+  "service": "ingest",
+  "stage": "decode",
+  "reason": "response body is not valid JSON: input ends before the first record is complete",
+  "failed_at": "2026-09-27T08:57:45Z",
+  "source_url": "https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=json",
+  "payload": "[{\"OBJECT_NAME\":\"ISS (ZARYA)\",\"OBJECT_ID\":\"1998-067A\",\"EPOCH\":\"2026-09-27T04:10:50.460096\",\"MEAN_MOTION\":15.48664528,\"ECCENTRICITY\":0.0007168,\"INCLINATION\":51.6315,\"RA_OF_ASC_NODE\":155.3455,\"ARG_OF_PE",
+  "payload_encoding": "utf-8",
+  "payload_bytes": 200
+}

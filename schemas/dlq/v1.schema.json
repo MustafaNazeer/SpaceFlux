@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/MustafaNazeer/SpaceFlux/schemas/dlq/v1.schema.json",
+  "title": "Dead letter event, version 1",
+  "description": "Shared envelope for every .dlq topic. It records why a payload could not be published to, or consumed from, its source topic, and carries the payload unchanged. See docs/data/topics.md.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "source_topic",
+    "service",
+    "stage",
+    "reason",
+    "failed_at",
+    "payload",
+    "payload_encoding",
+    "payload_bytes"
+  ],
+  "properties": {
+    "schema_version": {
+      "description": "Major version of this contract. Always 1 for events written against this file.",
+      "type": "integer",
+      "const": 1
+    },
+    "source_topic": {
+      "description": "The topic the payload was meant for, or was read from. The dead letter topic is this name plus .dlq.",
+      "type": "string",
+      "pattern": "^[a-z]+(\\.[a-z]+)*$"
+    },
+    "service": {
+      "description": "The service that dead lettered the payload, for example ingest or risk-engine. Needed because both the producer and every consumer validate.",
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "description": "Where the failure happened. fetch: the provider request failed. decode: the bytes are not the expected JSON. validate: the event does not match its topic schema. publish: the broker rejected the write.",
+      "type": "string",
+      "enum": ["fetch", "decode", "validate", "publish"]
+    },
+    "reason": {
+      "description": "Human readable error, including validation error paths where there are any.",
+      "type": "string",
+      "minLength": 1
+    },
+    "failed_at": {
+      "description": "RFC 3339 UTC time of the failure. Always ends in Z.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
+    },
+    "source_url": {
+      "description": "The provider URL the payload came from, when there is one.",
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "payload": {
+      "description": "The failing bytes, unchanged. Stored as text when they are valid UTF-8 and as base64 otherwise, because the bytes may not be valid JSON or valid UTF-8.",
+      "type": "string"
+    },
+    "payload_encoding": {
+      "description": "How payload is encoded: utf-8 for the bytes as text, base64 otherwise.",
+      "type": "string",
+      "enum": ["utf-8", "base64"]
+    },
+    "payload_bytes": {
+      "description": "Length in bytes of the original payload before any encoding or truncation.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "payload_truncated": {
+      "description": "True when payload holds only a prefix of the original bytes, because the original was too large to fit in a Kafka record. payload_bytes still gives the original length. Absent means false.",
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": true
+}
