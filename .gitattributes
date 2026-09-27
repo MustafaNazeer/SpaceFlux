@@ -1,0 +1,3 @@
+risk-engine/src/test/resources/sgp4/* -text
+risk-engine/src/main/resources/orekit-data/tai-utc.dat -text
+risk-engine/src/test/resources/celestrak/*.json -text

@@ -17,6 +17,7 @@ hs_err_pid*
 /bin/
 *.test
 *.out
+!risk-engine/src/test/resources/sgp4/*.out
 coverage.txt
 
 # Node and Angular
