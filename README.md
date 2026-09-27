@@ -6,33 +6,45 @@ Designed around data from CelesTrak, NOAA SWPC, and NASA DONKI, which are public
 
 ## Status
 
-**Work in progress. Nothing below is built yet.** This README describes the planned system. Features, benchmarks, and evaluation results will be added here only once they exist in the code and can be reproduced from a committed script and dataset.
+**Work in progress. Only the ingest service is built so far.** Everything else in this README is planned and is marked that way. Features, benchmarks, and evaluation results are added here only once they exist in the code and can be reproduced from a committed script and dataset.
+
+### Built: the ingest service
+
+`ingest` is a Go service that polls two public feeds and publishes every new record to Kafka as a versioned JSON event:
+
+* **CelesTrak GP orbital elements** for the `stations` group, polled every 2 hours 10 minutes and published to `raw.gp`, keyed by NORAD catalog number. CelesTrak updates GP data every 2 hours and asks clients to stop on any HTTP error rather than retry, so the poller refuses an interval under 2 hours and halts on any response other than 200 until it is restarted ([ADR 0004](docs/adr/0004-celestrak-polling-and-error-handling.md)).
+* **Four NOAA SWPC products**, polled every 5 minutes with conditional requests and published to `raw.swpc`, keyed by product: the planetary Kp index, GOES X-ray flux, GOES integral proton flux, and SWPC alerts, watches, and warnings. Transient errors are retried with exponential backoff and jitter, never sooner than 1 minute apart ([ADR 0005](docs/adr/0005-swpc-polling-and-error-handling.md)).
+
+The CelesTrak feed and each SWPC product run in their own poller, so one halted poller does not stop the others. Every event is validated against a JSON Schema file in [`schemas/`](schemas/) before it is published. A payload that fails decoding or validation goes to the topic's dead letter topic (`raw.gp.dlq` or `raw.swpc.dlq`) with the reason attached, and nothing is dropped silently. Records already published are skipped, so an unchanged feed does not produce new events. The service exposes liveness and readiness endpoints; readiness reports Kafka, publishing, and each feed separately. Topics, keys, and schemas are described in [docs/data/topics.md](docs/data/topics.md).
+
+The local stack is a Docker Compose `core` profile with a single Kafka broker, a one shot topic creation container, and `ingest`. With the container limits in place and the current code, one 7 minute run with only the SWPC feed enabled measured Kafka and `ingest` together at a median of 482.3 MiB and a maximum of 590.0 MiB. That is a single run on one machine, and the CelesTrak path was not part of it; the method, raw samples, and caveats are in [docs/perf/local-memory.md](docs/perf/local-memory.md).
+
+To build, test, and run it, see [docs/setup-guide.md](docs/setup-guide.md).
 
 ## What it is meant to do
 
-1. Poll public orbital and space weather feeds and publish every payload as a versioned event on Kafka.
+1. Poll public orbital and space weather feeds and publish every payload as a versioned event on Kafka. (Built for CelesTrak and SWPC.)
 2. Propagate orbits for a watchlist of satellites (starting with the ISS) and screen them for close approaches against the public catalog.
 3. Map space weather observations onto the NOAA Space Weather Scales and raise alerts when a level is reached.
 4. Serve the catalog, alerts, and space weather context to an operator dashboard over REST and GraphQL, with a live alert subscription.
 5. Answer questions about current conditions through an LLM assistant that retrieves space weather reports, pulls live numbers through read only tools, and cites its sources.
 
-## Planned components
+## Components
 
-| Component | Stack | Job |
-|---|---|---|
-| `ingest` | Go | One poller per feed with its own rate limiter and backoff; validates, deduplicates, and publishes raw events |
-| `risk-engine` | Java, Spring Boot, Orekit | Consumes orbital and space weather events, runs SGP4 propagation and close approach screening, applies storm rules, emits alerts |
-| `query-api` | Java, Spring Boot | REST and GraphQL over MySQL and MongoDB; hosts the archiver that stores raw feed documents |
-| `assistant` | Java, Spring AI | Retrieval over space weather text plus tool calls to `query-api` through a read only MCP tool server, with citations |
-| `dashboard` | Angular | Read only operator console showing alerts, passes, and space weather context |
+| Component | Stack | State | Job |
+|---|---|---|---|
+| `ingest` | Go | Built | One poller per feed with its own interval and backoff; validates, deduplicates, and publishes raw events |
+| `risk-engine` | Java, Spring Boot, Orekit | Planned | Consumes orbital and space weather events, runs SGP4 propagation and close approach screening, applies storm rules, emits alerts |
+| `query-api` | Java, Spring Boot | Planned | REST and GraphQL over MySQL and MongoDB; hosts the archiver that stores raw feed documents |
+| `assistant` | Java, Spring AI | Planned | Retrieval over space weather text plus tool calls to `query-api` through a read only MCP tool server, with citations |
+| `dashboard` | Angular | Planned | Read only operator console showing alerts, passes, and space weather context |
 
-Supporting pieces: Kafka topics with dead letter topics, MySQL with Flyway migrations for the catalog and alerts, MongoDB Atlas for raw documents and vector search, OpenTelemetry tracing across Kafka, Prometheus and Grafana, Terraform for an on demand AWS environment (EKS, ECR, Secrets Manager), and GitHub Actions for CI.
+Supporting pieces that exist today: Kafka topics with dead letter topics, JSON Schema files for every event, and the local Compose stack. Planned: MySQL with Flyway migrations for the catalog and alerts, MongoDB Atlas for raw documents and vector search, OpenTelemetry tracing across Kafka, Prometheus and Grafana, Terraform for an on demand AWS environment (EKS, ECR, Secrets Manager), and GitHub Actions for CI.
 
 The full design, including why each service scales differently and how delivery, errors, and security are handled, is in [docs/architecture.md](docs/architecture.md). Decisions with lasting weight are recorded as ADRs in [docs/adr/](docs/adr/).
 
 ## Planned
 
-* Go ingest for CelesTrak and SWPC into Kafka, with a local Docker Compose stack split into profiles
 * Risk engine with SGP4 propagation built test first against published verification cases
 * Query API with MySQL, the MongoDB archiver, and contract tests
 * Angular dashboard with GraphQL and a live alert subscription
@@ -43,16 +55,16 @@ The full design, including why each service scales differently and how delivery,
 
 ## Security
 
-The dashboard is read only, secrets never live in images, logs, or commits, and all feed text is treated as untrusted input to the assistant. See the [threat model](docs/security/threat-model.md) and the [hardening checklist](docs/security/hardening-checklist.md).
+Secrets never live in images, logs, or commits. The ingest container runs as a non root user on a read only filesystem with all Linux capabilities dropped, and its health port is bound to localhost. The planned dashboard is read only, and all feed text will be treated as untrusted input to the planned assistant. See the [threat model](docs/security/threat-model.md) and the [hardening checklist](docs/security/hardening-checklist.md).
 
 ## Data sources
 
-* [CelesTrak](https://celestrak.org/) GP orbital elements
-* [NOAA Space Weather Prediction Center](https://www.swpc.noaa.gov/) JSON products
-* [NASA DONKI](https://kauai.ccmc.gsfc.nasa.gov/DONKI/) space weather event database, through api.nasa.gov
-* [Space-Track](https://www.space-track.org/) conjunction data messages, used under its user agreement and never republished
+* [CelesTrak](https://celestrak.org/) GP orbital elements (ingested)
+* [NOAA Space Weather Prediction Center](https://www.swpc.noaa.gov/) JSON products (ingested)
+* [NASA DONKI](https://kauai.ccmc.gsfc.nasa.gov/DONKI/) space weather event database, through api.nasa.gov (planned)
+* [Space-Track](https://www.space-track.org/) conjunction data messages, used under its user agreement and never republished (planned)
 
-Each provider's usage guidance will be respected; polling cadences will be documented alongside the ingest code once verified against the provider's own documentation.
+Each provider's published usage guidance, and how the poller follows it, is recorded with links in [docs/source/celestrak.md](docs/source/celestrak.md) and [docs/source/swpc.md](docs/source/swpc.md).
 
 ## License
 
