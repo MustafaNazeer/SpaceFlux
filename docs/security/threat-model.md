@@ -1,6 +1,6 @@
 # Threat model
 
-This threat model covers the planned SpaceFlux design. Nothing is built yet, so every threat and mitigation below is written against the architecture in [docs/architecture.md](../architecture.md) and the README. It will be revised as each component lands, and the [hardening checklist](hardening-checklist.md) turns the mitigations here into items every pull request is checked against.
+This threat model covers the SpaceFlux design in [docs/architecture.md](../architecture.md) and the README. So far only the `ingest` service's CelesTrak poller, its health endpoint, and the local Kafka Compose stack are built. Where a mitigation below describes what that code does today, it says so; everything else is written against the planned architecture. The model is revised as each component lands, and the [hardening checklist](hardening-checklist.md) turns the mitigations here into items every pull request is checked against.
 
 SpaceFlux is a demonstration of streaming system design on public data. It is not an operational collision avoidance or space weather warning service. That scoping matters for security too: the worst realistic outcomes are a leaked credential, a surprise cloud or LLM bill, a misleading alert shown to a viewer, or a breach of a data provider's terms, not harm to a spacecraft.
 
@@ -74,6 +74,7 @@ Runtime environments:
 | TB6 | `assistant` to MCP tool server to `query-api` | Model chosen tool calls become real API requests |
 | TB7 | GitHub Actions to AWS and to the OpenAI API | CI holds or obtains credentials |
 | TB8 | Developer machine to public GitHub | Anything pushed becomes public |
+| TB9 | Local host or cluster network to service health endpoints | Probes and anyone who can reach the port read readiness detail |
 
 ## 5. Assumptions
 
@@ -91,20 +92,21 @@ Threats are grouped by component and labelled with STRIDE categories (Spoofing, 
 
 | ID | Threat | STRIDE | Mitigation | Checklist |
 |---|---|---|---|---|
-| T1.1 | A malformed, oversized, or hostile payload crashes a poller or a consumer, or exhausts memory | D | Response body size cap, request timeouts, strict schema validation at the producer, malformed payloads routed to the `.dlq` topic with the reason attached | `ingest` |
+| T1.1 | A malformed, oversized, or hostile payload crashes a poller or a consumer, or exhausts memory, or a payload too large for Kafka stalls the feed | D | Response body size cap, request timeouts, strict schema validation at the producer, malformed payloads routed to the `.dlq` topic with the reason attached. In the CelesTrak poller today: an 8 MiB body cap and a 512 byte cap on error bodies; a 60 second total request timeout with explicit 30 second connect and 10 second TLS handshake limits; a 512 KiB cap per GP record, with larger records dead lettered; only the first 256 KiB of a failing payload copied into a dead letter, marked `payload_truncated` with the true size kept in `payload_bytes`; every dead letter validated against its own schema before publish; the reason text capped at 4 KiB, and a dead letter whose JSON encoding would exceed 900,000 bytes stores its payload as base64 instead, which keeps it under the client's 1,000,012 byte record limit (tested with payloads that JSON escapes sixfold) | `ingest` |
 | T1.2 | Feed free text carries instructions aimed at the assistant (indirect prompt injection that is stored and later retrieved) | T, E | Feed text is stored as data, never interpreted; the assistant treats it as untrusted (see 6.7) | `ingest`, `assistant` |
-| T1.3 | Plausible but wrong values (spoofed feed, upstream error) produce false alerts | T | Range and consistency checks on physical quantities, epoch sanity checks, stale data banners; the demonstration disclaimer on every surface | `ingest`, `risk-engine`, `dashboard` |
-| T1.4 | Polling faster than a provider allows gets the project blocked or breaches its terms | D | Per feed rate limiter and exponential backoff with jitter, cadences taken from each provider's own guidance **(to be verified per provider)**, an identifying request header with a contact address where the provider asks for one **(to be verified)** | `ingest` |
-| T1.5 | API keys sent as URL query parameters leak through logs, traces, or error messages. api.nasa.gov documents its key as an `api_key` URL query parameter (https://api.nasa.gov/); whether it also accepts the key in a header **(to be verified)** | I | Redact query strings and credential headers in every log line, span attribute, and DLQ reason | `ingest`, `observability` |
+| T1.3 | Plausible but wrong values (spoofed feed, upstream error) produce false alerts | T | Range and consistency checks on physical quantities, epoch sanity checks, stale data banners; the demonstration disclaimer on every surface. Today the `raw.gp` schema bounds inclination, the three angles, eccentricity, and the catalog and element set numbers, citing the CCSDS OMM schema ([docs/data/topics.md](../data/topics.md)). A positive mean motion and epochs that are implausibly far in the past or future are not checked at ingest; they are checked in the risk engine before propagation (SEC-RSK-01) | `ingest`, `risk-engine`, `dashboard` |
+| T1.4 | Polling faster than a provider allows gets the project blocked or breaches its terms | D | Per feed interval and exponential backoff with jitter, cadences taken from each provider's own guidance, and an identifying request header where the provider asks for one. **CelesTrak (verified):** its guidance is recorded with quotes and links in [docs/source/celestrak.md](../source/celestrak.md), and [ADR 0004](../adr/0004-celestrak-polling-and-error-handling.md) turns it into code: a 2 hour interval floor with a 2 hour 10 minute default, a halt on any non 200 response (never retried, because CelesTrak counts 301, 403, and 404 toward a firewall limit), backoff only for failures that never received an HTTP response, and a full interval wait after a 200 whose body fails. CelesTrak's documentation does not ask for a `User-Agent`; ingest sends a descriptive one anyway. **SWPC, DONKI, Space-Track:** cadence and header guidance **(to be verified)** when each poller is added | `ingest` |
+| T1.5 | API keys sent as URL query parameters leak through logs, traces, or error messages. api.nasa.gov documents its key as an `api_key` URL query parameter (https://api.nasa.gov/); whether it also accepts the key in a header **(to be verified)** | I | Redact query strings and credential headers in every log line, span attribute, and DLQ reason. Today the full request URL, query string included, is logged on each fetch and recorded as `source_url` on every event and dead letter. That is safe for CelesTrak, whose query carries no credential. When the DONKI poller is added, the key is redacted from `source_url`, logs, and dead letter reasons, with a test | `ingest`, `observability` |
 | T1.6 | Space-Track session credentials or cookies leak, or the account is used outside its user agreement | I, S | Credentials only from the secret store; session reuse to limit logins; terms summarized in an ADR before any Space-Track code lands | `ingest`, `secrets` |
-| T1.7 | Redirect or DNS tampering sends a poller to an unexpected host | S | TLS verification never disabled; redirects to hosts outside a per feed allowlist rejected | `ingest` |
+| T1.7 | Redirect or DNS tampering sends a poller to an unexpected host | S | TLS verification never disabled; redirects to hosts outside a per feed allowlist rejected. Today the CelesTrak client never follows a redirect (a 3xx is a non 200 response and halts the poller), leaves Go's default TLS verification untouched, and refuses to start unless `CELESTRAK_BASE_URL` is exactly `https://celestrak.org` | `ingest` |
+| T1.8 | The ingest health endpoint (`GET /healthz`, `GET /readyz`) is reachable beyond the host and leaks internal detail, or is held open to exhaust the process | I, D | Listens on `127.0.0.1:8080` by default; the container image listens on `:8080` inside its own network namespace and Compose publishes it only on `127.0.0.1`. The server sets a 5 second header read timeout, a 10 second write timeout, a 60 second idle timeout, and an 8 KiB header cap; the readiness check bounds its Kafka ping to 2 seconds; responses are JSON with `X-Content-Type-Options: nosniff`. `/readyz` currently returns the Kafka ping error, the CelesTrak halt reason (including up to 512 bytes of CelesTrak's error body), and the publish failure streak. That detail is acceptable while the port is loopback only; before the first cloud deployment it is reduced to status words, with details kept in logs, and the port gets no public Service or ingress route | `ingest`, `aws` |
 
 ### 6.2 Kafka
 
 | ID | Threat | STRIDE | Mitigation | Checklist |
 |---|---|---|---|---|
-| T2.1 | Broker port exposed beyond the host or cluster lets anyone publish forged events to `alerts` or `raw.*` | S, T | Local Compose binds broker ports to `127.0.0.1` only; in EKS the broker has no public Service and a NetworkPolicy limits producers and consumers **(NetworkPolicy enforcement depends on the cluster's network plugin, to be verified)** | `kafka`, `aws` |
-| T2.2 | A poison message stalls a consumer group | D | Bounded retries then `.dlq`; consumer lag alerting | `kafka`, `observability` |
+| T2.1 | Broker port exposed beyond the host or cluster lets anyone publish forged events to `alerts` or `raw.*` | S, T | Local Compose binds broker ports to `127.0.0.1` only (in place today, with automatic topic creation disabled and topics created by a separate setup container); in EKS the broker has no public Service and a NetworkPolicy limits producers and consumers **(NetworkPolicy enforcement depends on the cluster's network plugin, to be verified)** | `kafka`, `aws` |
+| T2.2 | A poison message stalls a consumer group, or a producer blocks on a broker that is down | D | Bounded retries then `.dlq`; consumer lag alerting. On the producer side today, each ingest publish is bounded by a 60 second delivery timeout, retried with backoff on the same body without a new provider request, and while publishing keeps failing `/readyz` reports the failure streak ([ADR 0004](../adr/0004-celestrak-polling-and-error-handling.md)) | `kafka`, `observability` |
 | T2.3 | Replayed or duplicated events create duplicate alerts | T | Idempotent consumers deduplicating on feed epoch and ID fields | `kafka`, `risk-engine` |
 | T2.4 | Trace context headers are trusted as authentication or copied into queries | T | Headers used only for tracing, never for authorization or data | `kafka`, `observability` |
 
@@ -183,7 +185,7 @@ The assistant reads three kinds of untrusted text: the user's question, retrieve
 
 | ID | Threat | STRIDE | Mitigation | Checklist |
 |---|---|---|---|---|
-| T9.1 | `.env` committed or copied into an image | I | `.env` and variants git ignored, `.env.example` holds placeholders only, `.dockerignore` excludes `.env`, secret scanning before push and in CI | `secrets`, `repo`, `ci` |
+| T9.1 | `.env` committed or copied into an image | I | `.env` and variants git ignored, `.env.example` holds placeholders only, secret scanning before push and in CI. Today `.dockerignore` excludes everything except `ingest/` and `schemas/`, and within those excludes `.env`, `.env.*`, `*.pem`, and `*.key` at any depth, plus the recorded test fixtures | `secrets`, `repo`, `ci` |
 | T9.2 | Secrets baked into container images through build args or layers | I | No secrets at build time; image scan for secrets before push to ECR | `secrets`, `ci` |
 | T9.3 | Secrets printed in logs, startup banners, config dumps, or actuator style endpoints | I | Redaction in logging config; management endpoints that expose environment or config disabled or kept internal | `secrets`, `observability` |
 | T9.4 | Kubernetes Secrets readable by any pod or stored unencrypted | I, E | Per service service accounts and RBAC; secret values synced from AWS Secrets Manager rather than written into manifests. The sync mechanism (Secrets Store CSI driver or External Secrets Operator) and whether EKS encrypts Secrets at rest with a KMS key by default **(to be verified)** | `secrets`, `aws` |
@@ -198,7 +200,7 @@ The assistant reads three kinds of untrusted text: the user's question, retrieve
 | T10.2 | Pods run with node level AWS permissions | E | Per service IAM roles bound to Kubernetes service accounts (IRSA or EKS Pod Identity, choice **(to be verified)** against current EKS docs) | `aws` |
 | T10.3 | The EKS API endpoint is open to the internet | S | Endpoint access restricted to my address ranges or private access **(options to be verified)** | `aws` |
 | T10.4 | Orphaned resources keep billing after a demo | D | Everything created by Terraform, tagged, and removed by `terraform destroy`; a billing check after each teardown; budget alerts on the account | `aws` |
-| T10.5 | Containers run as root or with writable root filesystems | E | Non root users, read only root filesystem where the runtime allows, dropped capabilities, resource limits | `aws` |
+| T10.5 | Containers run as root or with writable root filesystems | E | Non root users, read only root filesystem where the runtime allows, dropped capabilities, resource limits. Locally today the ingest container runs as the distroless `nonroot` user with a read only root filesystem, all capabilities dropped, and `no-new-privileges`; the Kafka container runs as its image's non root user. Compose memory and process limits are set once the local memory budget has been measured | `aws` |
 
 ### 6.11 CI and supply chain
 
@@ -207,7 +209,7 @@ The assistant reads three kinds of untrusted text: the user's question, retrieve
 | T11.1 | A pull request from a fork reads secrets or spends the OpenAI key through the eval job | I, D | Secret using jobs run only on trusted events; no `pull_request_target` workflow checks out untrusted code | `ci` |
 | T11.2 | A compromised third party GitHub Action | T, E | Actions pinned to a full commit SHA; workflow token permissions set to least privilege | `ci` |
 | T11.3 | A vulnerable or malicious dependency | T, E | Dependency update and vulnerability alerts enabled for Go modules, Maven or Gradle, and npm; lockfiles committed; new dependencies reviewed before merge | `ci`, `all` |
-| T11.4 | A vulnerable base image | T, E | Minimal, pinned base images scanned in CI before push | `ci` |
+| T11.4 | A vulnerable base image | T, E | Minimal, pinned base images scanned in CI before push. Today the ingest build and runtime images and the Kafka image are pinned by digest, in Compose and in the Kafka integration test; image scanning arrives with CI | `ci` |
 
 ### 6.12 The public repository
 
@@ -243,6 +245,17 @@ These are decided in ADRs before the affected component is built.
 5. **Atlas network access** for a cluster whose egress addresses change each time it is recreated.
 6. **CDM test fixtures**: how CDM handling is tested without committing raw CDM content.
 7. **GraphQL introspection** in the demo environment.
+
+### Deferred and open items in the built code
+
+These are known gaps in the `ingest` service and the local Compose stack as they stand today, each with the point at which it is handled.
+
+| Item | Threat | Handled |
+|---|---|---|
+| `/readyz` returns raw dependency errors and a prefix of CelesTrak's error body | T1.8 | Before the first cloud deployment: status words only in the response, details in logs, and no public Service or ingress for the port |
+| Full request URLs, query strings included, are logged and stored as `source_url` | T1.5 | When the DONKI poller is added: the api.nasa.gov key is redacted from `source_url`, logs, and dead letter reasons, with a test |
+| No check that mean motion is positive or that an epoch is plausible | T1.3 | In the risk engine, before propagation (SEC-RSK-01) |
+| No Compose memory or process limits on the ingest and Kafka containers, and no dropped capabilities or `no-new-privileges` on the Kafka container | T10.5 | When the local memory budget is measured |
 
 ## 9. When this document changes
 

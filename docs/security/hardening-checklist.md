@@ -2,7 +2,7 @@
 
 Every pull request is checked against the items whose tags match the parts of the system it touches. Items tagged `all` apply to every pull request. Each item is written so it can be answered yes or no by reading the diff, running a command, or inspecting configuration. The reasoning behind each item is in the [threat model](threat-model.md); the IDs in brackets point to the threat it addresses.
 
-Items marked **(to be verified)** depend on a tool, library, or provider behavior that I have not yet confirmed against its documentation. The exact tool or setting is chosen and linked when the component it belongs to is built, and the mark is removed then.
+Items marked **(to be verified)** depend on a tool, library, or provider behavior that I have not yet confirmed against its documentation. The exact tool or setting is chosen and linked when the component it belongs to is built, and the mark is removed then. Known gaps in the code built so far, and when each is handled, are listed in the threat model's [deferred and open items](threat-model.md#deferred-and-open-items-in-the-built-code).
 
 ## Tags
 
@@ -38,12 +38,17 @@ Items marked **(to be verified)** depend on a tool, library, or provider behavio
 - [ ] `SEC-ING-02` Response bodies are read through a size limit, with the limit per feed stated in code. [T1.1]
 - [ ] `SEC-ING-03` TLS certificate verification is never disabled, including in tests that hit real endpoints. [T1.7]
 - [ ] `SEC-ING-04` Redirects are either disabled or restricted to a per feed host allowlist. [T1.7]
-- [ ] `SEC-ING-05` Each poller has its own rate limiter and exponential backoff with jitter, and its interval is linked to the provider's published guidance in `docs/source/` **(guidance per provider to be verified)**. [T1.4]
-- [ ] `SEC-ING-06` Requests send the identifying header and contact information the provider asks for, if it asks **(to be verified per provider)**. [T1.4]
+- [ ] `SEC-ING-05` Each poller has its own interval and exponential backoff with jitter, and its interval is linked to the provider's published guidance in `docs/source/`. CelesTrak's guidance is verified in [docs/source/celestrak.md](../source/celestrak.md) and applied by [ADR 0004](../adr/0004-celestrak-polling-and-error-handling.md); SWPC, DONKI, and Space-Track guidance **(to be verified)** when each poller is added. [T1.4]
+- [ ] `SEC-ING-06` Requests send the identifying header and contact information the provider asks for, if it asks. CelesTrak's documentation does not ask for one ([docs/source/celestrak.md](../source/celestrak.md)), and ingest sends a descriptive `User-Agent` regardless; other providers **(to be verified)** when each poller is added. [T1.4]
 - [ ] `SEC-ING-07` Payloads failing validation go to the matching `.dlq` topic with a reason, and are never silently dropped. [T1.1]
-- [ ] `SEC-ING-08` Numeric fields are range checked (epochs, orbital elements, Kp, flux values) before publish, with bounds cited in `docs/risk/` or `docs/source/`. [T1.3]
-- [ ] `SEC-ING-09` Feed credentials (api.nasa.gov key, Space-Track login) are read from the environment at startup and never logged, including in failed request logs. [T1.5, T1.6]
+- [ ] `SEC-ING-08` Numeric fields are range checked (epochs, orbital elements, Kp, flux values) before publish, with bounds cited in `docs/risk/`, `docs/source/`, or `docs/data/`. A check the producer cannot make from a cited bound is named, with the consumer that makes it (for GP data, positive mean motion and plausible epochs are checked in the risk engine under `SEC-RSK-01`). [T1.3]
+- [ ] `SEC-ING-09` Feed credentials (api.nasa.gov key, Space-Track login) are read from the environment at startup and never logged, including in failed request logs, and a key sent as a query parameter is redacted from `source_url` and dead letter reasons, with a test. [T1.5, T1.6]
 - [ ] `SEC-ING-10` No Space-Track code lands before the ADR summarizing its user agreement exists. [T1.6]
+- [ ] `SEC-ING-11` A provider base URL from configuration is checked at startup against the provider's one allowed scheme and host, and the service refuses to start otherwise. [T1.7]
+- [ ] `SEC-ING-12` Every record and every dead letter published has a stated byte cap that holds after encoding and stays under the Kafka client's record limit, with a test using a payload that expands when encoded. [T1.1, T2.2]
+- [ ] `SEC-ING-13` Dead letters are validated against the dead letter schema before publish. [T1.1]
+- [ ] `SEC-ING-14` Health and readiness endpoints listen on loopback by default, are published by Compose only on `127.0.0.1`, set header read, write, and idle timeouts and a header size cap, and send `X-Content-Type-Options: nosniff`. [T1.8]
+- [ ] `SEC-ING-15` Before the first cloud deployment, readiness responses carry status words only, with error detail kept in logs, and health ports have no public Service or ingress route. [T1.8, T5.5]
 
 ## kafka
 
@@ -56,7 +61,7 @@ Items marked **(to be verified)** depend on a tool, library, or provider behavio
 
 ## risk-engine
 
-- [ ] `SEC-RSK-01` Orbital elements are validated before propagation, and a test covers rejection of out of range elements. [T3.1]
+- [ ] `SEC-RSK-01` Orbital elements are validated before propagation, including a positive mean motion and an epoch within a plausible window of the current time, and a test covers rejection of out of range elements. [T3.1, T1.3]
 - [ ] `SEC-RSK-02` Propagation and screening per event have a time budget, and exceeding it is logged and counted. [T3.1]
 - [ ] `SEC-RSK-03` Every alert carries the IDs and epochs of the events that produced it. [T3.2]
 
@@ -126,7 +131,7 @@ Items marked **(to be verified)** depend on a tool, library, or provider behavio
 
 ## secrets
 
-- [ ] `SEC-SEC-01` `.env` and its variants are git ignored, `.env.example` contains placeholders only, and `.dockerignore` excludes `.env`. [T9.1]
+- [ ] `SEC-SEC-01` `.env` and its variants are git ignored, `.env.example` contains placeholders only, and `.dockerignore` excludes `.env`, `.env.*`, and private key files at any depth, not only at the root. [T9.1]
 - [ ] `SEC-SEC-02` No secret is passed as a Docker build argument or copied into an image layer. [T9.2]
 - [ ] `SEC-SEC-03` In EKS, secrets come from AWS Secrets Manager through the chosen sync mechanism, not from values in manifests or Helm values files **(mechanism to be verified)**. [T9.4]
 - [ ] `SEC-SEC-04` Each service has its own Kubernetes service account, and RBAC lets it read only its own secrets. [T9.4]
@@ -143,7 +148,7 @@ Items marked **(to be verified)** depend on a tool, library, or provider behavio
 - [ ] `SEC-AWS-05` Terraform state is not committed; if remote state is used, its bucket blocks public access, is encrypted, and is versioned. [T9.5]
 - [ ] `SEC-AWS-06` Secret values are not stored as plain Terraform variables or outputs; any secret that passes through Terraform is marked sensitive, and what that marking does and does not protect is checked **(to be verified)**. [T9.5]
 - [ ] `SEC-AWS-07` Budget alerts are configured on the account, and after each `terraform destroy` the billing console is checked for remaining resources. [T10.4]
-- [ ] `SEC-AWS-08` Containers run as a non root user, drop all Linux capabilities not needed, set resource requests and limits, and use a read only root filesystem where the runtime allows. [T10.5]
+- [ ] `SEC-AWS-08` Containers run as a non root user, drop all Linux capabilities not needed, set resource requests and limits, and use a read only root filesystem where the runtime allows. The same applies to local Compose services, with memory and process limits added once the local memory budget is measured. [T10.5]
 - [ ] `SEC-AWS-09` Only the dashboard, `query-api`, and (if the ADR allows it) the assistant are reachable through ingress; Kafka, databases, the MCP tool server, Prometheus, and Grafana are not. [T2.1, T8.4, T13.2]
 
 ## ci
