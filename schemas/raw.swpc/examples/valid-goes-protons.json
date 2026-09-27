@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "source": "swpc",
+  "product": "swpc.goes.protons",
+  "fetched_at": "2026-09-27T16:30:37Z",
+  "source_url": "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-6-hour.json",
+  "record": {"time_tag": "2026-09-27T10:30:00Z", "satellite": 18, "flux": 0.3076002597808838, "energy": ">=1 MeV"}
+}

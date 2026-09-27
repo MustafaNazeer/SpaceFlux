@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/MustafaNazeer/SpaceFlux/schemas/raw.swpc/v1.schema.json",
+  "title": "raw.swpc event, version 1",
+  "description": "One record from a NOAA SWPC JSON product, as published by ingest to the raw.swpc topic. The Kafka record key is the product field. The record schema applied depends on product. See docs/data/topics.md.",
+  "type": "object",
+  "required": ["schema_version", "source", "product", "fetched_at", "source_url", "record"],
+  "properties": {
+    "schema_version": {
+      "description": "Major version of this contract. Always 1 for events written against this file.",
+      "type": "integer",
+      "const": 1
+    },
+    "source": {
+      "description": "Provider the record came from.",
+      "type": "string",
+      "const": "swpc"
+    },
+    "product": {
+      "description": "Fixed identifier of the polled SWPC file, also used as the Kafka record key. swpc.kp: products/noaa-planetary-k-index.json. swpc.goes.xrays: json/goes/primary/xrays-6-hour.json. swpc.goes.protons: json/goes/primary/integral-protons-6-hour.json. swpc.alerts: products/alerts.json.",
+      "type": "string",
+      "enum": ["swpc.kp", "swpc.goes.xrays", "swpc.goes.protons", "swpc.alerts"]
+    },
+    "fetched_at": {
+      "description": "RFC 3339 UTC time at which ingest received the HTTP response carrying this record. Always ends in Z. The pattern enforces the shape because format is only an annotation by default in draft 2020-12.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
+    },
+    "source_url": {
+      "description": "The exact URL ingest requested.",
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "record": {
+      "description": "One element of the JSON array SWPC returned, with SWPC's own key names and JSON types, copied without transformation. Its schema is selected by product below.",
+      "type": "object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"product": {"const": "swpc.kp"}}, "required": ["product"]},
+      "then": {"properties": {"record": {"$ref": "#/$defs/kp"}}}
+    },
+    {
+      "if": {"properties": {"product": {"const": "swpc.goes.xrays"}}, "required": ["product"]},
+      "then": {"properties": {"record": {"$ref": "#/$defs/goesXrays"}}}
+    },
+    {
+      "if": {"properties": {"product": {"const": "swpc.goes.protons"}}, "required": ["product"]},
+      "then": {"properties": {"record": {"$ref": "#/$defs/goesProtons"}}}
+    },
+    {
+      "if": {"properties": {"product": {"const": "swpc.alerts"}}, "required": ["product"]},
+      "then": {"properties": {"record": {"$ref": "#/$defs/alert"}}}
+    }
+  ],
+  "$defs": {
+    "kp": {
+      "description": "One 3 hour planetary Kp estimate. Required: time_tag (dedupe identity and time of the value) and Kp (the value the G scale is read from). Additional properties are allowed so that a key added by SWPC does not dead letter every record.",
+      "type": "object",
+      "required": ["time_tag", "Kp"],
+      "properties": {
+        "time_tag": {
+          "description": "Time of the 3 hour value. Observed with no time zone designator and no fractional seconds; SWPC does not state the time zone. The pattern matches the observed form only.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$"
+        },
+        "Kp": {
+          "description": "Estimated planetary Kp index. The key has a capital K in this file. Written with two decimals, for example 1.33, and typed as any JSON number. No range is enforced because SWPC publishes none for this file.",
+          "type": "number"
+        },
+        "a_running": {
+          "description": "Observed as an integer.",
+          "type": "integer"
+        },
+        "station_count": {
+          "description": "Observed as an integer, 8 in every recorded value.",
+          "type": "integer"
+        }
+      },
+      "additionalProperties": true
+    },
+    "goesXrays": {
+      "description": "One 1 minute GOES X-ray flux value for one satellite and one passband. Required: time_tag, satellite and energy (together the dedupe identity; energy also selects the 0.1-0.8nm band the R scale is defined on) and flux and observed_flux (SWPC does not say which of the two the R scale is read from, so both are required until that is settled). Additional properties are allowed so that a key added by SWPC does not dead letter every record.",
+      "type": "object",
+      "required": ["time_tag", "satellite", "energy", "flux", "observed_flux"],
+      "properties": {
+        "time_tag": {
+          "description": "Time of the 1 minute average, UTC. Observed with a Z suffix and no fractional seconds. The pattern matches the observed form only.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "satellite": {
+          "description": "GOES satellite number, for example 18. Part of the identity because SWPC switches the primary satellite.",
+          "type": "integer"
+        },
+        "energy": {
+          "description": "Passband, observed as 0.05-0.4nm or 0.1-0.8nm. Not enumerated, so that a new band does not dead letter every record.",
+          "type": "string"
+        },
+        "flux": {
+          "description": "X-ray flux. SWPC's product page does not explain how it differs from observed_flux.",
+          "type": "number"
+        },
+        "observed_flux": {
+          "description": "X-ray flux. SWPC's product page does not explain how it differs from flux.",
+          "type": "number"
+        },
+        "electron_correction": {
+          "description": "Observed as a number. SWPC's product page does not explain it.",
+          "type": "number"
+        },
+        "electron_contaminaton": {
+          "description": "Observed as a boolean. The key is misspelled this way in SWPC's data and is kept as sent.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "goesProtons": {
+      "description": "One 5 minute GOES integral proton flux value for one satellite and one energy threshold. Required: time_tag, satellite and energy (together the dedupe identity; energy also selects the >=10 MeV series the S scale is defined on) and flux (the value the S scale is read from). Additional properties are allowed so that a key added by SWPC does not dead letter every record.",
+      "type": "object",
+      "required": ["time_tag", "satellite", "energy", "flux"],
+      "properties": {
+        "time_tag": {
+          "description": "Time of the 5 minute average, UTC. Observed with a Z suffix and no fractional seconds. The pattern matches the observed form only.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+        },
+        "satellite": {
+          "description": "GOES satellite number, for example 18. Part of the identity because SWPC switches the primary satellite.",
+          "type": "integer"
+        },
+        "energy": {
+          "description": "Integral energy threshold, observed as one of >=1, >=5, >=10, >=30, >=50, >=60, >=100 and >=500 MeV, written for example as >=10 MeV. Not enumerated, so that a new threshold does not dead letter every record.",
+          "type": "string"
+        },
+        "flux": {
+          "description": "Integral proton flux, protons/(cm2 s sr) per SWPC's product page.",
+          "type": "number"
+        }
+      },
+      "additionalProperties": true
+    },
+    "alert": {
+      "description": "One SWPC alert, watch, warning or summary message. Required: product_id and issue_datetime (together the dedupe identity) and message (the only content of the record; without it the event carries nothing to act on). Additional properties are allowed so that a key added by SWPC does not dead letter every record.",
+      "type": "object",
+      "required": ["product_id", "issue_datetime", "message"],
+      "properties": {
+        "product_id": {
+          "description": "Message type, for example K04W. Not unique per message, so it is not the Kafka key and not an identity on its own.",
+          "type": "string"
+        },
+        "issue_datetime": {
+          "description": "Issue time. Observed with a space instead of T, three fractional digits and no time zone designator, for example 2026-09-27 05:02:04.940. The pattern matches the observed form only.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}$"
+        },
+        "message": {
+          "description": "Free text message as issued, with both CRLF and LF line breaks. Untrusted input for every downstream consumer.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
