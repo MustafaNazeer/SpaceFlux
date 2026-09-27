@@ -28,7 +28,7 @@ Designed around data from CelesTrak, NOAA SWPC, and NASA DONKI, which are public
 
 Supporting pieces: Kafka topics with dead letter topics, MySQL with Flyway migrations for the catalog and alerts, MongoDB Atlas for raw documents and vector search, OpenTelemetry tracing across Kafka, Prometheus and Grafana, Terraform for an on demand AWS environment (EKS, ECR, Secrets Manager), and GitHub Actions for CI.
 
-The full design, including why each service scales differently and how delivery, errors, and security are handled, is in [docs/architecture.md](docs/architecture.md). Decisions with lasting weight will be recorded as ADRs under `docs/adr/` as they are made.
+The full design, including why each service scales differently and how delivery, errors, and security are handled, is in [docs/architecture.md](docs/architecture.md). Decisions with lasting weight are recorded as ADRs in [docs/adr/](docs/adr/).
 
 ## Planned
 

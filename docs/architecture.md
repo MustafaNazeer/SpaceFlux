@@ -41,12 +41,12 @@ Each service is bounded by a different resource, which is the reason they are sp
 
 The archiver starts inside `query-api` to keep the local memory footprint small. Splitting it into its own deployable is a decision to revisit only if measured consumer lag justifies it.
 
-Language, framework, and broker versions are pinned when each component is introduced, after checking current stable releases.
+The repository layout and the Maven multi-module build for the Java services are described in [ADR 0001](adr/0001-repo-layout-and-build-tool.md). Language, framework, and broker versions are pinned when each component is introduced, after checking current stable releases.
 
 ## Topics and contracts
 
 * **Topics:** `raw.gp` (orbital elements), `raw.swpc` (space weather products), `raw.donki` (space weather event reports), `raw.cdm` (conjunction data messages), and `alerts`. Each has a matching `.dlq` dead letter topic.
-* **Schemas:** events are versioned JSON with one schema per topic, validated at the producer and again at the consumer. Whether schemas live in a schema registry or as JSON Schema files in the repo is to be decided.
+* **Schemas:** events are versioned JSON with one schema per topic, validated at the producer and again at the consumer. Schemas are JSON Schema files in the repository, with compatibility checked in CI; see [ADR 0002](adr/0002-event-schemas-and-serialization.md).
 * **Keys:** the NORAD catalog ID for orbital data and the feed's product ID for space weather data. Events with the same key are written to the same partition, and Kafka guarantees a consumer reads a partition in the order it was written, so events for one object are processed in order as long as the partition count stays fixed (adding partitions remaps keys), the producer keeps idempotence enabled (the default unless conflicting settings are made), and each consumer handles a partition's events one at a time.
 
 ## Delivery semantics
