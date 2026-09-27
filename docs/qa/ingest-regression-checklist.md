@@ -358,11 +358,11 @@ One row per check per run. A check is passed only when someone has run it and re
 
 | Date (UTC) | Commit | Check | Result | Notes |
 |---|---|---|---|---|
-| | | C1 | not yet run | |
-| | | C2 | not yet run | |
-| | | C3 | not yet run | |
-| | | C4 | not yet run | |
-| | | C5 | not yet run | |
-| | | C6 | not yet run | |
-| | | C7 | not yet run | |
-| | | C8 | not yet run | |
+| 2026-09-27 | eaa6f65 | C1 | passed | kafka running, topics exited 0, ingest running, `INGEST_FEEDS=swpc` |
+| 2026-09-27 | eaa6f65 | C2 | passed | `/healthz` 200 alive; `/readyz` 200 with kafka ok, publish ok, four SWPC products running, no celestrak field |
+| 2026-09-27 | eaa6f65 | C3 | passed | since start: kp 62, xrays 716, protons 568, alerts 68; unknown 0, invalid 0, key differs 0, duplicates 0 |
+| 2026-09-27 | eaa6f65 | C4 | passed | 3 polls per product, shortest gaps 300.1 s each, 0 warnings or errors |
+| 2026-09-27 | eaa6f65 | C5 | passed | 0 dead letters on `raw.swpc.dlq` since start |
+| 2026-09-27 | eaa6f65 | C6 | passed | 360 s run: kafka max 578.4 MiB of 1024, ingest max 10.7 MiB of 128, no swap, OOMKilled false for both |
+| 2026-09-27 | eaa6f65 | C7 | passed | `exit=0 oom=false`, last log line `shutting down` |
+| 2026-09-27 | eaa6f65 | C8 | passed | run at 20:21:43Z with `INGEST_FEEDS=celestrak,swpc`: `/readyz` shows celestrak running with the four SWPC products, 1 CelesTrak fetch (20:22:05Z), 22 events since start, invalid 0, key differs 0, 0 dead letters on `raw.gp.dlq` |
