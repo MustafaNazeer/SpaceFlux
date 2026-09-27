@@ -37,7 +37,7 @@ type Product struct {
 }
 
 var Products = []Product{
-	{ID: "swpc.kp", Path: "/products/noaa-planetary-k-index.json", identity: []string{"time_tag"}},
+	{ID: "swpc.kp", Path: "/products/noaa-planetary-k-index.json", identity: []string{"time_tag", "Kp"}},
 	{ID: "swpc.goes.xrays", Path: "/json/goes/primary/xrays-6-hour.json", identity: []string{"time_tag", "satellite", "energy"}},
 	{ID: "swpc.goes.protons", Path: "/json/goes/primary/integral-protons-6-hour.json", identity: []string{"time_tag", "satellite", "energy"}},
 	{ID: "swpc.alerts", Path: "/products/alerts.json", identity: []string{"product_id", "issue_datetime"}, allowEmpty: true},

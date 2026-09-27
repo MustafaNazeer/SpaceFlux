@@ -195,6 +195,6 @@ Solar wind is useful context but drives no NOAA scale; if it is wanted, the two 
 ## Open questions this note cannot settle
 
 * The time zone of time tags without a `Z` (Kp files, RTSW files, `issue_datetime`) is not stated in the data. The alert text says UTC and agrees with `issue_datetime` in the sample, so UTC is the likely reading for alerts; for the Kp and RTSW files it is unconfirmed.
-* Whether SWPC revises an already published 3 hour Kp value is not stated. If it does, dedupe on `time_tag` alone would drop the revision.
+* Whether SWPC revises an already published 3 hour Kp value is not stated. If it does, dedupe on `time_tag` alone would drop the revision, which is why ingest identifies Kp records by (`time_tag`, `Kp`) ([ADR 0006](../adr/0006-kp-record-identity.md)).
 * Which X-ray value (`flux` or `observed_flux`) the R scale should be read from is not explained on W3.
 * Conditional requests were tested only with `If-None-Match` against unchanged files at the CloudFront edge; behavior at the origin, and for `If-Modified-Since`, is not documented or tested.

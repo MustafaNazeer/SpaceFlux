@@ -278,6 +278,36 @@ func TestGOESPrimarySwitchPublishesBothSatellites(t *testing.T) {
 	}
 }
 
+func TestKpRevisionUnderTheSameTimeTagIsRepublished(t *testing.T) {
+	first := `{"time_tag": "2026-09-20T00:00:00", "Kp": 4.33, "a_running": 32, "station_count": 8}`
+	revised := strings.Replace(first, `"Kp": 4.33`, `"Kp": 4.67`, 1)
+	pub := &fakePublisher{}
+	p := newProcessor(t, "swpc.kp", pub)
+	for _, rec := range []string{first, revised} {
+		if err := p.Process(context.Background(), []byte("["+rec+"]"), fetchedAt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := len(pub.byTopic(TopicRawSWPC)); n != 2 {
+		t.Fatalf("published %d, want 2: a revised Kp value must reach consumers", n)
+	}
+}
+
+func TestKpStationCountChangeAloneIsNotRepublished(t *testing.T) {
+	first := `{"time_tag": "2026-09-20T00:00:00", "Kp": 4.33, "a_running": 32, "station_count": 7}`
+	more := strings.Replace(first, `"station_count": 7`, `"station_count": 8`, 1)
+	pub := &fakePublisher{}
+	p := newProcessor(t, "swpc.kp", pub)
+	for _, rec := range []string{first, more} {
+		if err := p.Process(context.Background(), []byte("["+rec+"]"), fetchedAt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := len(pub.byTopic(TopicRawSWPC)); n != 1 {
+		t.Fatalf("published %d, want 1: station_count is not part of the identity", n)
+	}
+}
+
 func TestDuplicateIdentityWithinOneResponsePublishedOnce(t *testing.T) {
 	rec := `{"time_tag": "2026-09-20T00:00:00", "Kp": 2.33, "a_running": 9, "station_count": 8}`
 	pub := &fakePublisher{}

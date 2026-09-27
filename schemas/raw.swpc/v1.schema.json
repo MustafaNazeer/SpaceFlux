@@ -58,7 +58,7 @@
   ],
   "$defs": {
     "kp": {
-      "description": "One 3 hour planetary Kp estimate. Required: time_tag (dedupe identity and time of the value) and Kp (the value the G scale is read from). Additional properties are allowed so that a key added by SWPC does not dead letter every record.",
+      "description": "One 3 hour planetary Kp estimate. Required: time_tag (the time of the value) and Kp (the value the G scale is read from); together they are the dedupe identity. Additional properties are allowed so that a key added by SWPC does not dead letter every record.",
       "type": "object",
       "required": ["time_tag", "Kp"],
       "properties": {

@@ -1,6 +1,6 @@
 # ADR 0005: SWPC products, polling interval, and error handling
 
-* **Status:** accepted
+* **Status:** accepted; the `swpc.kp` identity in decision 4 is superseded by [ADR 0006](0006-kp-record-identity.md)
 * **Date:** 2026-09-27
 
 ## Context
