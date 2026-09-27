@@ -27,8 +27,16 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_LOG_DIRS: /var/lib/kafka/data
+      # The image default is a 1 GiB heap; the measured live heap was about
+      # 178 MiB (docs/perf/local-memory.md).
+      KAFKA_HEAP_OPTS: "-Xmx512m -Xms512m"
     volumes:
       - kafka-data:/var/lib/kafka/data
+    mem_limit: 1g
+    memswap_limit: 1g
+    pids_limit: 512
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     healthcheck:
       test: ["CMD", "/opt/kafka/bin/kafka-broker-api-versions.sh", "--bootstrap-server", "kafka:19092"]
       interval: 10s
@@ -46,7 +54,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        for t in raw.gp raw.gp.dlq; do
+        for t in raw.gp raw.gp.dlq raw.swpc raw.swpc.dlq; do
           /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --if-not-exists --topic "$$t" --partitions 1 --replication-factor 1 || exit 1
         done
     restart: "no"
@@ -61,8 +69,13 @@ services:
         condition: service_completed_successfully
     environment:
       KAFKA_BROKERS: kafka:19092
+      # Set INGEST_FEEDS=swpc to restart without a new CelesTrak request.
+      INGEST_FEEDS: ${INGEST_FEEDS:-celestrak,swpc}
     ports:
       - "127.0.0.1:8080:8080"
+    mem_limit: 128m
+    memswap_limit: 128m
+    pids_limit: 64
     read_only: true
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]

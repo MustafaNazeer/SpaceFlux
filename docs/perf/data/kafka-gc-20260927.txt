@@ -1,0 +1,11 @@
+# Kafka broker GC log excerpt (apache/kafka:4.3.1, KAFKA_HEAP_OPTS=-Xmx512m -Xms512m)
+# Command: docker exec spaceflux-kafka-1 sh -c 'grep -E "Heap (Initial|Max) Capacity|Pause Young.*->" /opt/kafka/logs/kafkaServer-gc.log'
+# Captured 2026-09-27; each Pause Young line shows heap before->after the collection (committed size).
+[2026-09-27T17:05:44.801+0000][gc,init] Heap Initial Capacity: 512M
+[2026-09-27T17:05:44.801+0000][gc,init] Heap Max Capacity: 512M
+[2026-09-27T17:05:46.740+0000][gc          ] GC(0) Pause Young (Allocation Failure) 137M->23M(494M) 50.592ms
+[2026-09-27T17:05:48.193+0000][gc          ] GC(1) Pause Young (Allocation Failure) 98M->30M(494M) 43.063ms
+[2026-09-27T17:05:48.308+0000][gc          ] GC(2) Pause Young (Allocation Failure) 167M->158M(494M) 76.636ms
+[2026-09-27T17:12:00.173+0000][gc          ] GC(3) Pause Young (Allocation Failure) 295M->162M(494M) 50.328ms
+[2026-09-27T17:24:23.616+0000][gc          ] GC(4) Pause Young (Allocation Failure) 298M->171M(494M) 93.082ms
+[2026-09-27T17:34:18.547+0000][gc          ] GC(5) Pause Young (Allocation Failure) 308M->172M(494M) 21.254ms

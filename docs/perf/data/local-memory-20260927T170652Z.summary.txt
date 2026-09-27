@@ -1,0 +1,49 @@
+spaceflux memory summary
+samples file: local-memory-20260927T170652Z.tsv
+window: duration 360s, interval 5s, ended 2026-09-27T17:12:59Z
+source: cgroup v2 files; usage = memory.current - inactive_file (the docker stats figure)
+
+host
+  kernel: 6.17.0-41-generic
+  docker: 29.1.3
+  cgroup: v2 driver systemd
+  memory: total 7.1Gi, swap 11Gi
+
+containers
+  spaceflux-ingest-1
+    image: spaceflux-ingest id sha256:69cf2fb706f55c1ff456d58767b1ab6febbba2f640038d9b6614e378ae59d089
+    started: 2026-09-27T17:06:05.992848441Z
+    limits: mem_limit 134217728 (0 is none), pids_limit 64
+    env: INGEST_FEEDS=swpc
+    memory.peak since container start: 15.3 MiB (includes page cache)
+  spaceflux-kafka-1
+    image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837 id sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+    started: 2026-09-27T17:05:42.081717863Z
+    limits: mem_limit 1073741824 (0 is none), pids_limit 512
+    env: KAFKA_HEAP_OPTS=-Xmx512m -Xms512m
+    memory.peak since container start: 612.2 MiB (includes page cache)
+
+per series over the window (MiB; pids as counts)
+  usage is memory.current minus inactive_file; usage+swap adds memory.swap.current
+  (for _host_used, the swap column is host swap in use)
+  series                    n       min    median       max  swap_max   u+s_med   u+s_max  max_pids
+  _containers_total        71     424.0     448.8     557.6       0.0     448.8     557.6         -
+  _host_available          71    2869.0    3051.0    3303.4       0.0    3051.0    3303.4         -
+  _host_used               71    3993.1    4245.5    4427.5    2657.4    6688.9    6991.3         -
+  spaceflux-ingest-1       71       7.7      11.4      13.6       0.0      11.4      13.6        10
+  spaceflux-kafka-1        71     413.5     436.4     546.2       0.0     436.4     546.2       129
+
+network bytes received per container over the window (poll evidence)
+  spaceflux-ingest-1 rx delta 87914 bytes
+  spaceflux-kafka-1 rx delta 15011 bytes
+  intervals where a container received more than 10 KiB:
+    17:07:15Z spaceflux-ingest-1 +10693 bytes
+    17:07:15Z spaceflux-kafka-1 +10552 bytes
+    17:11:19Z spaceflux-ingest-1 +73432 bytes
+
+cross check at 2026-09-27T17:06:52Z: cgroup usage read before and after docker stats
+  spaceflux-ingest-1 cgroup_before=11.39MiB docker_stats=11.39MiB / 128MiB cgroup_after=11.39MiB
+  spaceflux-kafka-1 cgroup_before=416.70MiB docker_stats=526.1MiB / 1GiB cgroup_after=525.70MiB
+cross check at 2026-09-27T17:12:56Z: cgroup usage read before and after docker stats
+  spaceflux-ingest-1 cgroup_before=13.34MiB docker_stats=13.34MiB / 128MiB cgroup_after=13.34MiB
+  spaceflux-kafka-1 cgroup_before=523.80MiB docker_stats=439.5MiB / 1GiB cgroup_after=439.46MiB
