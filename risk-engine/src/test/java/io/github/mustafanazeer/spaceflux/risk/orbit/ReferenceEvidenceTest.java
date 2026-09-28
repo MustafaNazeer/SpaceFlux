@@ -139,6 +139,13 @@ class ReferenceEvidenceTest {
         }
         line("largest row error over the 28 agreeing cases: %.3f mm, %s", largestRow * 1000, largestAt);
 
+        ReferenceCases.Case c28872 = find(cases, 28872, 0);
+        TLEPropagator p28872 = TLEPropagator.selectExtrapolator(tle(c28872));
+        for (double days : new double[] {1, 30, 365, 7670}) {
+            line("28872 at %.0f days after epoch: Orekit radius %.1f km", days,
+                    p28872.getPVCoordinates(tle(c28872).getDate().shiftedBy(days * 86400)).getPosition().getNorm() / 1000);
+        }
+
         line("33333 at 25 min: Orekit position NaN %s", TLEPropagator.selectExtrapolator(tle(c33333))
                 .getPVCoordinates(tle(c33333).getDate().shiftedBy(25 * 60.0)).getPosition().isNaN());
 

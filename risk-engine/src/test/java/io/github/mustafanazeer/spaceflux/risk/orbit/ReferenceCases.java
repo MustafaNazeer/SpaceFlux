@@ -15,13 +15,13 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /** Reads the AIAA 2006-6753 verification files (see src/test/resources/sgp4/PROVENANCE.md). */
-final class ReferenceCases {
+public final class ReferenceCases {
 
-    record Row(double minutes, double[] positionKm, double[] velocityKmPerS) {
+    public record Row(double minutes, double[] positionKm, double[] velocityKmPerS) {
     }
 
-    record Case(String line1, String line2, List<Row> rows) {
-        int catalogNumber() {
+    public record Case(String line1, String line2, List<Row> rows) {
+        public int catalogNumber() {
             return Integer.parseInt(line1.substring(2, 7).trim());
         }
     }
@@ -29,7 +29,7 @@ final class ReferenceCases {
     private ReferenceCases() {
     }
 
-    static List<String> lines(String resource) throws IOException {
+    public static List<String> lines(String resource) throws IOException {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(
                 ReferenceCases.class.getResourceAsStream(resource), StandardCharsets.US_ASCII))) {
             return in.lines().map(String::stripTrailing).toList();
@@ -66,7 +66,7 @@ final class ReferenceCases {
         return blocks;
     }
 
-    static List<Case> published() throws IOException {
+    public static List<Case> published() throws IOException {
         List<String[]> sets = elementSets();
         List<List<Row>> blocks = results("/sgp4/tforverf.out");
         List<Integer> blockCatalogs = lines("/sgp4/tforverf.out").stream()
@@ -90,7 +90,7 @@ final class ReferenceCases {
      * The same element set as CelesTrak publishes it in GP JSON: text fields converted to numbers
      * exactly, with the epoch day fraction written out in full.
      */
-    static ObjectNode toGpJson(String line1, String line2) {
+    public static ObjectNode toGpJson(String line1, String line2) {
         ObjectNode gp = new ObjectMapper().createObjectNode();
         gp.put("NORAD_CAT_ID", Integer.parseInt(line1.substring(2, 7).trim()));
         gp.put("CLASSIFICATION_TYPE", line1.substring(7, 8));

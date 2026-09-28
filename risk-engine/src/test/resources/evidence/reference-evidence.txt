@@ -15,6 +15,10 @@
 11801 blank designator: launch year 2000 from text, 0 from GP JSON
 88888 blank designator: launch year 2000 from text, 0 from GP JSON
 largest row error over the 28 agreeing cases: 1.974 mm, 26900 at 9360.0 min
+28872 at 1 days after epoch: Orekit radius 6372.5 km
+28872 at 30 days after epoch: Orekit radius 3060.8 km
+28872 at 365 days after epoch: Orekit radius 52612.0 km
+28872 at 7670 days after epoch: Orekit radius 41431232.7 km
 33333 at 25 min: Orekit position NaN true
 16925 published rows: lowest 155.3 km at 840.0 min; last row 1440.0 min at 1424.9 km
 22312 published rows: lowest 70.5 km at 474.2028672 min; last row 474.2028672 min at 70.5 km
