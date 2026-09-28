@@ -13,6 +13,7 @@ The levels SpaceFlux computes are derived mechanically from one physical measure
 | W4 | SWPC, GOES Proton Flux product page | https://www.spaceweather.gov/products/goes-proton-flux |
 | W7 | NOAA Space Weather Scales table (PDF, dated "December 11, 2023"), linked from https://www.spaceweather.gov/noaa-scales-explanation | https://www.spaceweather.gov/sites/default/files/images/NOAAscales.pdf |
 | T1 | SWPC 3-Day Forecast text product, issue "2026 Sep 27 1230 UTC" (read 2026-09-27 about 20:33 UTC) | https://services.swpc.noaa.gov/text/3-day-forecast.txt |
+| T2 | Earlier issues of the same SWPC 3-Day Forecast product, as captured by the Internet Archive (listed in Section 1.2); unmodified copies with provenance are kept in [risk-engine/src/test/resources/swpc-kp-labels](../../risk-engine/src/test/resources/swpc-kp-labels/PROVENANCE.md) | https://web.archive.org/web/2024*/https://services.swpc.noaa.gov/text/3-day-forecast.txt |
 | X1 | Machol, Mothersbaugh, Lucas, Mahon, "User's Guide for GOES-R XRS L2 Products", NOAA NCEI, 15 December 2025 | https://data.ngdc.noaa.gov/platforms/solar-space-observing-satellites/goes/goes16/l2/docs/GOES-R_XRS_L2_Data_Users_Guide.pdf |
 | X2 | Machol, Mothersbaugh, Lucas, Mahon, "Readme for GOES-R XRS L2 Data", NOAA NCEI, 15 December 2025 | https://data.ngdc.noaa.gov/platforms/solar-space-observing-satellites/goes/goes16/l2/docs/GOES-R_XRS_L2_Data_ReadMe.pdf |
 | F | Recorded SWPC fixtures in this repository, captured 2026-09-27T16:30:37Z, with provenance in `ingest/testdata/swpc/PROVENANCE.md` | [ingest/testdata/swpc](../../ingest/testdata/swpc/) |
@@ -27,7 +28,7 @@ Endpoints, shapes, and polling are documented in [docs/source/swpc.md](../source
 | R (radio blackouts) | `/json/goes/primary/xrays-6-hour.json` | `energy` equal to `"0.1-0.8nm"` | `flux` | W m⁻² | ≥ 1e-5 (M1) | ≥ 5e-5 (M5) | ≥ 1e-4 (X1) | ≥ 1e-3 (X10) | ≥ 2e-3 (X20) |
 | S (solar radiation storms) | `/json/goes/primary/integral-protons-6-hour.json` | `energy` equal to `">=10 MeV"` | `flux` | pfu, protons/(cm² s sr) | ≥ 10 | ≥ 100 | ≥ 1,000 | ≥ 10,000 | ≥ 100,000 |
 
-Below level 1 the derived level is "none". The G row applies the thirds reading in Section 1.2, which is a ruling on an ambiguity in the published table, not a direct quote.
+Below level 1 the derived level is "none". The G row applies the thirds reading in Section 1.2. The scale table itself leaves the thirds implicit, so the reading rests on SWPC's own labeling of decimal Kp values in its 3-Day Forecast product, quoted there.
 
 ## 1. G scale from planetary Kp
 
@@ -39,12 +40,20 @@ W7 lists the physical measure as "Kp values determined every 3 hours": G1 "Kp=5"
 
 Kp is reported in thirds, written with `-`, `o`, and `+` suffixes (W2 and W7 use "9-" and "9o"). **Observed:** every `Kp` value in the recorded fixture is a multiple of one third rounded to two decimals (the set is 0.0, 0.33, 0.67, 1.0, ..., 4.33), so 4.67 is "5-", 5.0 is "5o", and 5.33 is "5+".
 
-The table does not say directly whether "Kp=5" includes 5- (4.67). I read it as including it, for two reasons:
+The scale table does not say in words whether "Kp=5" includes 5- (4.67). SWPC's own products show that it does:
 
-1. W7 needs the words "including a 9-" to place 9- (8.67) in G4. That exception is only necessary if "Kp=9" would otherwise include 9-, which means "Kp=N" covers N-, No, and N+.
-2. **Observed:** SWPC issued "ALERT: Geomagnetic K-index of 4" (`ALTK04`) for "Synoptic Period: 2100-2400" on 2026 Sep 25 and for "Synoptic Period: 0000-0300" on 2026 Sep 25, and the recorded Kp for both intervals (`time_tag` 2026-09-25T21:00:00 and 2026-09-25T00:00:00) is 3.67, that is 4-. SWPC treated a 4- interval as reaching K 4. (Alerts are issued in real time, so this is supporting evidence, not proof: the real time estimate could have been higher than the final value.)
+1. **SWPC labels decimal Kp values with G levels in the 3-Day Forecast (T1, T2).** The product's "NOAA Kp index breakdown" table appends a G level to each 3 hour value that reaches the scale, and its summary lines state the level of the greatest value. Quoted from archived issues (accessed 2026-09-27):
+   * Issue "2024 Apr 16 1230 UTC" ([archive](https://web.archive.org/web/20240416212305/https://services.swpc.noaa.gov/text/3-day-forecast.txt), [copy](../../risk-engine/src/test/resources/swpc-kp-labels/3-day-forecast-20240416212305.txt)): "The greatest expected 3 hr Kp for Apr 16-Apr 18 2024 is 4.67 (NOAA Scale G1)", and the breakdown row "03-06UT ... 4.67 (G1)".
+   * Issue "2024 May 14 1230 UTC" ([archive](https://web.archive.org/web/20240514123452/https://services.swpc.noaa.gov/text/3-day-forecast.txt), [copy](../../risk-engine/src/test/resources/swpc-kp-labels/3-day-forecast-20240514123452.txt)): "is 5.67 (NOAA Scale G2)"; the breakdown shows "4.67 (G1)", "5.67 (G2)", and "4.33" with no label.
+   * Issue "2024 May 20 1230 UTC" ([archive](https://web.archive.org/web/20240520152328/https://services.swpc.noaa.gov/text/3-day-forecast.txt), [copy](../../risk-engine/src/test/resources/swpc-kp-labels/3-day-forecast-20240520152328.txt)): "is 6.67 (NOAA Scale G3)"; the breakdown shows "6.67 (G3)".
+   * Issue "2024 May 11 0030 UTC" ([archive](https://web.archive.org/web/20240511011540/https://services.swpc.noaa.gov/text/3-day-forecast.txt), [copy](../../risk-engine/src/test/resources/swpc-kp-labels/3-day-forecast-20240511011540.txt)): the breakdown shows "7.67 (G4)", "8.00 (G4)", "7.00 (G3)", and "4.33" with no label.
+   * Issue "2024 Sep 19 1240 UTC" ([archive](https://web.archive.org/web/20240919213019/https://services.swpc.noaa.gov/text/3-day-forecast.txt), [copy](../../risk-engine/src/test/resources/swpc-kp-labels/3-day-forecast-20240919213019.txt)): "The greatest observed 3 hr Kp over the past 24 hours was 4.67 (G1-Minor)."
 
-Consequences, all as the "≥" comparisons in the Summary table: G1 from 4.67, G2 from 5.67, G3 from 6.67, G4 from 7.67, and G5 only at 9.00, since W2 and W7 both put 9- in G4. Comparisons use a tolerance of 0.005 so that 4.67 compares equal to the 4.67 threshold regardless of floating point representation; the data carries two decimals.
+   Across the 96 distinct issues from 2024 Jan 1 to 2026 Jan 18 that the archive returned on 2026-09-27, every breakdown value followed the same rule with no exception: 4.33 and below carried no label, 4.67 to 5.33 carried G1, 5.67 to 6.33 G2, 6.67 to 7.00 G3, and 7.67 to 8.00 G4. No issue in that set contained 8.67 or 9.00.
+2. The 9- versus 9o split comes from the scale table and the Kp page directly. W2: "Kp = 8, 9- (G4) Kp = 9o (G5)". W7 needs the words "including a 9-" to place 9- (8.67) in G4, which is only necessary because "Kp=N" otherwise covers N-, No, and N+.
+3. **Observed, supporting only:** SWPC issued "ALERT: Geomagnetic K-index of 4" (`ALTK04`) for "Synoptic Period: 2100-2400" on 2026 Sep 25 and for "Synoptic Period: 0000-0300" on 2026 Sep 25, and the recorded Kp for both intervals (`time_tag` 2026-09-25T21:00:00 and 2026-09-25T00:00:00) is 3.67, that is 4-. This concerns K-index alerts rather than the G scale, and alerts are issued in real time from an estimate that can differ from the later value, so it is consistent with the reading but does not establish it.
+
+Consequences, all as the "≥" comparisons in the Summary table: G1 from 4.67, G2 from 5.67, G3 from 6.67, G4 from 7.67, and G5 only at 9.00. The G1 to G4 lower bounds are each shown directly by SWPC's forecast labels above. G5 at 9.00 only, with 8.67 in G4, rests on W2 and W7, since no archived issue in the set contained either value. Comparisons use a tolerance of 0.005 so that 4.67 compares equal to the 4.67 threshold regardless of floating point representation; the data carries two decimals.
 
 ### 1.3 Time zone and interval anchoring of `time_tag`
 
@@ -102,13 +111,24 @@ The comparisons are "≥". W4: "Initial ALERTS for ≥10 MeV and ≥100 MeV ener
 
 W4 also notes that "Because flux levels can drop slowly, the time of a 'confirmed' drop below threshold can sometimes take several hours to determine." SpaceFlux reports the level of each 5 minute value; it does not declare the end of an event.
 
-## 4. Missing and invalid data
+## 4. How a derived level is presented
+
+A derived level reads on the dashboard and in alerts like an official scale level unless the wording stops it. These rules apply to every surface that shows one:
+
+* **Name the source and the measurement, not a storm.** Write "G1 level from SWPC estimated Kp 4.67, 00 to 03 UTC", "R1 level from GOES-18 X-ray flux 1.2e-5 W m⁻² at 14:02 UTC", or "S1 level from GOES-18 ≥10 MeV proton flux 12 pfu at 14:05 UTC". Do not write "G1 storm in progress", "radio blackout", or "radiation storm warning": SWPC decides those with other physical measures too (the W7 footnote above), and SWPC issues its own alerts, watches, and warnings.
+* **Observed values only, no forecast.** A derived level describes a value SWPC has already published. It is not a watch or a warning, and it says nothing about the next interval. For forecasts and official notices, point to SWPC at https://www.spaceweather.gov.
+* **Kp is an estimate.** W2 calls it "The Estimated 3-hour Planetary Kp-index", and a value can change (Section 1.4); a G level can therefore change or disappear for the same interval, and the display says so rather than presenting it as final.
+* **Per sample, not per event.** R and S levels are per 1 minute and per 5 minute value. One sample at a threshold is shown as that sample, not as the start of an event, and SpaceFlux does not declare an event's end (Section 3.2).
+* **Keep the three states distinct.** "none" (valid value below level 1), "no data" (Section 5), and a level are shown differently, and "no data" is never shown as quiet.
+* **No safety of life or protective language.** No surface tells anyone to take or skip an action, calls conditions safe, or presents SpaceFlux as a space weather warning service. The effects listed in the NOAA scale table describe what SWPC associates with each level in general, not an assessment of any specific satellite, grid, or person, and are quoted as such if shown at all.
+
+## 5. Missing and invalid data
 
 * A gap is not a quiet period. When a product has no record for an interval (outages happen; see [docs/source/swpc.md](../source/swpc.md)), the derived level for that interval is "no data", never "none".
 * A value that is not finite, or is negative, is rejected with a reason and does not set a level.
 * The derived level is "none" only when a valid value exists and is below the level 1 threshold.
 
-## 5. Test data needed for the thresholds
+## 6. Test data needed for the thresholds
 
 Every recorded SWPC fixture is from a quiet period (the recorded Kp maximum is 4.33, the long band X-ray maximum is about 1.2e-6 W m⁻², and T1 reports solar radiation "below S-scale storm level thresholds"), so none of them exercises a threshold. Two kinds of test data are needed:
 

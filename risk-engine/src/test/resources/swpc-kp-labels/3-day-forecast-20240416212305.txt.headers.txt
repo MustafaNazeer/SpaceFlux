@@ -1,0 +1,48 @@
+HTTP/2 200 
+server: nginx
+date: Sun, 27 Sep 2026 23:12:03 GMT
+content-type: text/plain; charset=UTF-8
+content-length: 1843
+x-archive-orig-content-length: 1843
+x-archive-orig-connection: keep-alive
+x-archive-orig-server: Apache
+x-archive-orig-last-modified: Tue, 16 Apr 2024 12:30:15 GMT
+x-archive-orig-accept-ranges: bytes
+x-archive-orig-access-control-allow-origin: *
+x-archive-orig-access-control-allow-headers: origin, x-requested-with, content-type
+x-archive-orig-access-control-allow-methods: PUT, GET, POST, DELETE, OPTIONS
+x-archive-orig-strict-transport-security: max-age=31536000
+x-archive-orig-date: Tue, 16 Apr 2024 21:22:05 GMT
+x-archive-orig-expires: Tue, 16 Apr 2024 21:23:05 GMT
+x-archive-orig-cache-control: max-age=60
+x-archive-orig-etag: "733-61635e66943c0"
+x-archive-orig-vary: Accept-Encoding
+x-archive-orig-x-cache: Hit from cloudfront
+x-archive-orig-via: 1.1 a5facfe972c5950b095ce2b946902f9c.cloudfront.net (CloudFront)
+x-archive-orig-x-amz-cf-pop: YUL62-C1
+x-archive-orig-x-amz-cf-id: TEDdP2qqPTN0-hIL5wFDHrAlliF4adav9vgSEjRGHeP6LRdOvjC7DQ==
+x-archive-orig-age: 59
+cache-control: max-age=1800
+accept-ranges: bytes
+memento-datetime: Tue, 16 Apr 2024 21:23:05 GMT
+link: <https://services.swpc.noaa.gov/text/3-day-forecast.txt>; rel="original", <https://web.archive.org/web/timemap/link/https://services.swpc.noaa.gov/text/3-day-forecast.txt>; rel="timemap"; type="application/link-format", <https://web.archive.org/web/https://services.swpc.noaa.gov/text/3-day-forecast.txt>; rel="timegate"
+content-security-policy: default-src 'self' 'unsafe-eval' 'unsafe-inline' data: blob: archive.org web.archive.org web-static.archive.org wayback-api.archive.org athena.archive.org analytics.archive.org pragma.archivelab.org wwwb-events.archive.org
+x-archive-src: archiveteam_archivebot_go_20240416223023_ce760f7c/fivethirtyeight.com-inf-20240408-172625-aggl8-00215.warc.gz
+server-timing: captures_list;dur=0.497344, exclusion.robots;dur=0.043318, exclusion.robots.policy;dur=0.034737, esindex;dur=0.010240, cdx.remote;dur=7.336376, LoadShardBlock;dur=199.838209, PetaboxLoader3.resolve;dur=162.453561, PetaboxLoader3.datanode;dur=118.540905, load_resource;dur=142.707601
+x-app-server: wwwb-app246-dc8
+x-ts: 200
+x-tr: 373
+server-timing: TR;dur=0,Tw;dur=0,Tc;dur=1
+set-cookie: wb-p-SERVER=wwwb-app246; path=/
+cache-control: private
+x-location: All
+x-as: REDACTED
+x-rl: 0
+x-na: 0
+x-page-cache: MISS
+server-timing: MISS
+x-nid: REDACTED
+referrer-policy: no-referrer-when-downgrade
+permissions-policy: interest-cohort=()
+x-sd: 0
+

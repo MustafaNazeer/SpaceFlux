@@ -1,0 +1,50 @@
+:Product: Daily Space Weather Indices dayind.txt
+:Issued: 2024 May 13 1816 UT
+# Prepared by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Product description and SWPC contact on the Web
+# https://www.spaceweather.gov
+#
+#                       Daily Space Weather Indices
+#
+#
+:Solar_Indices: 2024 May 12
+# SWO Sunspot  Penticton Radio   90-day Radio   GOES X-ray   Stanford Solar
+#   Number       Flux 10.7cm     Flux 10.7cm     Bkgd Flux       Mean Field
+   186              222              165          4.95e-06          -999
+#
+:Solar_Region_Data: 2024 May 12
+#                                                 --------- Flares ---------
+# Sunspot Area       New         Spotted           X-ray          Optical
+# 10E-6 Hemis.     Regions        Region           C  M  X       S  1  2  3  4
+   2460               4             12             5  9  1      24  1  0  0  0
+#
+:Solar_Radio_Flux: 2024 May 12
+#      Learmonth  San Vito   Sag Hill  Penticton  Penticton  Palehua  Penticton
+#        0400       1000       1700       1700       2000       2300       2300
+  245     42         32         -1         -1         -1         24         -1
+  410     50         53         -1         -1         -1         44         -1
+  610     75         -1         -1         -1         -1         67         -1
+ 1415    122        146         -1         -1         -1        126         -1
+ 2695    211        220         -1         -1         -1        223         -1
+ 2800     -1         -1         -1        227        222         -1        222
+ 4995    250        329         -1         -1         -1        258         -1
+ 8800    360        416         -1         -1         -1        271         -1
+15400    603        600         -1         -1         -1         -1         -1
+#
+:Particle_Data: 2024 May 12
+#    GOES Proton Fluence          GOES Electron Fluence     GOES      Neutron
+# ---- Protons/cm2-day-sr ----   - Electrons/cm2-day-sr -  Location    Monitor
+#  ->1 MeV   >10 MeV  >100 MeV     >0.8 MeV     >2 MeV       West    % of bkgd
+  1.59e+08  1.29e+06 -1.00e+00    -1.00e+00   4.51e+06      75.20      -999.9
+#
+:Geomagnetic_Indices: 2024 May 12
+#      Middle Latitude                       Middle Latitude
+# ----- Fredericksburg -----           --------- Boulder ---------
+# A        K-indices                   A        K-indices
+#     03-06-09-12-15-18-21-24              03-06-09-12-15-18-21-24
+ 31    5  6  3  3  3  3  3  5         59    5  8  5  4  2  2  3  6 
+#        High Latitude                                  Estimated
+# --------- College ---------      -------------------- Planetary --------------------
+# A       K-indices                A                    K-indices
+#     03-06-09-12-15-18-21-24            03  - 06  - 09  - 12  - 15  - 18  - 21  - 24
+ 45    6  6  5  5  3  4  3  5     54    6.67  7.00  3.67  3.67  2.67  2.67  4.00  6.33 

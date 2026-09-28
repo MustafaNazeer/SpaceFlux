@@ -1,0 +1,12 @@
+HTTP/2 200 
+date: Sun, 27 Sep 2026 22:05:05 GMT
+server: Apache
+strict-transport-security: max-age=31536000;
+last-modified: Sat, 11 May 2024 18:16:20 GMT
+accept-ranges: bytes
+content-length: 2889
+x-frame-options: SAMEORIGIN
+access-control-allow-origin: *
+access-control-allow-headers: X-Requested-With, Content-Type
+content-type: text/plain; charset=UTF-8
+

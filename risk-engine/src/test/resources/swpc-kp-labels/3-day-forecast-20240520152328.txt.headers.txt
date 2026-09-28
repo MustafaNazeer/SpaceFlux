@@ -1,0 +1,47 @@
+HTTP/2 200 
+server: nginx
+date: Sun, 27 Sep 2026 23:12:21 GMT
+content-type: text/plain; charset=UTF-8
+content-length: 2033
+x-archive-orig-content-length: 2033
+x-archive-orig-connection: close
+x-archive-orig-server: Apache
+x-archive-orig-last-modified: Mon, 20 May 2024 12:30:15 GMT
+x-archive-orig-accept-ranges: bytes
+x-archive-orig-access-control-allow-origin: *
+x-archive-orig-access-control-allow-headers: origin, x-requested-with, content-type
+x-archive-orig-access-control-allow-methods: PUT, GET, POST, DELETE, OPTIONS
+x-archive-orig-strict-transport-security: max-age=31536000
+x-archive-orig-date: Mon, 20 May 2024 15:23:28 GMT
+x-archive-orig-expires: Mon, 20 May 2024 15:24:28 GMT
+x-archive-orig-cache-control: max-age=60
+x-archive-orig-etag: "7f1-618e1dd0403c0"
+x-archive-orig-vary: Accept-Encoding
+x-archive-orig-x-cache: RefreshHit from cloudfront
+x-archive-orig-via: 1.1 dbf749b5462dc5b2c9b4f9b080fa86cc.cloudfront.net (CloudFront)
+x-archive-orig-x-amz-cf-pop: SFO5-C3
+x-archive-orig-x-amz-cf-id: E8X0SiU_8fXgg39LdHkx4Nk1mBj69e9WWYG3deK3DR3Z-zgjP1kWWA==
+cache-control: max-age=1800
+accept-ranges: bytes
+memento-datetime: Mon, 20 May 2024 15:23:28 GMT
+link: <https://services.swpc.noaa.gov/text/3-day-forecast.txt>; rel="original", <https://web.archive.org/web/timemap/link/https://services.swpc.noaa.gov/text/3-day-forecast.txt>; rel="timemap"; type="application/link-format", <https://web.archive.org/web/https://services.swpc.noaa.gov/text/3-day-forecast.txt>; rel="timegate"
+content-security-policy: default-src 'self' 'unsafe-eval' 'unsafe-inline' data: blob: archive.org web.archive.org web-static.archive.org wayback-api.archive.org athena.archive.org analytics.archive.org pragma.archivelab.org wwwb-events.archive.org
+x-archive-src: nbcnews.com-20240520-002427/IA-FOC-nbcnews.com-20240520142414-00004.warc.gz
+server-timing: captures_list;dur=0.368806, exclusion.robots;dur=0.037545, exclusion.robots.policy;dur=0.029403, esindex;dur=0.007513, cdx.remote;dur=19.701456, LoadShardBlock;dur=102.674581, PetaboxLoader3.datanode;dur=72.606080, PetaboxLoader3.resolve;dur=293.620024, load_resource;dur=332.681462
+x-app-server: wwwb-app218-dc8
+x-ts: 200
+x-tr: 475
+server-timing: TR;dur=0,Tw;dur=0,Tc;dur=1
+set-cookie: wb-p-SERVER=wwwb-app218; path=/
+cache-control: private
+x-location: All
+x-as: REDACTED
+x-rl: 0
+x-na: 0
+x-page-cache: MISS
+server-timing: MISS
+x-nid: REDACTED
+referrer-policy: no-referrer-when-downgrade
+permissions-policy: interest-cohort=()
+x-sd: 0
+

@@ -1,0 +1,13 @@
+HTTP/1.1 200 OK
+Date: Sun, 27 Sep 2026 22:05:26 GMT
+Server: Apache
+Strict-Transport-Security: max-age=31536000
+strict-transport-security: max-age=31536000;
+last-modified: Sun, 01 Oct 2017 10:19:15 GMT
+accept-ranges: bytes
+content-length: 3185412
+x-frame-options: SAMEORIGIN
+access-control-allow-origin: *
+access-control-allow-headers: X-Requested-With, Content-Type
+content-type: text/csv
+
