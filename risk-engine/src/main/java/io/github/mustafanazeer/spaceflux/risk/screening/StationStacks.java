@@ -4,8 +4,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -19,38 +21,75 @@ public final class StationStacks {
     private static final String RESOURCE = "/screening/stacks.json";
 
     private final Map<Integer, String> stackOf;
+    private final Map<Integer, String> addedOn;
 
-    private StationStacks(Map<Integer, String> stackOf) {
+    private StationStacks(Map<Integer, String> stackOf, Map<Integer, String> addedOn) {
         this.stackOf = Map.copyOf(stackOf);
+        this.addedOn = Map.copyOf(addedOn);
     }
 
     public static StationStacks none() {
-        return new StationStacks(Map.of());
+        return new StationStacks(Map.of(), Map.of());
     }
 
     public static StationStacks load() {
-        try (InputStream in = StationStacks.class.getResourceAsStream(RESOURCE)) {
+        return load(RESOURCE);
+    }
+
+    static StationStacks load(String resource) {
+        try (InputStream in = StationStacks.class.getResourceAsStream(resource)) {
             if (in == null) {
-                throw new IllegalStateException("missing " + RESOURCE);
+                throw new IllegalStateException("missing " + resource);
             }
             Map<Integer, String> stackOf = new HashMap<>();
-            for (JsonNode stack : new ObjectMapper().readTree(in).get("stacks")) {
-                String name = stack.get("name").asString();
-                for (JsonNode member : stack.get("members")) {
-                    String previous = stackOf.put(member.get("norad").asInt(), name);
-                    if (previous != null) {
-                        throw new IllegalStateException(member.get("norad").asInt() + " is in both " + previous + " and " + name);
+            Map<Integer, String> addedOn = new HashMap<>();
+            Set<String> names = new HashSet<>();
+            for (JsonNode stack : required(new ObjectMapper().readTree(in), "stacks", resource)) {
+                String name = required(stack, "name", resource).asString();
+                if (!names.add(name)) {
+                    throw new IllegalStateException(name + " is listed twice in " + resource);
+                }
+                for (JsonNode member : required(stack, "members", resource + " stack " + name)) {
+                    String where = resource + " stack " + name;
+                    int norad = wholeNumber(required(member, "norad", where), where);
+                    String previous = stackOf.put(norad, name);
+                    if (name.equals(previous)) {
+                        throw new IllegalStateException(norad + " is listed twice in " + name + " in " + resource);
                     }
+                    if (previous != null) {
+                        throw new IllegalStateException(norad + " is in both " + previous + " and " + name + " in " + resource);
+                    }
+                    addedOn.put(norad, required(member, "added", where + " member " + norad).asString());
                 }
             }
-            return new StationStacks(stackOf);
+            return new StationStacks(stackOf, addedOn);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
+    private static JsonNode required(JsonNode node, String field, String where) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) {
+            throw new IllegalStateException("missing \"" + field + "\" in " + where);
+        }
+        return value;
+    }
+
+    private static int wholeNumber(JsonNode value, String where) {
+        if (!value.isIntegralNumber() || !value.canConvertToInt()) {
+            throw new IllegalStateException("\"norad\" " + value + " is not a whole number in " + where);
+        }
+        return value.asInt();
+    }
+
     public Optional<String> sharedStack(int a, int b) {
         String stack = stackOf.get(a);
         return stack != null && stack.equals(stackOf.get(b)) ? Optional.of(stack) : Optional.empty();
+    }
+
+    /** The date a member was put on the list. */
+    public String added(int member) {
+        return addedOn.get(member);
     }
 }

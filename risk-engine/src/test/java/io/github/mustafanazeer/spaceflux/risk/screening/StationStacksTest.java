@@ -1,6 +1,7 @@
 package io.github.mustafanazeer.spaceflux.risk.screening;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
 
@@ -19,5 +20,45 @@ class StationStacksTest {
         assertThat(stacks.sharedStack(25544, 48274)).isEmpty();
         assertThat(stacks.sharedStack(25544, 66906)).isEmpty();
         assertThat(stacks.sharedStack(25544, 25544)).contains("International Space Station");
+    }
+
+    @Test
+    void knowsWhenEachMemberWasAdded() {
+        assertThat(stacks.added(25544)).isEqualTo("2026-09-27");
+    }
+
+    @Test
+    void refusesACatalogNumberThatIsNotAWholeNumber() {
+        assertThatThrownBy(() -> StationStacks.load("/screening/stacks-fractional-norad.json"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("\"norad\" 25544.7 is not a whole number");
+    }
+
+    @Test
+    void refusesTwoStacksWithTheSameName() {
+        assertThatThrownBy(() -> StationStacks.load("/screening/stacks-same-name.json"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Test stack is listed twice");
+    }
+
+    @Test
+    void refusesAMemberListedTwiceInOneStack() {
+        assertThatThrownBy(() -> StationStacks.load("/screening/stacks-member-twice.json"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("25544 is listed twice in Test stack");
+    }
+
+    @Test
+    void refusesAMemberInTwoStacks() {
+        assertThatThrownBy(() -> StationStacks.load("/screening/stacks-in-two.json"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("25544 is in both First stack and Second stack");
+    }
+
+    @Test
+    void namesTheMissingFieldInAMalformedList() {
+        assertThatThrownBy(() -> StationStacks.load("/screening/stacks-missing-norad.json"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("norad");
     }
 }

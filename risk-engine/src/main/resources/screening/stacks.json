@@ -2,29 +2,27 @@
   "stacks": [
     {
       "name": "International Space Station",
-      "added": "2026-09-27",
       "basis": "Members share the station's orbit in the CelesTrak stations group captured 2026-09-27: over a 7 day scan their separation from each other never exceeds 61 km.",
       "members": [
-        { "norad": 25544, "name": "ISS (ZARYA)" },
-        { "norad": 36086, "name": "POISK" },
-        { "norad": 49044, "name": "ISS (NAUKA)" },
-        { "norad": 67796, "name": "CREW DRAGON 12" },
-        { "norad": 68689, "name": "CYGNUS NG-24" },
-        { "norad": 68837, "name": "PROGRESS-MS 34" },
-        { "norad": 100057, "name": "SOYUZ-MS 29" },
-        { "norad": 100712, "name": "PROGRESS-MS 35" }
+        { "norad": 25544, "name": "ISS (ZARYA)", "added": "2026-09-27" },
+        { "norad": 36086, "name": "POISK", "added": "2026-09-27" },
+        { "norad": 49044, "name": "ISS (NAUKA)", "added": "2026-09-27" },
+        { "norad": 67796, "name": "CREW DRAGON 12", "added": "2026-09-27" },
+        { "norad": 68689, "name": "CYGNUS NG-24", "added": "2026-09-27" },
+        { "norad": 68837, "name": "PROGRESS-MS 34", "added": "2026-09-27" },
+        { "norad": 100057, "name": "SOYUZ-MS 29", "added": "2026-09-27" },
+        { "norad": 100712, "name": "PROGRESS-MS 35", "added": "2026-09-27" }
       ]
     },
     {
       "name": "China Space Station",
-      "added": "2026-09-27",
       "basis": "Members share the station's orbit in the CelesTrak stations group captured 2026-09-27: over a 7 day scan their separation from each other never exceeds 169 km.",
       "members": [
-        { "norad": 48274, "name": "CSS (TIANHE)" },
-        { "norad": 53239, "name": "CSS (WENTIAN)" },
-        { "norad": 54216, "name": "CSS (MENGTIAN)" },
-        { "norad": 69049, "name": "TIANZHOU-10" },
-        { "norad": 69180, "name": "SHENZHOU-23 (SZ-23)" }
+        { "norad": 48274, "name": "CSS (TIANHE)", "added": "2026-09-27" },
+        { "norad": 53239, "name": "CSS (WENTIAN)", "added": "2026-09-27" },
+        { "norad": 54216, "name": "CSS (MENGTIAN)", "added": "2026-09-27" },
+        { "norad": 69049, "name": "TIANZHOU-10", "added": "2026-09-27" },
+        { "norad": 69180, "name": "SHENZHOU-23 (SZ-23)", "added": "2026-09-27" }
       ]
     }
   ]

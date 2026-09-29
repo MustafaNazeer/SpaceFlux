@@ -1,0 +1,15 @@
+{
+  "stacks": [
+    {
+      "name": "Test stack",
+      "basis": "Test input.",
+      "members": [
+        {
+          "norad": 25544.7,
+          "name": "ISS (ZARYA)",
+          "added": "2026-09-27"
+        }
+      ]
+    }
+  ]
+}

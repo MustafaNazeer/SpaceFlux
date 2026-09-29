@@ -1,0 +1,26 @@
+{
+  "stacks": [
+    {
+      "name": "First stack",
+      "basis": "Test input.",
+      "members": [
+        {
+          "norad": 25544,
+          "name": "ISS (ZARYA)",
+          "added": "2026-09-27"
+        }
+      ]
+    },
+    {
+      "name": "Second stack",
+      "basis": "Test input.",
+      "members": [
+        {
+          "norad": 25544,
+          "name": "ISS (ZARYA)",
+          "added": "2026-09-27"
+        }
+      ]
+    }
+  ]
+}
