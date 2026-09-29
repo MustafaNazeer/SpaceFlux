@@ -25,11 +25,11 @@ public final class StormRules {
     static final String R_BAND = "0.1-0.8nm";
     static final String S_CHANNEL = ">=10 MeV";
 
-    private StormRules() {
-    }
-
     /** Kp tops out at 9o; anything above it is not a Kp value (Section 5). */
     static final double KP_MAX = 9.00;
+
+    private StormRules() {
+    }
 
     static int gLevel(double kp) {
         usable("Kp", kp);
@@ -52,8 +52,9 @@ public final class StormRules {
     }
 
     /**
-     * GOES values are published as 32 bit floats, so the value and the threshold are compared at that precision: the
-     * float nearest 1e-5 lies below the double 1e-5 and would otherwise read one level low (Section 2.1).
+     * SWPC publishes GOES values in its JSON as 32 bit floats, so the value and the threshold are compared at that
+     * precision: the float nearest 1e-5 lies below the double 1e-5 and would otherwise read one level low
+     * (Section 2.1).
      */
     private static int goesLevel(double flux, double[] thresholds) {
         usable("flux", flux);

@@ -96,6 +96,7 @@ class StormRulesTest {
     @CsvSource(delimiter = '|', value = {
             "negative Kp | swpc.kp | {\"time_tag\":\"2024-05-10T00:00:00\",\"Kp\":-1} | \"Kp\" -1.0 is negative",
             "Kp above 9o | swpc.kp | {\"time_tag\":\"2024-05-10T00:00:00\",\"Kp\":9.33} | \"Kp\" 9.33 is above 9.00",
+            "Kp just past the tolerance | swpc.kp | {\"time_tag\":\"2024-05-10T00:00:00\",\"Kp\":9.006} | above 9.00",
             "missing time_tag | swpc.kp | {\"Kp\":9.0} | \"time_tag\" is missing",
             "time_tag as number | swpc.kp | {\"time_tag\":1715374800,\"Kp\":9.0} | \"time_tag\" is not text",
             "missing energy | swpc.goes.xrays | {\"time_tag\":\"2024-05-10T06:54:00Z\",\"satellite\":16,\"flux\":1e-3,\"observed_flux\":1e-3} | \"energy\" is missing",
@@ -123,6 +124,12 @@ class StormRulesTest {
         assertThat(StormRules.rLevel((double) 5e-5f)).isEqualTo(2);
         assertThat(StormRules.rLevel((double) 1e-4f)).isEqualTo(3);
         assertThat(StormRules.rLevel((double) Math.nextDown(1e-5f))).isZero();
+        assertThat(StormRules.rLevel((double) 1e-3f)).isEqualTo(4);
+        assertThat(StormRules.rLevel((double) Math.nextDown(1e-3f))).isEqualTo(3);
+        assertThat(StormRules.rLevel((double) 2e-3f)).isEqualTo(5);
+        assertThat(StormRules.rLevel((double) Math.nextDown(2e-3f))).isEqualTo(4);
+        assertThat(StormRules.sLevel((double) 10f)).isEqualTo(1);
+        assertThat(StormRules.sLevel((double) Math.nextDown(10f))).isZero();
     }
 
     @Test

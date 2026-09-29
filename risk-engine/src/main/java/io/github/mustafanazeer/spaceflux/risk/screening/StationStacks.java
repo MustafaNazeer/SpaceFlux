@@ -61,7 +61,7 @@ public final class StationStacks {
                     if (previous != null) {
                         throw new IllegalStateException(norad + " is in both " + previous + " and " + name + " in " + resource);
                     }
-                    addedOn.put(norad, isoDate(required(member, "added", where + " member " + norad), where));
+                    addedOn.put(norad, isoDate(required(member, "added", where + " member " + norad), where + " member " + norad));
                 }
             }
             return new StationStacks(stackOf, addedOn);
