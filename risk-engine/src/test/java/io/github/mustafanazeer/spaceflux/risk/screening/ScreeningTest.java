@@ -304,6 +304,21 @@ class ScreeningTest {
     }
 
     @Test
+    void reportsTheRecordedCrossingThroughTheWholePipeline() throws IOException {
+        List<TrackedObject> pair = Fixtures.crossing();
+
+        ScreeningResult result = withStacks().run(List.of(pair.get(1)), pair, Fixtures.CROSSING_START);
+
+        assertThat(result.suppressed()).isEmpty();
+        assertThat(result.coverage().pairsSearched()).isEqualTo(1);
+        assertThat(result.approaches()).singleElement().satisfies(ca -> {
+            assertThat(ca.watchlistNumber()).isEqualTo(57036);
+            assertThat(ca.otherNumber()).isEqualTo(27958);
+            assertThat(ca.missM()).isLessThanOrEqualTo(ScreeningSettings.REPORT_DISTANCE_M);
+        });
+    }
+
+    @Test
     void screensWatchlistObjectsAgainstEachOtherEvenWhenTheCatalogLacksThem() throws IOException {
         List<TrackedObject> watchlist = List.of(Fixtures.station(25544), Fixtures.station(36086));
 

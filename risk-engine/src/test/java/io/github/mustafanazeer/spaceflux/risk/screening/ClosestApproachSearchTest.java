@@ -15,6 +15,8 @@ import org.orekit.propagation.analytical.tle.TLEPropagator;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.utils.PVCoordinates;
 
+import io.github.mustafanazeer.spaceflux.risk.orbit.OrekitData;
+
 /** docs/risk/orbital-conventions.md 3.4 and 3.6. */
 class ClosestApproachSearchTest {
 
@@ -27,18 +29,56 @@ class ClosestApproachSearchTest {
      */
     private static final double NUMERIC_SLACK_M = 1e-3;
 
+    private static final double DENSE_STEP_S = 1;
+
+    /** Twice the escape speed at the Earth's surface, 22.36 km/s with WGS-72, rounded up. */
+    private static final double MAX_RELATIVE_SPEED_KM_PER_S = 22.4;
+
+    private static final double HALF_STEP_TRAVEL_KM = MAX_RELATIVE_SPEED_KM_PER_S * DENSE_STEP_S / 2;
+
     @Test
     void findsEveryDenseScanMinimumWithinTheReportDistanceAndNothingElse() throws IOException {
-        List<TrackedObject> objects = Fixtures.stations();
-        AbsoluteDate start = Fixtures.STATIONS_START;
+        int[] counts = crossCheck(Fixtures.stations(), Fixtures.STATIONS_START);
+        System.out.printf("Screening cross check: %d pairs, %d dense minima within 5 km, %d pipeline approaches%n",
+                counts[0], counts[1], counts[2]);
+        assertThat(counts[1]).isPositive();
+    }
+
+    @Test
+    void findsTheRecordedCrossingEncounterTheDenseScanFinds() throws IOException {
+        List<TrackedObject> pair = Fixtures.crossing();
+        int[] counts = crossCheck(pair, Fixtures.CROSSING_START);
+
+        ObjectTrack a = ObjectTrack.sample(pair.get(0), Fixtures.CROSSING_START,
+                Fixtures.CROSSING_START.shiftedBy(WINDOW_S), ScreeningSettings.SAMPLE_STEP_S);
+        ObjectTrack b = ObjectTrack.sample(pair.get(1), Fixtures.CROSSING_START,
+                Fixtures.CROSSING_START.shiftedBy(WINDOW_S), ScreeningSettings.SAMPLE_STEP_S);
+        CloseApproach ca = ClosestApproachSearch.find(a, b, Fixtures.CROSSING_START, REPORT_M).getFirst();
+        System.out.printf("Crossing cross check: %d dense minima within 5 km, %d pipeline approaches; TCA %s, "
+                + "miss %.1f m, relative speed %.3f km/s%n", counts[1], counts[2],
+                ca.tca().toStringWithoutUtcOffset(OrekitData.utc(), 3) + "Z", ca.missM(), ca.relativeSpeedMPerS() / 1000);
+        assertThat(counts[1]).isEqualTo(1);
+        assertThat(counts[2]).isEqualTo(1);
+        assertThat(ca.relativeSpeedMPerS()).isGreaterThan(10_000);
+    }
+
+    /**
+     * Returns pairs, dense minima within the report distance, and pipeline approaches. A sampled minimum can sit up
+     * to half a step of relative motion above the true one: at a 1 s step and a relative speed below 22.4 km/s
+     * (twice the escape speed at the Earth's surface, which no two bound orbits exceed) that is under 11.2 km, so
+     * every sampled minimum within 5 + 11.2 km is refined before it is compared with the pipeline.
+     */
+    private static int[] crossCheck(List<TrackedObject> objects, AbsoluteDate start) {
         AbsoluteDate end = start.shiftedBy(WINDOW_S);
         Map<Integer, ObjectTrack> tracks = new HashMap<>();
+        Map<Integer, TrackedObject> byNumber = new HashMap<>();
         for (TrackedObject o : objects) {
             tracks.put(o.catalogNumber(), ObjectTrack.sample(o, start, end, ScreeningSettings.SAMPLE_STEP_S));
+            byNumber.put(o.catalogNumber(), o);
         }
 
         List<BruteForceScan.PairStats> dense = BruteForceScan.scan(objects.stream().map(TrackedObject::tle).toList(),
-                start, WINDOW_S, 1, 2 * REPORT_M / 1000);
+                start, WINDOW_S, DENSE_STEP_S, REPORT_M / 1000 + HALF_STEP_TRAVEL_KM);
 
         int denseMinima = 0;
         int pipelineApproaches = 0;
@@ -48,28 +88,29 @@ class ClosestApproachSearchTest {
             List<CloseApproach> found = RadialPrefilter.mayApproach(a, b, REPORT_M)
                     ? ClosestApproachSearch.find(a, b, start, REPORT_M)
                     : List.of();
-            List<BruteForceScan.Minimum> within = pair.minimaWithin(REPORT_M / 1000);
+            List<BruteForceScan.Minimum> within = pair.minima().stream()
+                    .map(m -> BruteForceScan.refine(byNumber.get(pair.a()).tle(), byNumber.get(pair.b()).tle(), start,
+                            m, DENSE_STEP_S))
+                    .filter(m -> m.distanceKm() * 1000 <= REPORT_M)
+                    .toList();
             denseMinima += within.size();
             pipelineApproaches += found.size();
 
             for (BruteForceScan.Minimum m : within) {
-                assertThat(found).as("pair %d-%d dense minimum at %s s", pair.a(), pair.b(), m.secondsFromStart())
-                        .anySatisfy(ca -> {
-                            assertThat(Math.abs(ca.tca().durationFrom(start) - m.secondsFromStart())).isLessThan(1.0);
-                            assertThat(ca.missM()).isLessThanOrEqualTo(m.distanceKm() * 1000 + NUMERIC_SLACK_M);
-                            assertThat(m.distanceKm() * 1000 - ca.missM()).isLessThanOrEqualTo(ca.relativeSpeedMPerS() * 1.0);
-                        });
+                assertThat(found).as("pair %d-%d refined minimum at %s s", pair.a(), pair.b(), m.secondsFromStart())
+                        .anySatisfy(ca -> matches(ca, m, start));
             }
             for (CloseApproach ca : found) {
-                double t = ca.tca().durationFrom(start);
-                assertThat(pair.minimaNear(t, 1.0, REPORT_M / 1000 + ca.relativeSpeedMPerS() / 1000))
-                        .as("pair %d-%d pipeline TCA at %s s has no dense counterpart", pair.a(), pair.b(), t)
-                        .isTrue();
+                assertThat(within).as("pair %d-%d pipeline TCA at %s s has no refined counterpart", pair.a(), pair.b(),
+                        ca.tca().durationFrom(start)).anySatisfy(m -> matches(ca, m, start));
             }
         }
-        System.out.printf("Screening cross check: %d pairs, %d dense minima within 5 km, %d pipeline approaches%n",
-                dense.size(), denseMinima, pipelineApproaches);
-        assertThat(denseMinima).isPositive();
+        return new int[] {dense.size(), denseMinima, pipelineApproaches};
+    }
+
+    private static void matches(CloseApproach ca, BruteForceScan.Minimum m, AbsoluteDate start) {
+        assertThat(Math.abs(ca.tca().durationFrom(start) - m.secondsFromStart())).isLessThan(DENSE_STEP_S);
+        assertThat(Math.abs(ca.missM() - m.distanceKm() * 1000)).isLessThanOrEqualTo(NUMERIC_SLACK_M);
     }
 
     @Test

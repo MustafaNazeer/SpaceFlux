@@ -34,6 +34,34 @@ final class BruteForceScan {
     private BruteForceScan() {
     }
 
+    /**
+     * The smallest separation within one step either side of a sampled minimum, by golden section search on
+     * |Δr| alone, independent of the event detector the pipeline uses.
+     */
+    static Minimum refine(TLE a, TLE b, AbsoluteDate start, Minimum sampled, double stepS) {
+        TLEPropagator pa = TLEPropagator.selectExtrapolator(a);
+        TLEPropagator pb = TLEPropagator.selectExtrapolator(b);
+        double ratio = (Math.sqrt(5) - 1) / 2;
+        double lo = sampled.secondsFromStart() - stepS;
+        double hi = sampled.secondsFromStart() + stepS;
+        while (hi - lo > 1e-7) {
+            double x1 = hi - ratio * (hi - lo);
+            double x2 = lo + ratio * (hi - lo);
+            if (distanceKm(pa, pb, start, x1) < distanceKm(pa, pb, start, x2)) {
+                hi = x2;
+            } else {
+                lo = x1;
+            }
+        }
+        double t = (lo + hi) / 2;
+        return new Minimum(t, distanceKm(pa, pb, start, t));
+    }
+
+    private static double distanceKm(TLEPropagator pa, TLEPropagator pb, AbsoluteDate start, double t) {
+        AbsoluteDate date = start.shiftedBy(t);
+        return pa.getPVCoordinates(date).getPosition().distance(pb.getPVCoordinates(date).getPosition()) / 1000;
+    }
+
     static List<PairStats> scan(List<TLE> tles, AbsoluteDate start, double durationS, double stepS, double collectKm) {
         int n = tles.size();
         List<TLEPropagator> propagators = tles.stream().map(TLEPropagator::selectExtrapolator).toList();

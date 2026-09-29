@@ -32,6 +32,21 @@ final class Fixtures {
         return objects;
     }
 
+    /** A window start just after the newer element set in the crossing pair (celestrak/PROVENANCE.md). */
+    static final AbsoluteDate CROSSING_START = new AbsoluteDate("2026-09-28T15:00:00", OrekitData.utc());
+
+    /** Two independent objects recorded for a real crossing close approach: SL-12 DEB and OBJECT AJ. */
+    static List<TrackedObject> crossing() throws IOException {
+        List<TrackedObject> objects = new ArrayList<>();
+        for (int catalogNumber : new int[] {27958, 57036}) {
+            try (InputStream in = Fixtures.class.getResourceAsStream("/celestrak/gp-catnr-" + catalogNumber + ".json")) {
+                JsonNode gp = new ObjectMapper().readTree(in).get(0);
+                objects.add(new TrackedObject(gp.get("OBJECT_NAME").asString(), GpElementSets.toTle(gp)));
+            }
+        }
+        return objects;
+    }
+
     static TrackedObject station(int catalogNumber) throws IOException {
         return stations().stream().filter(o -> o.catalogNumber() == catalogNumber).findFirst().orElseThrow();
     }
