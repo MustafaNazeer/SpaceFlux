@@ -5,6 +5,7 @@ import org.orekit.utils.PVCoordinates;
 
 import io.github.mustafanazeer.spaceflux.risk.orbit.PropagationStoppedException;
 import io.github.mustafanazeer.spaceflux.risk.orbit.Sgp4Propagator;
+import io.github.mustafanazeer.spaceflux.risk.screening.ScreeningResult.NotScreened.Kind;
 
 /**
  * One object sampled over the screening window: how long it can be screened, and its radial band
@@ -13,7 +14,7 @@ import io.github.mustafanazeer.spaceflux.risk.orbit.Sgp4Propagator;
  * that is earlier than the window, since SGP4 far past a decay returns finite states that pass the per date
  * checks; the samples before the window only feed the latch, not the band.
  */
-public record ObjectTrack(TrackedObject object, AbsoluteDate screenableUntil, String stopReason,
+public record ObjectTrack(TrackedObject object, AbsoluteDate screenableUntil, Kind stopKind, String stopReason,
         double sampledMinM, double sampledMaxM, double maxRadialRateMPerS, double stepS) {
 
     public static ObjectTrack sample(TrackedObject object, AbsoluteDate start, AbsoluteDate end, double stepS) {
@@ -21,7 +22,8 @@ public record ObjectTrack(TrackedObject object, AbsoluteDate screenableUntil, St
         try {
             propagator = new Sgp4Propagator(object.tle());
         } catch (PropagationStoppedException e) {
-            return new ObjectTrack(object, start, e.getMessage(), Double.NaN, Double.NaN, Double.NaN, stepS);
+            return new ObjectTrack(object, start, Kind.CANNOT_PROPAGATE, e.getMessage(), Double.NaN, Double.NaN,
+                    Double.NaN, stepS);
         }
         AbsoluteDate epoch = object.tle().getDate();
         AbsoluteDate lastGood = null;
@@ -30,15 +32,18 @@ public record ObjectTrack(TrackedObject object, AbsoluteDate screenableUntil, St
             try {
                 propagator.screeningState(date);
             } catch (PropagationStoppedException e) {
-                return new ObjectTrack(object, lastGood == null ? epoch : lastGood, e.getMessage(), Double.NaN,
+                return new ObjectTrack(object, lastGood == null ? epoch : lastGood,
+                        lastGood == null ? Kind.CANNOT_PROPAGATE : Kind.STOPPED_BEFORE_WINDOW, e.getMessage(), Double.NaN,
                         Double.NaN, Double.NaN, stepS);
             }
             lastGood = date;
         }
+        boolean goodBeforeStart = lastGood != null;
         lastGood = null;
         double min = Double.POSITIVE_INFINITY;
         double max = Double.NEGATIVE_INFINITY;
         double maxRate = 0;
+        Kind stopKind = null;
         String stopReason = null;
         double span = end.durationFrom(start);
         for (long k = 0; k * stepS <= span; k++) {
@@ -47,6 +52,8 @@ public record ObjectTrack(TrackedObject object, AbsoluteDate screenableUntil, St
             try {
                 pv = propagator.screeningState(date);
             } catch (PropagationStoppedException e) {
+                stopKind = lastGood != null ? Kind.STOPPED_IN_WINDOW
+                        : goodBeforeStart ? Kind.STOPPED_BEFORE_WINDOW : Kind.CANNOT_PROPAGATE;
                 stopReason = e.getMessage();
                 break;
             }
@@ -56,7 +63,8 @@ public record ObjectTrack(TrackedObject object, AbsoluteDate screenableUntil, St
             maxRate = Math.max(maxRate, Math.abs(pv.getPosition().dotProduct(pv.getVelocity()) / r));
             lastGood = date;
         }
-        return new ObjectTrack(object, lastGood == null ? start : lastGood, stopReason, min, max, maxRate, stepS);
+        return new ObjectTrack(object, lastGood == null ? start : lastGood, stopKind, stopReason, min, max, maxRate,
+                stepS);
     }
 
     public boolean screenable() {

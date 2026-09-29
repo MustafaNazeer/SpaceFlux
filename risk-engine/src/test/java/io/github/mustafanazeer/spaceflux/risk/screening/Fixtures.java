@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.time.AbsoluteDate;
 
 import io.github.mustafanazeer.spaceflux.risk.orbit.GpElementSets;
@@ -33,6 +34,23 @@ final class Fixtures {
 
     static TrackedObject station(int catalogNumber) throws IOException {
         return stations().stream().filter(o -> o.catalogNumber() == catalogNumber).findFirst().orElseThrow();
+    }
+
+    /**
+     * A synthetic variant of a recorded element set for edge cases no recording contains; never presented as
+     * recorded data. Arguments left null keep the recorded value.
+     */
+    static TrackedObject variant(TrackedObject o, String name, Integer catalogNumber, AbsoluteDate epoch,
+            Double meanMotion, Double e, Double i, Double meanAnomaly) {
+        TLE t = o.tle();
+        return new TrackedObject(name == null ? o.name() : name, new TLE(
+                catalogNumber == null ? t.getSatelliteNumber() : catalogNumber, t.getClassification(), t.getLaunchYear(),
+                t.getLaunchNumber(), t.getLaunchPiece(), t.getEphemerisType(), t.getElementNumber(),
+                epoch == null ? t.getDate() : epoch, meanMotion == null ? t.getMeanMotion() : meanMotion,
+                t.getMeanMotionFirstDerivative(), t.getMeanMotionSecondDerivative(), e == null ? t.getE() : e,
+                i == null ? t.getI() : i, t.getPerigeeArgument(), t.getRaan(),
+                meanAnomaly == null ? t.getMeanAnomaly() : meanAnomaly, t.getRevolutionNumberAtEpoch(), t.getBStar(),
+                OrekitData.utc()));
     }
 
     static TrackedObject reference(int catalogNumber) throws IOException {

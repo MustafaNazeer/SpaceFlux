@@ -91,8 +91,8 @@ class ClosestApproachSearchTest {
             assertThat(ca.relativeSpeedMPerS()).isEqualTo(b.getVelocity().distance(a.getVelocity()));
             assertThat(g(iss, poisk, ca.tca().shiftedBy(-1e-3))).isNegative();
             assertThat(g(iss, poisk, ca.tca().shiftedBy(1e-3))).isPositive();
-            assertThat(ca.elementAgeDaysA()).isEqualTo(ca.tca().durationFrom(iss.tle().getDate()) / 86400);
-            assertThat(ca.elementAgeDaysB()).isEqualTo(ca.tca().durationFrom(poisk.tle().getDate()) / 86400);
+            assertThat(ca.elementAgeDaysWatchlist()).isEqualTo(ca.tca().durationFrom(iss.tle().getDate()) / 86400);
+            assertThat(ca.elementAgeDaysOther()).isEqualTo(ca.tca().durationFrom(poisk.tle().getDate()) / 86400);
         }
     }
 

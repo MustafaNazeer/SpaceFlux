@@ -46,17 +46,19 @@ public final class Sgp4Propagator {
         try {
             pv = propagator.getPVCoordinates(date);
         } catch (RuntimeException e) {
-            throw new PropagationStoppedException("propagation failed at " + date + ": " + e.getMessage(), e);
+            throw new PropagationStoppedException("propagation failed at " + date.toStringRfc3339(OrekitData.utc()) + ": " + e.getMessage(), e);
         }
         if (pv.getPosition().isNaN() || pv.getPosition().isInfinite()
                 || pv.getVelocity().isNaN() || pv.getVelocity().isInfinite()) {
-            throw new PropagationStoppedException("state not finite at " + date);
+            throw new PropagationStoppedException("state not finite at " + date.toStringRfc3339(OrekitData.utc()));
         }
         double radius = pv.getPosition().getNorm();
         if (radius < DECAY_RADIUS_M) {
             throw new PropagationStoppedException(String.format(Locale.ROOT,
-                    "altitude %.1f km below the %.0f km decay floor at %s",
-                    (radius / 1000) - TLEConstants.EARTH_RADIUS, DECAY_ALTITUDE_FLOOR_M / 1000, date));
+                    "SGP4 altitude %.1f km at %s, under the %.0f km screening floor; screening stops here "
+                            + "(a screening convention, not a reentry prediction)",
+                    (radius / 1000) - TLEConstants.EARTH_RADIUS, date.toStringRfc3339(OrekitData.utc()),
+                    DECAY_ALTITUDE_FLOOR_M / 1000));
         }
         return pv;
     }

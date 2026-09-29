@@ -1,0 +1,20 @@
+{
+  "stacks": [
+    {
+      "name": "Test stack",
+      "basis": "Test input: POISK added to the list after the ISS.",
+      "members": [
+        {
+          "norad": 25544,
+          "name": "ISS (ZARYA)",
+          "added": "2026-09-27"
+        },
+        {
+          "norad": 36086,
+          "name": "POISK",
+          "added": "2026-10-02"
+        }
+      ]
+    }
+  ]
+}

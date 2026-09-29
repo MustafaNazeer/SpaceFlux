@@ -1,0 +1,20 @@
+{
+  "stacks": [
+    {
+      "name": "Test stack with a departed member",
+      "basis": "Test input: DUPLEX is not attached to the ISS, so this entry stands for a list entry left in place after a vehicle departs.",
+      "members": [
+        {
+          "norad": 25544,
+          "name": "ISS (ZARYA)",
+          "added": "2026-09-27"
+        },
+        {
+          "norad": 66906,
+          "name": "DUPLEX",
+          "added": "2026-09-27"
+        }
+      ]
+    }
+  ]
+}
