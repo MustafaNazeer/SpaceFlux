@@ -1,0 +1,6 @@
+stations fixture from 2026-09-27T05:00:00.000Z, 22 objects, 231 pairs, sampled every 10 s over 7 days
+China Space Station: widest pair CSS (TIANHE) and TIANZHOU-10, largest separation 168.151 km
+International Space Station: widest pair POISK and CREW DRAGON 12, largest separation 60.933 km
+193 pairs outside a shared stack
+outside a shared stack, smallest largest separation: LEOPARD and HMU-SAT2, 4780.545 km
+outside a shared stack, smallest separation: LEOPARD and HMU-SAT2, 18.268 km
