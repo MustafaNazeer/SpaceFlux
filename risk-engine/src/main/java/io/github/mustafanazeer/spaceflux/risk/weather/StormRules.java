@@ -28,57 +28,81 @@ public final class StormRules {
     private StormRules() {
     }
 
+    /** Kp tops out at 9o; anything above it is not a Kp value (Section 5). */
+    static final double KP_MAX = 9.00;
+
     static int gLevel(double kp) {
-        return level(kp, G_THRESHOLDS, KP_TOLERANCE);
+        usable("Kp", kp);
+        if (kp > KP_MAX + KP_TOLERANCE) {
+            throw new InvalidReadingException("\"Kp\" " + kp + " is above 9.00, the largest Kp value");
+        }
+        int level = 0;
+        while (level < G_THRESHOLDS.length && kp >= G_THRESHOLDS[level] - KP_TOLERANCE) {
+            level++;
+        }
+        return level;
     }
 
     static int rLevel(double flux) {
-        return level(flux, R_THRESHOLDS, 0);
+        return goesLevel(flux, R_THRESHOLDS);
     }
 
     static int sLevel(double flux) {
-        return level(flux, S_THRESHOLDS, 0);
+        return goesLevel(flux, S_THRESHOLDS);
+    }
+
+    /**
+     * GOES values are published as 32 bit floats, so the value and the threshold are compared at that precision: the
+     * float nearest 1e-5 lies below the double 1e-5 and would otherwise read one level low (Section 2.1).
+     */
+    private static int goesLevel(double flux, double[] thresholds) {
+        usable("flux", flux);
+        int level = 0;
+        while (level < thresholds.length && (float) flux >= (float) thresholds[level]) {
+            level++;
+        }
+        return level;
     }
 
     /**
      * The level derived from the record, or empty when no scale is read from it (another X-ray band, another proton
-     * channel, or the alerts product). Throws {@link InvalidReadingException} when the value cannot set a level.
+     * channel, or the alerts product). Throws {@link InvalidReadingException} when the record cannot set a level.
      */
     public static Optional<DerivedLevel> derive(String product, JsonNode record) {
         return switch (product) {
-            case "swpc.kp" -> Optional.of(new DerivedLevel(Scale.G, gLevel(value(record, "Kp")), product,
-                    text(record, "time_tag"), null, value(record, "Kp")));
+            case "swpc.kp" -> {
+                double kp = value(record, "Kp");
+                yield Optional.of(new DerivedLevel(Scale.G, gLevel(kp), product, text(record, "time_tag"), null, kp));
+            }
             case "swpc.goes.xrays" -> R_BAND.equals(text(record, "energy"))
-                    ? Optional.of(goes(Scale.R, rLevel(value(record, "flux")), product, record))
+                    ? Optional.of(goes(Scale.R, product, record))
                     : Optional.empty();
             case "swpc.goes.protons" -> S_CHANNEL.equals(text(record, "energy"))
-                    ? Optional.of(goes(Scale.S, sLevel(value(record, "flux")), product, record))
+                    ? Optional.of(goes(Scale.S, product, record))
                     : Optional.empty();
-            default -> Optional.empty();
+            case "swpc.alerts" -> Optional.empty();
+            default -> throw new InvalidReadingException("unknown product " + product);
         };
     }
 
-    private static DerivedLevel goes(Scale scale, int level, String product, JsonNode record) {
+    private static DerivedLevel goes(Scale scale, String product, JsonNode record) {
+        String timeTag = text(record, "time_tag");
         JsonNode satellite = record.get("satellite");
-        if (satellite == null || !satellite.isIntegralNumber()) {
+        if (satellite == null || !satellite.isIntegralNumber() || !satellite.canConvertToInt()) {
             throw new InvalidReadingException("\"satellite\" is missing or not a whole number");
         }
-        return new DerivedLevel(scale, level, product, text(record, "time_tag"), satellite.asInt(),
-                value(record, "flux"));
+        double flux = value(record, "flux");
+        int level = scale == Scale.R ? rLevel(flux) : sLevel(flux);
+        return new DerivedLevel(scale, level, product, timeTag, satellite.asInt(), flux);
     }
 
-    private static int level(double value, double[] thresholds, double tolerance) {
+    private static void usable(String field, double value) {
         if (!Double.isFinite(value)) {
-            throw new InvalidReadingException("value " + value + " is not finite");
+            throw new InvalidReadingException("\"" + field + "\" " + value + " is not finite");
         }
         if (value < 0) {
-            throw new InvalidReadingException("value " + value + " is negative");
+            throw new InvalidReadingException("\"" + field + "\" " + value + " is negative");
         }
-        int level = 0;
-        while (level < thresholds.length && value >= thresholds[level] - tolerance) {
-            level++;
-        }
-        return level;
     }
 
     private static double value(JsonNode record, String field) {
@@ -94,6 +118,12 @@ public final class StormRules {
 
     private static String text(JsonNode record, String field) {
         JsonNode v = record.get(field);
-        return v == null || v.isNull() ? null : v.asString();
+        if (v == null || v.isNull()) {
+            throw new InvalidReadingException("\"" + field + "\" is missing");
+        }
+        if (!v.isString()) {
+            throw new InvalidReadingException("\"" + field + "\" is not text: " + v);
+        }
+        return v.asString();
     }
 }

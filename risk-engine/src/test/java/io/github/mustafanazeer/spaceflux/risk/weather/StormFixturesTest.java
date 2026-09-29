@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -25,8 +26,9 @@ class StormFixturesTest {
     private static List<DerivedLevel> derive(String resource) throws IOException {
         ObjectMapper json = new ObjectMapper();
         List<DerivedLevel> levels = new ArrayList<>();
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(
-                StormFixturesTest.class.getResourceAsStream("/swpc-storms/" + resource), StandardCharsets.US_ASCII))) {
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(Objects.requireNonNull(
+                StormFixturesTest.class.getResourceAsStream("/swpc-storms/" + resource), resource),
+                StandardCharsets.US_ASCII))) {
             for (String line = in.readLine(); line != null; line = in.readLine()) {
                 JsonNode event = json.readTree(line);
                 StormRules.derive(event.get("product").asString(), event.get("record")).ifPresent(levels::add);
@@ -61,6 +63,7 @@ class StormFixturesTest {
 
         List<DerivedLevel> levels = derive("kp-2024-05-10-to-12.jsonl");
 
+        assertThat(levels).hasSize(24);
         Map<String, String> actual = new LinkedHashMap<>();
         levels.forEach(d -> actual.put(d.timeTag(), d.label()));
         assertThat(actual).containsExactlyEntriesOf(expected);
@@ -75,6 +78,9 @@ class StormFixturesTest {
                 .containsExactlyEntriesOf(new TreeMap<>(Map.of("R1", 124L, "R2", 22L, "R3", 31L, "none", 183L)));
         assertThat(firstAtOrAbove(levels, 1)).isEqualTo("2024-05-10T03:24:00Z");
         assertThat(firstAtOrAbove(levels, 2)).isEqualTo("2024-05-10T06:41:00Z");
+        assertThat(levels.stream().max(Comparator.comparingDouble(DerivedLevel::value)).orElseThrow())
+                .extracting(DerivedLevel::timeTag, DerivedLevel::value, DerivedLevel::label)
+                .containsExactly("2024-05-10T06:54:00Z", 3.978928434662521e-4, "R3");
         assertThat(levels.stream().filter(d -> d.level() == 3).map(DerivedLevel::timeTag).toList())
                 .first().isEqualTo("2024-05-10T06:43:00Z");
         assertThat(levels.stream().filter(d -> d.level() == 3).map(DerivedLevel::timeTag).toList())

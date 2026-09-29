@@ -24,9 +24,9 @@ class StormRulesTest {
 
     @ParameterizedTest(name = "Kp {0} is level {1}")
     @CsvSource({
-            "0.0, 0", "4.33, 0", "4.66, 0", "4.665, 1", "4.67, 1", "5.0, 1", "5.33, 1",
+            "0.0, 0", "4.33, 0", "4.66, 0", "4.666, 1", "4.67, 1", "5.0, 1", "5.33, 1",
             "5.66, 1", "5.67, 2", "6.33, 2", "6.66, 2", "6.67, 3", "7.0, 3", "7.33, 3",
-            "7.66, 3", "7.67, 4", "8.0, 4", "8.33, 4", "8.67, 4", "8.99, 4", "9.0, 5"})
+            "7.66, 3", "7.67, 4", "8.0, 4", "8.33, 4", "8.67, 4", "8.99, 4", "9.0, 5", "9.004, 5"})
     void theGScaleReadsKpInThirds(double kp, int level) {
         assertThat(StormRules.gLevel(kp)).isEqualTo(level);
     }
@@ -94,17 +94,35 @@ class StormRulesTest {
 
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
-            "negative Kp | swpc.kp | {\"time_tag\":\"2024-05-10T00:00:00\",\"Kp\":-1} | negative",
+            "negative Kp | swpc.kp | {\"time_tag\":\"2024-05-10T00:00:00\",\"Kp\":-1} | \"Kp\" -1.0 is negative",
+            "Kp above 9o | swpc.kp | {\"time_tag\":\"2024-05-10T00:00:00\",\"Kp\":9.33} | \"Kp\" 9.33 is above 9.00",
+            "missing time_tag | swpc.kp | {\"Kp\":9.0} | \"time_tag\" is missing",
+            "time_tag as number | swpc.kp | {\"time_tag\":1715374800,\"Kp\":9.0} | \"time_tag\" is not text",
+            "missing energy | swpc.goes.xrays | {\"time_tag\":\"2024-05-10T06:54:00Z\",\"satellite\":16,\"flux\":1e-3,\"observed_flux\":1e-3} | \"energy\" is missing",
+            "oversized satellite | swpc.goes.protons | {\"time_tag\":\"2017-09-10T16:40:00Z\",\"satellite\":4294967312,\"energy\":\">=10 MeV\",\"flux\":8} | satellite",
+            "unknown product | swpc.kpp | {\"time_tag\":\"2024-05-10T00:00:00\",\"Kp\":9.0} | unknown product",
             "Kp as text | swpc.kp | {\"time_tag\":\"2024-05-10T00:00:00\",\"Kp\":\"9\"} | not a number",
             "missing Kp | swpc.kp | {\"time_tag\":\"2024-05-10T00:00:00\"} | missing",
             "missing flux | swpc.goes.protons | {\"time_tag\":\"2017-09-10T16:40:00Z\",\"satellite\":13,\"energy\":\">=10 MeV\"} | missing",
             "missing satellite | swpc.goes.xrays | {\"time_tag\":\"2024-05-10T06:54:00Z\",\"energy\":\"0.1-0.8nm\",\"flux\":1e-6,\"observed_flux\":1e-6} | satellite",
-            "negative flux | swpc.goes.xrays | {\"time_tag\":\"2024-05-10T06:54:00Z\",\"satellite\":16,\"energy\":\"0.1-0.8nm\",\"flux\":-1e-6,\"observed_flux\":1e-6} | negative"})
+            "negative flux | swpc.goes.xrays | {\"time_tag\":\"2024-05-10T06:54:00Z\",\"satellite\":16,\"energy\":\"0.1-0.8nm\",\"flux\":-1e-6,\"observed_flux\":1e-6} | \"flux\" -1.0E-6 is negative"})
     void rejectsAnUnusableValueWithAReasonInsteadOfSettingALevel(String name, String product, String json,
             String reason) {
         assertThatThrownBy(() -> StormRules.derive(product, record(json)))
                 .isInstanceOf(InvalidReadingException.class)
                 .hasMessageContaining(reason);
+    }
+
+    /**
+     * GOES values are published as 32 bit floats: the float nearest 1e-5 is 9.999999747e-6, below the double 1e-5, so
+     * the comparison is made at that precision (docs/risk/space-weather-scales.md 2.1).
+     */
+    @Test
+    void aFluxPublishedAsTheFloatNearestAThresholdReachesThatLevel() {
+        assertThat(StormRules.rLevel((double) 1e-5f)).isEqualTo(1);
+        assertThat(StormRules.rLevel((double) 5e-5f)).isEqualTo(2);
+        assertThat(StormRules.rLevel((double) 1e-4f)).isEqualTo(3);
+        assertThat(StormRules.rLevel((double) Math.nextDown(1e-5f))).isZero();
     }
 
     @Test

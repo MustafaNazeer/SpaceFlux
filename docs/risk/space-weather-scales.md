@@ -80,7 +80,7 @@ Consequences for the pipeline: a consumer keyed on `time_tag` must replace a sto
 
 W7, Radio Blackouts: the measure is "GOES X-ray peak brightness by class and by flux", footnoted "Flux, measured in the 0.1-0.8 nm range, in W· m-2." R1 "M1 (10-5)", R2 "M5 (5x10-5)", R3 "X1 (10-4)", R4 "X10 (10-3)", R5 "X20 (2x10-3)". Only records whose `energy` is `"0.1-0.8nm"` are used; the `"0.05-0.4nm"` records never set an R level.
 
-The comparisons are "≥". X1 section 2.2 ("Flare Magnitudes") defines the classes by the flux itself ("an M5 index is defined for a 5x10-5 W m-2 peak irradiance") and says "The flare index is defined by the truncated (not rounded) irradiance; e.g., a flare with peak irradiance of 4.19 × 10−5 W/m2 is an M4.1 flare". Truncation means a flux of exactly 1e-5 is M1.0, so it reaches R1.
+The comparisons are "≥". X1 section 2.2 ("Flare Magnitudes") defines the classes by the flux itself ("an M5 index is defined for a 5x10-5 W m-2 peak irradiance") and says "The flare index is defined by the truncated (not rounded) irradiance; e.g., a flare with peak irradiance of 4.19 × 10−5 W/m2 is an M4.1 flare". Truncation means a flux of exactly 1e-5 is M1.0, so it reaches R1. **Observed:** every GOES value in the recorded fixtures is a 32 bit float widened to a 64 bit number, and the 32 bit float nearest 1e-5 is 9.999999747e-6, below the 64 bit 1e-5; the same holds at 5e-5 and 1e-4. So the value and each threshold are compared as 32 bit floats, the precision the data is published in, and a stored value of M1.0, M5.0, or X1.0 reaches its level. How SWPC itself compares is not documented.
 
 ### 2.2 Which field: `flux`, not `observed_flux`
 
@@ -125,7 +125,8 @@ A derived level reads on the dashboard and in alerts like an official scale leve
 ## 5. Missing and invalid data
 
 * A gap is not a quiet period. When a product has no record for an interval (outages happen; see [docs/source/swpc.md](../source/swpc.md)), the derived level for that interval is "no data", never "none".
-* A value that is not finite, or is negative, is rejected with a reason and does not set a level.
+* A value that is not finite, or is negative, is rejected with a reason and does not set a level. So is a Kp above 9.00 (plus the 0.005 tolerance of Section 1.2): 9o is the highest Kp value (W2, "Kp = 9o (G5)"), so a larger number is not a Kp value, and deriving G5 from it would present corrupt data as the most extreme level.
+* A record without its `time_tag`, or a GOES record without its `energy`, is rejected with a reason: a level cannot be attributed to a time, and a band or channel cannot be assumed.
 * The derived level is "none" only when a valid value exists and is below the level 1 threshold.
 
 ## 6. Test data needed for the thresholds
