@@ -3,6 +3,8 @@ package io.github.mustafanazeer.spaceflux.risk.screening;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -59,7 +61,7 @@ public final class StationStacks {
                     if (previous != null) {
                         throw new IllegalStateException(norad + " is in both " + previous + " and " + name + " in " + resource);
                     }
-                    addedOn.put(norad, required(member, "added", where + " member " + norad).asString());
+                    addedOn.put(norad, isoDate(required(member, "added", where + " member " + norad), where));
                 }
             }
             return new StationStacks(stackOf, addedOn);
@@ -74,6 +76,15 @@ public final class StationStacks {
             throw new IllegalStateException("missing \"" + field + "\" in " + where);
         }
         return value;
+    }
+
+    /** Screening compares these dates as text, which orders ISO dates correctly and nothing else. */
+    private static String isoDate(JsonNode value, String where) {
+        try {
+            return LocalDate.parse(value.asString()).toString();
+        } catch (DateTimeParseException e) {
+            throw new IllegalStateException("\"added\" " + value.asString() + " is not a date (YYYY-MM-DD) in " + where);
+        }
     }
 
     private static int wholeNumber(JsonNode value, String where) {

@@ -35,6 +35,13 @@ class StationStacksTest {
     }
 
     @Test
+    void refusesAnAddedDateThatIsNotAnIsoDate() {
+        assertThatThrownBy(() -> StationStacks.load("/screening/stacks-bad-date.json"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("\"added\" 27 September 2026 is not a date");
+    }
+
+    @Test
     void refusesTwoStacksWithTheSameName() {
         assertThatThrownBy(() -> StationStacks.load("/screening/stacks-same-name.json"))
                 .isInstanceOf(IllegalStateException.class)
