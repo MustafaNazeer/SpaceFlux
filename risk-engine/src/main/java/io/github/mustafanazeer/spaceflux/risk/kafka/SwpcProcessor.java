@@ -71,7 +71,7 @@ public final class SwpcProcessor {
                 continue;
             }
             JsonNode event = checked.node();
-            Optional<Reading> reading = read(event);
+            Optional<Reading> reading = read(event, now);
             if (reading.isEmpty()) {
                 continue;
             }
@@ -125,14 +125,13 @@ public final class SwpcProcessor {
             try {
                 publish(e.getValue().tick(now), now, alerts, dead);
             } catch (RuntimeException ex) {
-                LOG.error("timer check of the {} series failed; its state is reset", e.getKey(), ex);
-                e.setValue(new ScaleTracker(e.getKey(), RULES_VERSION));
+                LOG.error("timer check of the {} series failed; it is tried again on the next check", e.getKey(), ex);
             }
         }
         return new Out(alerts, dead, 0);
     }
 
-    private static Optional<Reading> read(JsonNode event) {
+    private static Optional<Reading> read(JsonNode event, Instant now) {
         Instant fetchedAt;
         try {
             fetchedAt = Instant.parse(event.get("fetched_at").asString());
@@ -140,7 +139,7 @@ public final class SwpcProcessor {
             return Optional.empty();
         }
         return Reading.of(event.get("product").asString(), event.get("record"), fetchedAt,
-                event.get("source_url").asString());
+                event.get("source_url").asString(), now);
     }
 
     private static boolean sameBatch(Reading a, Reading b) {
@@ -161,8 +160,7 @@ public final class SwpcProcessor {
                 alerts.add(new Message(ALERTS_TOPIC, key, value));
             } else {
                 LOG.error("alerts event {} fails its schema and is dead lettered", e.eventId());
-                DeadLetters.Message m = deadLetters.build(ALERTS_TOPIC, e.sourceUrl(), key, "schema", r.failure(),
-                        value, now);
+                DeadLetters.Message m = deadLetters.build(ALERTS_TOPIC, null, key, "schema", r.failure(), value, now);
                 dead.add(new Message(m.topic(), m.key(), m.value()));
             }
         }

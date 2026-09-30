@@ -36,6 +36,7 @@ class SwpcProcessorTest {
         ObjectNode r = (ObjectNode) e.get("record");
         r.put("time_tag", timeTag);
         r.put("Kp", kp);
+        e.put("fetched_at", Instant.parse(timeTag + "Z").plusSeconds(3 * 3600 + 240).toString());
         return e;
     }
 
@@ -45,6 +46,7 @@ class SwpcProcessorTest {
         r.put("time_tag", timeTag);
         r.put("flux", flux);
         r.put("energy", "0.1-0.8nm");
+        e.put("fetched_at", Instant.parse(timeTag).plusSeconds(180).toString());
         return e;
     }
 
@@ -180,5 +182,31 @@ class SwpcProcessorTest {
         assertThat(out.alerts()).singleElement().satisfies(m -> assertThat(
                 JSON.readTree(m.value()).get("space_weather_level").get("no_data_reason").asString())
                 .isEqualTo("age_limit"));
+    }
+
+    @Test
+    void anAlertThatFailsItsSchemaGoesToTheAlertsDeadLetterTopic() throws IOException {
+        java.util.Map<String, String> files = new java.util.HashMap<>();
+        for (String topic : List.of("raw.swpc", "dlq")) {
+            files.put(topic, Files.readString(Path.of("..", "schemas", topic, "v1.schema.json")));
+        }
+        files.put("alerts", "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"$id\":\""
+                + TopicSchemas.ID_PREFIX + "alerts/v1.schema.json\",\"not\":{}}");
+        SwpcProcessor strict = new SwpcProcessor(TopicSchemas.of(files));
+
+        SwpcProcessor.Out out = strict.process(List.of(in("swpc.kp", kp("2026-09-20T00:00:00", 7.67))),
+                Instant.parse("2026-09-20T03:10:00Z"));
+
+        assertThat(out.alerts()).isEmpty();
+        assertThat(out.deadLetters()).singleElement().satisfies(m -> {
+            assertThat(m.topic()).isEqualTo("alerts.dlq");
+            assertThat(m.key()).isEqualTo("space_weather.G");
+            JsonNode v = JSON.readTree(m.value());
+            assertThat(v.get("source_topic").asString()).isEqualTo("alerts");
+            assertThat(v.get("check").asString()).isEqualTo("schema");
+            assertThat(v.has("source_url")).isFalse();
+            assertThat(JSON.readTree(v.get("payload").asString()).get("kind").asString())
+                    .isEqualTo("space_weather_level");
+        });
     }
 }

@@ -74,4 +74,20 @@ class ReadingTest {
         assertThat(xray("2026-09-20T00:00:00Z", "2026-09-20T00:05:00Z", 0).outcome())
                 .isEqualTo(Reading.Outcome.REJECTED);
     }
+
+    @Test
+    void aRecordFromBeyondTheEnginesOwnClockIsRejected() {
+        Instant now = Instant.parse("2026-09-20T12:00:00Z");
+        String record = "{\"time_tag\":\"2300-01-01T00:00:00\",\"Kp\":2.0}";
+
+        Reading r = Reading.of("swpc.kp", JSON.readTree(record), Instant.parse("2300-01-01T03:04:00Z"), URL, now)
+                .orElseThrow();
+
+        assertThat(r.outcome()).isEqualTo(Reading.Outcome.REJECTED);
+        assertThat(r.reason()).contains("clock");
+        assertThat(r.placeable()).isFalse();
+        assertThat(Reading.of("swpc.kp", JSON.readTree("{\"time_tag\":\"2026-09-20T09:00:00\",\"Kp\":2.0}"),
+                Instant.parse("2026-09-20T12:04:00Z"), URL, now).orElseThrow().outcome())
+                .isEqualTo(Reading.Outcome.NONE);
+    }
 }

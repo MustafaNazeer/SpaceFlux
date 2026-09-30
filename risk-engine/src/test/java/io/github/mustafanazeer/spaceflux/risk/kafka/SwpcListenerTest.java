@@ -42,8 +42,8 @@ class SwpcListenerTest {
                     sent.add(inv.getArgument(1));
                     return CompletableFuture.completedFuture((SendResult<String, byte[]>) null);
                 });
-        byte[] kp = Files.readAllBytes(Path.of("..", "schemas", "raw.swpc", "examples", "valid-kp.json"));
-        List<ConsumerRecord<String, byte[]>> batch = List.of(new ConsumerRecord<>("raw.swpc", 0, 0, "swpc.kp", kp));
+        List<ConsumerRecord<String, byte[]>> batch = List.of(kp(0, "2026-09-20T00:00:00", 2.0,
+                "2026-09-20T03:04:00Z"));
         SwpcListener listener = new SwpcListener(kafka, Clock.fixed(Instant.parse("2026-09-20T03:10:00Z"), ZoneOffset.UTC));
 
         assertThatThrownBy(() -> listener.onBatch(batch)).isInstanceOf(IllegalStateException.class);

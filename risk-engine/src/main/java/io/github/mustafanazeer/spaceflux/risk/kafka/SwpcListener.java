@@ -55,7 +55,7 @@ public class SwpcListener {
             try {
                 out = processor.process(in, clock.instant());
                 send(out);
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | Error e) {
                 processor.restore(before);
                 throw e;
             }
@@ -73,8 +73,11 @@ public class SwpcListener {
             SwpcProcessor.Snapshot before = processor.snapshot();
             try {
                 send(processor.tick(clock.instant()));
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | Error e) {
                 processor.restore(before);
+                if (e instanceof Error err) {
+                    throw err;
+                }
                 LOG.warn("writing the clock driven events failed; they are computed again on the next check", e);
             }
         }

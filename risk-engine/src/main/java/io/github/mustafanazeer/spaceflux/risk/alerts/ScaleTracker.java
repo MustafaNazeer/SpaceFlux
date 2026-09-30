@@ -28,6 +28,12 @@ public final class ScaleTracker {
     /** Section 5.2, eclipse edge rule 2. */
     static final Duration EDGE = Duration.ofMinutes(5);
 
+    /**
+     * Kp intervals older than this before the newest are forgotten. SWPC's Kp file holds about 7.5 days
+     * (docs/data/topics.md), so an older interval cannot be revised by a live fetch.
+     */
+    static final Duration KP_HISTORY = Duration.ofDays(8);
+
     /** Kp has no satellite; -1 cannot collide, since a placed GOES reading has a satellite of 1 or more. */
     private static final int NO_SATELLITE = -1;
 
@@ -100,6 +106,10 @@ public final class ScaleTracker {
             }
         }
         return out;
+    }
+
+    int kpIntervalsHeld() {
+        return series.values().stream().mapToInt(x -> x.intervals.size()).sum();
     }
 
     private void markSent(List<LevelEvent> events, Instant now) {
@@ -187,8 +197,8 @@ public final class ScaleTracker {
         State current = State.UNKNOWN;
         boolean ended;
         Instant lastSent;
-        /** Kp value per interval, for revisions (ADR 0006). */
-        final Map<Instant, Reading> intervals = new TreeMap<>();
+        /** Kp value per interval, for revisions (ADR 0006), for the last {@link #KP_HISTORY}. */
+        final NavigableMap<Instant, Reading> intervals = new TreeMap<>();
         /** Recent R samples, for eclipse edges: the reading, its state, and whether it had its own event. */
         final NavigableMap<Instant, Sample> recent = new TreeMap<>();
         Instant lastInRun;
@@ -267,7 +277,9 @@ public final class ScaleTracker {
                         : revisionToNoData(r, previous));
             }
             intervals.put(r.time(), r);
-            return advance(r, State.of(r), now);
+            List<LevelEvent> out = advance(r, State.of(r), now);
+            intervals.headMap(freshness.minus(KP_HISTORY), false).clear();
+            return out;
         }
 
         private List<LevelEvent> readGoes(Reading r, Instant now) {

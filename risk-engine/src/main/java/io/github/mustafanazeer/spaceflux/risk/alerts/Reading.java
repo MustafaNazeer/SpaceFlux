@@ -30,6 +30,27 @@ public record Reading(Scale scale, String product, Integer satellite, String tim
         MISSING
     }
 
+    /**
+     * As {@link #of(String, JsonNode, Instant, String)}, and also rejects a record whose fetched_at or time_tag is more
+     * than 5 minutes after the risk engine's own clock, which no fetch can produce (Section 5.1; threat model T3.5).
+     * Such a record cannot be placed in a series.
+     */
+    public static Optional<Reading> of(String product, JsonNode record, Instant fetchedAt, String sourceUrl,
+            Instant now) {
+        Optional<Reading> read = of(product, record, fetchedAt, sourceUrl);
+        if (read.isEmpty()) {
+            return read;
+        }
+        Reading r = read.get();
+        Instant latest = now.plus(FUTURE_TOLERANCE);
+        if (fetchedAt.isAfter(latest) || r.time() != null && r.time().isAfter(latest)) {
+            return Optional.of(new Reading(r.scale(), product, r.satellite(), r.timeTag(), null, Outcome.REJECTED, 0,
+                    null, null, "fetched_at or \"time_tag\" is more than 5 minutes after the risk engine's clock "
+                            + now, fetchedAt, sourceUrl));
+        }
+        return read;
+    }
+
     /** Empty when no scale is read from the record: another band or channel, or the alerts product. */
     public static Optional<Reading> of(String product, JsonNode record, Instant fetchedAt, String sourceUrl) {
         Scale scale = switch (product) {

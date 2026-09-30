@@ -163,4 +163,21 @@ class ScaleTrackerEdgeCasesTest {
         assertThat(first).singleElement().extracting(LevelEvent::trigger).isEqualTo("revision");
         assertThat(saved.tick(at("06:40:00"))).noneMatch(e -> "no_data".equals(e.state()));
     }
+
+    @Test
+    void kpHistoryKeepsOnlyTheIntervalsSwpcStillPublishes() {
+        ScaleTracker g = new ScaleTracker(Scale.G, 1);
+        Instant start = Instant.parse("2026-09-01T00:00:00Z");
+        for (int i = 0; i < 8 * 30; i++) {
+            Instant t = start.plusSeconds(10_800L * i);
+            g.accept(List.of(kp(t.toString().replace("Z", ""), 2.0, t.plusSeconds(11_040).toString())),
+                    t.plusSeconds(11_100));
+        }
+
+        assertThat(g.kpIntervalsHeld()).isLessThanOrEqualTo(8 * 8 + 1);
+        Instant newest = start.plusSeconds(10_800L * (8 * 30 - 1));
+        Instant old = newest.minusSeconds(9 * 86_400);
+        assertThat(g.accept(List.of(kp(old.toString().replace("Z", ""), 5.0, newest.plusSeconds(11_100).toString())),
+                newest.plusSeconds(11_200))).isEmpty();
+    }
 }
