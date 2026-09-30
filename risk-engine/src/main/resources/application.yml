@@ -1,0 +1,30 @@
+# Kafka settings follow ADR 0008 and the risk engine items of docs/security/hardening-checklist.md.
+# The broker address comes from KAFKA_BROKERS; plaintext is for the local stack only.
+spaceflux:
+  swpc:
+    enabled: true
+
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    consumer:
+      group-id: risk-engine
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: 2000
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+      properties:
+        allow.auto.create.topics: false
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+      properties:
+        enable.idempotence: true
+        max.block.ms: 10000
+        delivery.timeout.ms: 30000
+        request.timeout.ms: 10000
+    listener:
+      type: batch
+      ack-mode: batch

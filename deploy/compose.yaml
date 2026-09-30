@@ -54,7 +54,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        for t in raw.gp raw.gp.dlq raw.swpc raw.swpc.dlq; do
+        for t in raw.gp raw.gp.dlq raw.swpc raw.swpc.dlq alerts alerts.dlq; do
           /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --if-not-exists --topic "$$t" --partitions 1 --replication-factor 1 || exit 1
         done
     restart: "no"

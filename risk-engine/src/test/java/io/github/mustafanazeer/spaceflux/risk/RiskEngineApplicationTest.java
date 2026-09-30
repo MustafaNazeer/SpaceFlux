@@ -8,7 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.orekit.time.TimeScale;
 
-@SpringBootTest
+@SpringBootTest(properties = "spaceflux.swpc.enabled=false")
 class RiskEngineApplicationTest {
 
     @Autowired

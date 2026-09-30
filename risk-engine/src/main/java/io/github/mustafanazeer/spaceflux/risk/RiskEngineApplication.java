@@ -1,13 +1,17 @@
 package io.github.mustafanazeer.spaceflux.risk;
 
+import java.time.Clock;
+
 import org.orekit.time.TimeScale;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import io.github.mustafanazeer.spaceflux.risk.orbit.OrekitData;
 
 @SpringBootApplication
+@EnableScheduling
 public class RiskEngineApplication {
 
     public static void main(String[] args) {
@@ -15,6 +19,11 @@ public class RiskEngineApplication {
     }
 
     /** Built eagerly so a missing leap second table fails startup rather than the first screening run. */
+    @Bean
+    Clock clock() {
+        return Clock.systemUTC();
+    }
+
     @Bean
     TimeScale utc() {
         return OrekitData.utc();

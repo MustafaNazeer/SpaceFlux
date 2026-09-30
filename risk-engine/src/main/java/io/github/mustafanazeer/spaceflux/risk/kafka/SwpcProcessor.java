@@ -89,6 +89,16 @@ public final class SwpcProcessor {
         return new Out(alerts, dead, missing);
     }
 
+    /**
+     * Forgets every series, as a restart does. Called when publishing a batch failed, so that the redelivered records
+     * produce their events again instead of being read as already seen (ADR 0008, at least once delivery).
+     */
+    public synchronized void reset() {
+        for (Scale s : Scale.values()) {
+            trackers.put(s, new ScaleTracker(s, RULES_VERSION));
+        }
+    }
+
     /** "No data" by age and fallback refreshes; called by a clock (docs/risk/space-weather-scales.md Section 5.3). */
     public synchronized Out tick(Instant now) {
         List<Message> alerts = new ArrayList<>();
