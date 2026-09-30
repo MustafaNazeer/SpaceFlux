@@ -58,7 +58,7 @@ public final class StormRules {
             throw new MissingValueException("\"flux\" is 0, SWPC's marker for a missing X-ray measurement");
         }
         if ((float) flux < R_FLOOR) {
-            throw new InvalidReadingException("\"flux\" " + flux + " is below the 1e-9 W m-2 minimum");
+            throw new BelowFloorException("\"flux\" " + flux + " is below the 1e-9 W m-2 minimum");
         }
         if ((float) flux > R_MAX) {
             throw new InvalidReadingException("\"flux\" " + flux + " is above 0.2 W m-2, the largest valid value");

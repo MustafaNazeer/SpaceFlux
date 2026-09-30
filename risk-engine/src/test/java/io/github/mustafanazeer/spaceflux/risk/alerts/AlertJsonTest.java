@@ -59,7 +59,7 @@ class AlertJsonTest {
 
     @Test
     void writesTheRNoDataExample() throws IOException {
-        LevelEvent e = new LevelEvent("space_weather_level/1/R/18/no_data/2026-09-24T08:22:00Z", Scale.R,
+        LevelEvent e = new LevelEvent("space_weather_level/1/R/18/no_data/rejected/2026-09-24T08:22:00Z", Scale.R,
                 "swpc.goes.xrays", "no_data", null, "no data", "none", null, "level_change", false, 18, null, null,
                 null, null, null, null, null, null, t("2026-09-24T08:27:00Z"), null, "rejected",
                 t("2026-09-24T08:22:00Z"), null, null);
@@ -93,6 +93,7 @@ class AlertJsonTest {
         events.addAll(g.accept(List.of(kp("2024-05-10T15:00:00", 4.33, kpUrl), kp("2024-05-10T18:00:00", 8.0, kpUrl)),
                 t("2024-05-10T21:25:00Z")));
         events.addAll(g.accept(List.of(kp("2024-05-10T21:00:00", 12.0, kpUrl)), t("2024-05-11T00:05:00Z")));
+        events.addAll(g.accept(List.of(kp("2024-05-10T18:00:00", 9.5, kpUrl)), t("2024-05-11T00:06:00Z")));
         events.addAll(g.tick(t("2024-05-11T08:00:00Z")));
 
         JsonNode records = JSON.readTree(getClass().getResourceAsStream(
@@ -116,6 +117,7 @@ class AlertJsonTest {
         assertThat(events).extracting(LevelEvent::trigger)
                 .contains("level_change", "revision", "restatement", "refresh");
         assertThat(events).extracting(LevelEvent::state).contains("level", "none", "no_data", "ended");
+        assertThat(events).anyMatch(e -> e.trigger().equals("revision") && e.state().equals("no_data"));
         TopicSchemas schemas = TopicSchemas.fromClasspath();
         for (LevelEvent e : events) {
             JsonNode json = AlertJson.write(e, 1, t("2026-09-30T20:00:00Z"));

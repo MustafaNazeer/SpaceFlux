@@ -157,12 +157,14 @@ class SwpcProcessorTest {
     }
 
     @Test
-    void afterAResetARedeliveredBatchPublishesItsEventsAgain() throws IOException {
-        List<SwpcProcessor.In> batch = List.of(in("swpc.kp", kp("2026-09-20T00:00:00", 7.67)));
-        List<SwpcProcessor.Message> first = processor.process(batch, Instant.parse("2026-09-20T03:10:00Z")).alerts();
+    void afterARestoreARedeliveredBatchPublishesTheSameEventsAgain() throws IOException {
+        processor.process(List.of(in("swpc.kp", kp("2026-09-20T00:00:00", 2.0))), Instant.parse("2026-09-20T03:10:00Z"));
+        SwpcProcessor.Snapshot before = processor.snapshot();
+        List<SwpcProcessor.In> batch = List.of(in("swpc.kp", kp("2026-09-20T03:00:00", 7.67)));
+        List<SwpcProcessor.Message> first = processor.process(batch, Instant.parse("2026-09-20T06:10:00Z")).alerts();
 
-        processor.reset();
-        List<SwpcProcessor.Message> again = processor.process(batch, Instant.parse("2026-09-20T03:10:00Z")).alerts();
+        processor.restore(before);
+        List<SwpcProcessor.Message> again = processor.process(batch, Instant.parse("2026-09-20T06:10:00Z")).alerts();
 
         assertThat(again).hasSize(1);
         assertThat(again.get(0).value()).isEqualTo(first.get(0).value());

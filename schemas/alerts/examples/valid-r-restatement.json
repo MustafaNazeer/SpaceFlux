@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "kind": "space_weather_level",
+  "rules_version": 1,
+  "event_id": "space_weather_level/1/R/18/2026-09-24T08:26:00Z/2026-09-30T19:18:36Z/restated",
+  "produced_at": "2026-09-30T20:42:38Z",
+  "space_weather_level": {
+    "scale": "R",
+    "product": "swpc.goes.xrays",
+    "state": "no_data",
+    "derived_label": "no data",
+    "previous_state": "none",
+    "trigger": "restatement",
+    "derived_from": "GOES-18 X-ray flux 0.1-0.8nm",
+    "estimated": false,
+    "satellite": 18,
+    "band": "0.1-0.8nm",
+    "value": 8.483063140829472e-09,
+    "unit": "W m-2",
+    "time_tag": "2026-09-24T08:26:00Z",
+    "sample_time": "2026-09-24T08:26:00Z",
+    "averaging_period_s": 60,
+    "fetched_at": "2026-09-30T19:18:36Z",
+    "source_url": "https://services.swpc.noaa.gov/json/goes/primary/xrays-7-day.json",
+    "freshness_reference": "2026-09-24T08:29:00Z",
+    "no_data_reason": "zero_run_edge",
+    "no_data_since": "2026-09-24T08:26:00Z",
+    "restated_by_time_tag": "2026-09-24T08:27:00Z"
+  }
+}

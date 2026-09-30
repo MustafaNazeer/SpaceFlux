@@ -18,12 +18,12 @@ public class RiskEngineApplication {
         SpringApplication.run(RiskEngineApplication.class, args);
     }
 
-    /** Built eagerly so a missing leap second table fails startup rather than the first screening run. */
     @Bean
     Clock clock() {
         return Clock.systemUTC();
     }
 
+    /** Built eagerly so a missing leap second table fails startup rather than the first screening run. */
     @Bean
     TimeScale utc() {
         return OrekitData.utc();

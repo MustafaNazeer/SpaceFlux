@@ -1,9 +1,11 @@
 package io.github.mustafanazeer.spaceflux.risk.alerts;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Optional;
 
+import io.github.mustafanazeer.spaceflux.risk.weather.BelowFloorException;
 import io.github.mustafanazeer.spaceflux.risk.weather.DerivedLevel;
 import io.github.mustafanazeer.spaceflux.risk.weather.InvalidReadingException;
 import io.github.mustafanazeer.spaceflux.risk.weather.MissingValueException;
@@ -23,6 +25,8 @@ public record Reading(Scale scale, String product, Integer satellite, String tim
         LEVEL,
         NONE,
         REJECTED,
+        /** Rejected, and part of a zero run (Section 5.2, eclipse edge rule 1). */
+        BELOW_FLOOR,
         MISSING
     }
 
@@ -46,13 +50,25 @@ public record Reading(Scale scale, String product, Integer satellite, String tim
                 return Optional.empty();
             }
             DerivedLevel d = derived.get();
+            String unusable = unusable(scale, time, satellite, fetchedAt);
+            if (unusable != null) {
+                return Optional.of(new Reading(scale, product, satellite, timeTag, time, Outcome.REJECTED, 0, null,
+                        null, unusable, fetchedAt, sourceUrl));
+            }
             String xrayClass = scale == Scale.R ? StormRules.xrayClass(d.value(), d.satellite()).orElse(null) : null;
             return Optional.of(new Reading(scale, product, satellite, timeTag, time,
                     d.level() == 0 ? Outcome.NONE : Outcome.LEVEL, d.level(), d.value(), xrayClass, null, fetchedAt,
                     sourceUrl));
         } catch (MissingValueException e) {
-            return Optional.of(new Reading(scale, product, satellite, timeTag, time, Outcome.MISSING, 0, null, null,
-                    e.getMessage(), fetchedAt, sourceUrl));
+            String unusable = unusable(scale, time, satellite, fetchedAt);
+            return Optional.of(new Reading(scale, product, satellite, timeTag, time,
+                    unusable == null ? Outcome.MISSING : Outcome.REJECTED, 0, null, null,
+                    unusable == null ? e.getMessage() : unusable, fetchedAt, sourceUrl));
+        } catch (BelowFloorException e) {
+            String unusable = unusable(scale, time, satellite, fetchedAt);
+            return Optional.of(new Reading(scale, product, satellite, timeTag, time,
+                    unusable == null ? Outcome.BELOW_FLOOR : Outcome.REJECTED, 0, null, null,
+                    unusable == null ? e.getMessage() : unusable, fetchedAt, sourceUrl));
         } catch (InvalidReadingException e) {
             if (scale != Scale.G && !readsScale(scale, record)) {
                 return Optional.empty();
@@ -60,6 +76,30 @@ public record Reading(Scale scale, String product, Integer satellite, String tim
             return Optional.of(new Reading(scale, product, satellite, timeTag, time, Outcome.REJECTED, 0, null, null,
                     e.getMessage(), fetchedAt, sourceUrl));
         }
+    }
+
+    /** A time_tag may run at most this far past the fetch that brought it (Section 5.1). */
+    static final Duration FUTURE_TOLERANCE = Duration.ofMinutes(5);
+
+    /**
+     * Why a record that has a value cannot be placed in a series: a time_tag that is not a real UTC time, is more than
+     * 5 minutes after fetched_at, or for Kp is not the start of a 3 hour UTC interval; or a GOES satellite number below
+     * 1 (docs/risk/space-weather-scales.md Section 5.1). Null when it can be placed.
+     */
+    private static String unusable(Scale scale, Instant time, Integer satellite, Instant fetchedAt) {
+        if (time == null) {
+            return "\"time_tag\" is not a valid UTC time";
+        }
+        if (time.isAfter(fetchedAt.plus(FUTURE_TOLERANCE))) {
+            return "\"time_tag\" is more than 5 minutes after fetched_at " + fetchedAt;
+        }
+        if (scale == Scale.G && time.getEpochSecond() % 10_800 != 0) {
+            return "\"time_tag\" is not the start of a 3 hour UTC interval";
+        }
+        if (scale != Scale.G && (satellite == null || satellite < 1)) {
+            return "\"satellite\" is not a GOES satellite number";
+        }
+        return null;
     }
 
     /** A rejected GOES record belongs to the scale's band or channel only when its energy says so, or is missing. */
@@ -93,7 +133,17 @@ public record Reading(Scale scale, String product, Integer satellite, String tim
         }
     }
 
+    /** A 0 or a value below the floor: rejected for the level, and a member of a zero run. */
+    boolean inZeroRun() {
+        return outcome == Outcome.MISSING || outcome == Outcome.BELOW_FLOOR;
+    }
+
+    /** Dead lettered as a rule rejection; a 0 is SWPC's missing marker and is counted instead. */
+    public boolean deadLettered() {
+        return outcome == Outcome.REJECTED || outcome == Outcome.BELOW_FLOOR;
+    }
+
     boolean placeable() {
-        return time != null && (scale == Scale.G || satellite != null);
+        return unusable(scale, time, satellite, fetchedAt) == null;
     }
 }

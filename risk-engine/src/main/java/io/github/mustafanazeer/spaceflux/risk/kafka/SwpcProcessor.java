@@ -14,6 +14,9 @@ import io.github.mustafanazeer.spaceflux.risk.alerts.LevelEvent;
 import io.github.mustafanazeer.spaceflux.risk.alerts.Reading;
 import io.github.mustafanazeer.spaceflux.risk.alerts.ScaleTracker;
 import io.github.mustafanazeer.spaceflux.risk.weather.Scale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -32,6 +35,7 @@ public final class SwpcProcessor {
     static final String SOURCE_TOPIC = "raw.swpc";
     static final String ALERTS_TOPIC = "alerts";
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final Logger LOG = LoggerFactory.getLogger(SwpcProcessor.class);
 
     private final TopicSchemas schemas;
     private final DeadLetters deadLetters;
@@ -72,40 +76,60 @@ public final class SwpcProcessor {
                 continue;
             }
             Reading r = reading.get();
-            if (r.outcome() == Reading.Outcome.REJECTED) {
+            if (r.deadLettered()) {
                 dead.add(deadLetter(in, r.sourceUrl(), "rule", r.reason(), now));
             } else if (r.outcome() == Reading.Outcome.MISSING) {
                 missing++;
             }
             if (!batch.isEmpty() && !sameBatch(batch.get(0), r)) {
-                alerts.addAll(publish(trackers.get(batch.get(0).scale()).accept(batch, now), now));
+                publish(trackers.get(batch.get(0).scale()).accept(batch, now), now, alerts, dead);
                 batch = new ArrayList<>();
             }
             batch.add(r);
         }
         if (!batch.isEmpty()) {
-            alerts.addAll(publish(trackers.get(batch.get(0).scale()).accept(batch, now), now));
+            publish(trackers.get(batch.get(0).scale()).accept(batch, now), now, alerts, dead);
         }
         return new Out(alerts, dead, missing);
     }
 
+    /** An independent copy of every series' state, taken before a batch whose writes may fail. */
+    public synchronized Snapshot snapshot() {
+        Map<Scale, ScaleTracker> copy = new EnumMap<>(Scale.class);
+        trackers.forEach((s, t) -> copy.put(s, t.copy()));
+        return new Snapshot(copy);
+    }
+
     /**
-     * Forgets every series, as a restart does. Called when publishing a batch failed, so that the redelivered records
-     * produce their events again instead of being read as already seen (ADR 0008, at least once delivery).
+     * Puts every series back as it was when {@code s} was taken. Called when writing a batch's events failed, so the
+     * redelivered batch is read from the same state and produces the same events with the same identities (ADR 0008,
+     * at least once delivery).
      */
-    public synchronized void reset() {
-        for (Scale s : Scale.values()) {
-            trackers.put(s, new ScaleTracker(s, RULES_VERSION));
+    public synchronized void restore(Snapshot s) {
+        s.trackers.forEach((scale, t) -> trackers.put(scale, t.copy()));
+    }
+
+    public static final class Snapshot {
+        private final Map<Scale, ScaleTracker> trackers;
+
+        private Snapshot(Map<Scale, ScaleTracker> trackers) {
+            this.trackers = trackers;
         }
     }
 
     /** "No data" by age and fallback refreshes; called by a clock (docs/risk/space-weather-scales.md Section 5.3). */
     public synchronized Out tick(Instant now) {
         List<Message> alerts = new ArrayList<>();
-        for (ScaleTracker t : trackers.values()) {
-            alerts.addAll(publish(t.tick(now), now));
+        List<Message> dead = new ArrayList<>();
+        for (Map.Entry<Scale, ScaleTracker> e : trackers.entrySet()) {
+            try {
+                publish(e.getValue().tick(now), now, alerts, dead);
+            } catch (RuntimeException ex) {
+                LOG.error("timer check of the {} series failed; its state is reset", e.getKey(), ex);
+                e.setValue(new ScaleTracker(e.getKey(), RULES_VERSION));
+            }
         }
-        return new Out(alerts, List.of(), 0);
+        return new Out(alerts, dead, 0);
     }
 
     private static Optional<Reading> read(JsonNode event) {
@@ -123,17 +147,25 @@ public final class SwpcProcessor {
         return a.product().equals(b.product()) && a.fetchedAt().equals(b.fetchedAt());
     }
 
-    private List<Message> publish(List<LevelEvent> events, Instant now) {
-        List<Message> out = new ArrayList<>();
+    /**
+     * Adds each event to the alerts, after checking it against the alerts schema. An event that fails is written to
+     * alerts.dlq instead (ADR 0007), so no record content can stop the consumer.
+     */
+    private void publish(List<LevelEvent> events, Instant now, List<Message> alerts, List<Message> dead) {
         for (LevelEvent e : events) {
             JsonNode json = AlertJson.write(e, RULES_VERSION, now);
+            byte[] value = MAPPER.writeValueAsBytes(json);
+            String key = "space_weather." + e.scale();
             TopicSchemas.Result r = schemas.check(ALERTS_TOPIC, json);
-            if (r.failure() != null) {
-                throw new IllegalStateException("alerts event " + e.eventId() + " fails its schema: " + r.failure());
+            if (r.failure() == null) {
+                alerts.add(new Message(ALERTS_TOPIC, key, value));
+            } else {
+                LOG.error("alerts event {} fails its schema and is dead lettered", e.eventId());
+                DeadLetters.Message m = deadLetters.build(ALERTS_TOPIC, e.sourceUrl(), key, "schema", r.failure(),
+                        value, now);
+                dead.add(new Message(m.topic(), m.key(), m.value()));
             }
-            out.add(new Message(ALERTS_TOPIC, "space_weather." + e.scale(), MAPPER.writeValueAsBytes(json)));
         }
-        return out;
     }
 
     /** A URL read from a record that failed its schema can itself be malformed; the dead letter then goes without it. */

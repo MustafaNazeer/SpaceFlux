@@ -98,7 +98,7 @@
     "spaceWeatherLevel": {
       "description": "The state of one series after a change, a correction, or on a periodic refresh: G from planetary Kp (one series, no satellite), R from GOES 0.1-0.8nm X-ray flux, or S from GOES >=10 MeV integral proton flux (one series per satellite for R and S; satellites are never merged). The state is a derived level, none (a valid value below level 1), no data (docs/risk/space-weather-scales.md Section 5.3), or ended (Section 5.4). One event describes one sample or one 3 hour interval, never an event with a start and an end.",
       "type": "object",
-      "required": ["scale", "product", "state", "derived_label", "trigger", "derived_from", "estimated"],
+      "required": ["scale", "product", "state", "derived_label", "trigger", "derived_from", "estimated", "unit"],
       "properties": {
         "scale": {
           "description": "NOAA Space Weather Scale the level is derived on: G (geomagnetic, from Kp), R (radio, from X-ray flux) or S (solar radiation, from proton flux).",
@@ -138,7 +138,7 @@
           "maximum": 5
         },
         "trigger": {
-          "description": "level_change: the series' current state differs from its previous state (including a change into or out of no data or ended, and the first state known after a start). revision: SWPC sent a different Kp value for an interval already seen; always published, including a revision to none; G only. When the revised interval is the newest one, the revision also sets the current state and is the only event published for it; a revision of an older interval replaces only that interval's state. restatement: SWPC's value is unchanged, but a later record showed that an earlier sample, published as none, lies on the edge of a zero run, so it is restated as no data (docs/risk/space-weather-scales.md Sections 5.1 and 5.2); R only; it replaces that sample's state and says nothing about the current state. refresh: no change of state; the series' current state repeated with its newest record, so a consumer can tell a quiet current series from a stale one. Published when newer records arrive for the series without changing its state, and by a timer fallback when nothing went out for the series within its interval (docs/risk/space-weather-scales.md Section 5.3); level or none only.",
+          "description": "level_change: the series' current state differs from its previous state (including a change into or out of no data or ended, and the first state known after a start). revision: SWPC sent a different Kp value for an interval already seen; always published, including a revision to none; G only. A revision to a value the rules reject (for example Kp 9.5) has state no_data with no_data_reason rejected, no_data_since the interval start, the interval's time_tag, interval_start, interval_end, fetched_at and source_url, and no value; the record is also dead lettered. When the revised interval is the newest one, the revision also sets the current state and is the only event published for it; a revision of an older interval replaces only that interval's state. restatement: SWPC's value is unchanged, but a later record showed that an earlier sample, published as none (by a level_change or by a refresh on arrival that carried it), lies on the edge of a zero run, so it is restated as no data (docs/risk/space-weather-scales.md Sections 5.1 and 5.2); R only; it replaces that sample's state and says nothing about the current state. refresh: no change of state; the series' current state repeated with its newest record, so a consumer can tell a quiet current series from a stale one. Published when newer records arrive for the series without changing its state, and by a timer fallback when nothing went out for the series within its interval (docs/risk/space-weather-scales.md Section 5.3); level or none only.",
           "type": "string",
           "enum": ["level_change", "revision", "restatement", "refresh"]
         },
@@ -169,7 +169,7 @@
           "minimum": 0
         },
         "unit": {
-          "description": "Unit of value: Kp index (dimensionless, in thirds), W m-2 (X-ray irradiance), or pfu (protons per cm2 s sr).",
+          "description": "Unit of the series, on every event including those without a value: Kp index (dimensionless, in thirds), W m-2 (X-ray irradiance), or pfu (protons per cm2 s sr).",
           "type": "string",
           "enum": ["Kp index", "W m-2", "pfu"]
         },
@@ -214,7 +214,7 @@
           "$ref": "#/$defs/utc"
         },
         "no_data_since": {
-          "description": "no_data and ended only: the time from which the series has no data, as docs/risk/space-weather-scales.md Sections 5.2 to 5.4 define it. For a rejected newest record, its time_tag, moved back to the first restated edge sample when a zero run restates earlier samples (so it can point at a well formed record); for the age limit, the time the limit was passed, which is not when data stopped, so a surface shows freshness_reference, the last record's time, next to it; for ended, the series' newest time_tag; for a restatement, the restated sample's time.",
+          "description": "no_data and ended only: the time from which the series has no data, as docs/risk/space-weather-scales.md Sections 5.2 to 5.4 define it. For a rejected newest record, its time_tag, moved back to the first restated edge sample after the last level inside the leading edge of a zero run, so a no data span never covers a published level (so it can point at a well formed record); for the age limit, the time the limit was passed, which is not when data stopped, so a surface shows freshness_reference, the last record's time, next to it; for ended, the series' newest time_tag; for a restatement, the restated sample's time; for a rejected Kp revision, the interval start.",
           "$ref": "#/$defs/utc"
         },
         "no_data_reason": {
@@ -322,11 +322,28 @@
           "if": {"properties": {"state": {"enum": ["no_data", "ended"]}}, "required": ["state"]},
           "then": {
             "required": ["no_data_since"],
-            "properties": {"derived_label": {"const": "no data"}, "trigger": {"enum": ["level_change", "restatement"]}},
-            "not": {"anyOf": [
-              {"required": ["derived_level"]}, {"required": ["xray_class"]}, {"required": ["interval_start"]},
-              {"required": ["interval_end"]}
-            ]}
+            "properties": {"derived_label": {"const": "no data"}, "trigger": {"enum": ["level_change", "restatement", "revision"]}},
+            "not": {"anyOf": [{"required": ["derived_level"]}, {"required": ["xray_class"]}]}
+          }
+        },
+        {
+          "if": {
+            "properties": {"state": {"enum": ["no_data", "ended"]}, "trigger": {"enum": ["level_change", "restatement"]}},
+            "required": ["state", "trigger"]
+          },
+          "then": {"not": {"anyOf": [{"required": ["interval_start"]}, {"required": ["interval_end"]}]}}
+        },
+        {
+          "if": {
+            "properties": {"state": {"const": "no_data"}, "trigger": {"const": "revision"}},
+            "required": ["state", "trigger"]
+          },
+          "then": {
+            "required": [
+              "time_tag", "interval_start", "interval_end", "fetched_at", "source_url", "freshness_reference",
+              "previous_state"
+            ],
+            "properties": {"scale": {"const": "G"}, "no_data_reason": {"const": "rejected"}}
           }
         },
         {
@@ -338,6 +355,10 @@
             {"required": ["value"]}, {"required": ["time_tag"]}, {"required": ["sample_time"]},
             {"required": ["restated_by_time_tag"]}
           ]}}
+        },
+        {
+          "if": {"properties": {"state": {"const": "no_data"}, "trigger": {"const": "revision"}}, "required": ["state", "trigger"]},
+          "then": {"not": {"anyOf": [{"required": ["value"]}, {"required": ["sample_time"]}]}}
         },
         {
           "if": {"properties": {"trigger": {"const": "restatement"}}, "required": ["trigger"]},

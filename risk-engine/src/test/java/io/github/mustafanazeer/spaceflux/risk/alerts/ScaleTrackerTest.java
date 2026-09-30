@@ -170,6 +170,35 @@ class ScaleTrackerTest {
     }
 
     @Test
+    void aKpRevisionToARejectedValueIsARevisionToNoDataForThatInterval() {
+        ScaleTracker g = new ScaleTracker(Scale.G, 1);
+        g.accept(List.of(kp("2024-05-10T18:00:00", 7.67, "2024-05-10T21:04:00Z")),
+                Instant.parse("2024-05-10T21:05:00Z"));
+
+        List<LevelEvent> events = g.accept(List.of(kp("2024-05-10T18:00:00", 9.5, "2024-05-10T21:09:00Z")),
+                Instant.parse("2024-05-10T21:10:00Z"));
+
+        assertThat(events).singleElement().satisfies(e -> {
+            assertThat(e.trigger()).isEqualTo("revision");
+            assertThat(e.state()).isEqualTo("no_data");
+            assertThat(e.noDataReason()).isEqualTo("rejected");
+            assertThat(e.noDataSince()).isEqualTo(Instant.parse("2024-05-10T18:00:00Z"));
+            assertThat(e.intervalStart()).isEqualTo(Instant.parse("2024-05-10T18:00:00Z"));
+            assertThat(e.intervalEnd()).isEqualTo(Instant.parse("2024-05-10T21:00:00Z"));
+            assertThat(e.previousState()).isEqualTo("level");
+            assertThat(e.previousDerivedLevel()).isEqualTo(4);
+            assertThat(e.value()).isNull();
+            assertThat(e.eventId())
+                    .isEqualTo("space_weather_level/1/G/-/2024-05-10T18:00:00/2024-05-10T21:09:00Z");
+        });
+        assertThat(g.accept(List.of(kp("2024-05-10T21:00:00", 2.0, "2024-05-11T00:04:00Z")),
+                Instant.parse("2024-05-11T00:05:00Z"))).singleElement().satisfies(e -> {
+                    assertThat(e.trigger()).isEqualTo("level_change");
+                    assertThat(e.previousState()).isEqualTo("no_data");
+                });
+    }
+
+    @Test
     void passingTheAgeLimitIsNoDataFromTheTimeTheLimitWasPassed() {
         ScaleTracker g = new ScaleTracker(Scale.G, 1);
         g.accept(List.of(kp("2024-05-10T18:00:00", 7.67, "2024-05-10T21:04:00Z")),
@@ -187,7 +216,7 @@ class ScaleTrackerTest {
             assertThat(e.previousState()).isEqualTo("level");
             assertThat(e.value()).isNull();
             assertThat(e.eventId())
-                    .isEqualTo("space_weather_level/1/G/-/no_data/2024-05-11T00:30:00Z");
+                    .isEqualTo("space_weather_level/1/G/-/no_data/age_limit/2024-05-11T00:30:00Z");
         });
         assertThat(g.tick(Instant.parse("2024-05-11T01:00:00Z"))).isEmpty();
     }
@@ -239,7 +268,7 @@ class ScaleTrackerTest {
             assertThat(e.previousState()).isEqualTo("none");
             assertThat(e.satellite()).isEqualTo(18);
             assertThat(e.estimated()).isFalse();
-            assertThat(e.eventId()).isEqualTo("space_weather_level/1/R/18/no_data/2026-09-24T08:01:00Z");
+            assertThat(e.eventId()).isEqualTo("space_weather_level/1/R/18/no_data/rejected/2026-09-24T08:01:00Z");
         });
         assertThat(r.accept(List.of(xr(18, "08:02", 2e-7)), at("08:07")))
                 .singleElement().extracting(LevelEvent::state).isEqualTo("none");
@@ -320,7 +349,7 @@ class ScaleTrackerTest {
             assertThat(e.endedBySatellite()).isEqualTo(19);
             assertThat(e.noDataSince()).isEqualTo(at("08:10"));
             assertThat(e.derivedLabel()).isEqualTo("no data");
-            assertThat(e.eventId()).isEqualTo("space_weather_level/1/R/18/ended/2026-09-24T08:10:00Z");
+            assertThat(e.eventId()).isEqualTo("space_weather_level/1/R/18/ended/19/2026-09-24T08:10:00Z");
         });
         assertThat(events.get(1)).satisfies(e -> {
             assertThat(e.satellite()).isEqualTo(19);

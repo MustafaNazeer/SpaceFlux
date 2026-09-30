@@ -2,7 +2,7 @@
   "schema_version": 1,
   "kind": "space_weather_level",
   "rules_version": 1,
-  "event_id": "space_weather_level/1/R/18/no_data/2026-09-24T08:22:00Z",
+  "event_id": "space_weather_level/1/R/18/no_data/rejected/2026-09-24T08:22:00Z",
   "produced_at": "2026-09-30T19:40:31Z",
   "space_weather_level": {
     "scale": "R",
