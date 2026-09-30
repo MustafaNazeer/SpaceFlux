@@ -43,6 +43,7 @@ class ScreeningTest {
                 .containsExactlyInAnyOrderElementsOf(ISS_STACK_OTHERS);
         assertThat(result.suppressed()).allSatisfy(s -> {
             assertThat(s.watchlistNumber()).isEqualTo(25544);
+            assertThat(s.detail()).contains("between the members' propagated element sets, not a measured distance");
             assertThat(s.detail()).contains("not screened for close approaches", "International Space Station",
                     "listed since 2026-09-27");
             assertThat(s.stackEntryMayBeStale()).isFalse();

@@ -31,13 +31,15 @@ class KafkaConfig {
      */
     @Bean(NEVER_COMMIT_FACTORY)
     @SuppressWarnings("unchecked")
-    ConcurrentKafkaListenerContainerFactory<String, byte[]> neverCommitFactory(ConsumerFactory<?, ?> consumers,
-            CommonErrorHandler errorHandler) {
+    ConcurrentKafkaListenerContainerFactory<String, byte[]> neverCommitFactory(ConsumerFactory<?, ?> consumers) {
         ConcurrentKafkaListenerContainerFactory<String, byte[]> f = new ConcurrentKafkaListenerContainerFactory<>();
         f.setConsumerFactory((ConsumerFactory<String, byte[]>) consumers);
         f.setBatchListener(true);
         f.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
-        f.setCommonErrorHandler(errorHandler);
+        DefaultErrorHandler neverCommit = new DefaultErrorHandler(retryUntilWritten());
+        // The default commits a batch's offsets after a retry succeeds; this consumer never commits.
+        neverCommit.setAckAfterHandle(false);
+        f.setCommonErrorHandler(neverCommit);
         return f;
     }
 

@@ -18,4 +18,19 @@ class KafkaConfigTest {
         }
         assertThat(last).isEqualTo(60_000);
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void theScreeningConsumerNeverCommitsEvenAfterARecoveredBatch() {
+        var consumers = new org.springframework.kafka.core.DefaultKafkaConsumerFactory<String, byte[]>(
+                java.util.Map.of());
+
+        var factory = new KafkaConfig().neverCommitFactory(consumers);
+
+        assertThat(factory.getContainerProperties().getAckMode())
+                .isEqualTo(org.springframework.kafka.listener.ContainerProperties.AckMode.MANUAL);
+        var handler = (org.springframework.kafka.listener.DefaultErrorHandler) org.springframework.test.util
+                .ReflectionTestUtils.getField(factory, "commonErrorHandler");
+        assertThat(handler.isAckAfterHandle()).isFalse();
+    }
 }

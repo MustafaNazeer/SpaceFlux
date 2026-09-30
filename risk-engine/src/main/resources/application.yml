@@ -30,3 +30,8 @@ spring:
     listener:
       type: batch
       ack-mode: batch
+  task:
+    scheduling:
+      pool:
+        # One thread each for the space weather check and the screening run, so one never delays the other.
+        size: 2

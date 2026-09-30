@@ -29,7 +29,9 @@ public record ScreeningResult(AbsoluteDate start, AbsoluteDate end, Coverage cov
 
         public enum Code {
             DEEP_SPACE,
-            STALE_ELEMENT_SET
+            STALE_ELEMENT_SET,
+            /** A configured watchlist object with no element set in the input. */
+            NOT_IN_INPUT
         }
     }
 

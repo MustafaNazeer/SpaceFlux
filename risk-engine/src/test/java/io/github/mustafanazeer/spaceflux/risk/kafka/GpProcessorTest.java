@@ -134,7 +134,7 @@ class GpProcessorTest {
     }
 
     @Test
-    void anElementSetOrekitCannotUseIsDeadLetteredWithCheckRule() throws IOException {
+    void anElementSetOrekitCannotUseIsDeadLetteredWithoutACheck() throws IOException {
         List<GpProcessor.In> batch = stations(FETCHED);
         ObjectNode e = (ObjectNode) JSON.readTree(batch.get(0).value());
         ((ObjectNode) e.get("gp")).put("ECCENTRICITY", 1.5);
@@ -143,11 +143,129 @@ class GpProcessorTest {
                 JSON.writeValueAsBytes(e))), FETCHED.plusSeconds(60));
 
         assertThat(out.deadLetters()).singleElement()
-                .satisfies(m -> assertThat(JSON.readTree(m.value()).get("check").asString()).isEqualTo("rule"));
+                .satisfies(m -> assertThat(JSON.readTree(m.value()).has("check")).isFalse());
     }
 
     @Test
     void anEmptyStateScreensNothing() {
         assertThat(processor.poll(FETCHED).alerts()).isEmpty();
+    }
+
+    private static JsonNode runOf(GpProcessor.Out out) {
+        return JSON.readTree(out.alerts().get(out.alerts().size() - 1).value()).get("screening_run");
+    }
+
+    private static List<GpProcessor.In> withIss(Instant fetchedAt, java.util.function.Consumer<ObjectNode> change)
+            throws IOException {
+        List<GpProcessor.In> out = new ArrayList<>();
+        for (GpProcessor.In in : stations(fetchedAt)) {
+            ObjectNode e = (ObjectNode) JSON.readTree(in.value());
+            if (e.get("gp").get("NORAD_CAT_ID").asInt() == 25544) {
+                change.accept((ObjectNode) e.get("gp"));
+                out.add(new GpProcessor.In(in.key(), JSON.writeValueAsBytes(e)));
+            }
+        }
+        return out;
+    }
+
+    @Test
+    void anEventFetchedAfterTheEnginesClockIsRejectedAndChangesNothing() throws IOException {
+        processor.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+        Instant future = Instant.parse("2300-01-01T00:00:00Z");
+
+        GpProcessor.Out out = processor.accept(stations(future).subList(0, 1), FETCHED.plusSeconds(61));
+
+        assertThat(out.deadLetters()).singleElement().satisfies(m -> {
+            JsonNode v = JSON.readTree(m.value());
+            assertThat(v.get("check").asString()).isEqualTo("rule");
+            assertThat(v.get("reason").asString()).contains("clock");
+        });
+        assertThat(runOf(processor.poll(FETCHED.plusSeconds(91))).get("window_start").asString())
+                .isEqualTo(FETCHED.toString());
+    }
+
+    /** Synthetic: the recorded ISS element set with its epoch moved into the future. */
+    @Test
+    void anElementSetDatedAfterItsFetchIsRejectedAndDoesNotReplaceTheHeldOne() throws IOException {
+        processor.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+
+        GpProcessor.Out out = processor.accept(withIss(FETCHED.plusSeconds(3_600),
+                gp -> gp.put("EPOCH", "2300-01-01T00:00:00.000000")), FETCHED.plusSeconds(3_660));
+
+        assertThat(out.deadLetters()).singleElement().satisfies(m -> assertThat(
+                JSON.readTree(m.value()).get("reason").asString()).contains("EPOCH").contains("after"));
+        JsonNode run = runOf(processor.poll(FETCHED.plusSeconds(3_700)));
+        assertThat(run.get("coverage").get("watchlist_accepted").asInt()).isEqualTo(1);
+        assertThat(run.get("window_start").asString()).isEqualTo(FETCHED.toString());
+    }
+
+    /** Synthetic: a second copy of the recorded ISS element set with the same epoch and another mean motion. */
+    @Test
+    void aSameEpochCopyWithOtherElementsIsListedAsADifferingCopy() throws IOException {
+        processor.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+
+        processor.accept(withIss(FETCHED.plusSeconds(60), gp -> gp.put("MEAN_MOTION", 15.4)),
+                FETCHED.plusSeconds(120));
+
+        JsonNode run = runOf(processor.poll(FETCHED.plusSeconds(150)));
+        assertThat(run.get("differing_copies")).singleElement().satisfies(d -> {
+            assertThat(d.get("catalog_number").asInt()).isEqualTo(25544);
+            assertThat(d.get("elements_differ").asBoolean()).isTrue();
+        });
+        assertThat(run.get("window_start").asString()).isEqualTo(FETCHED.plusSeconds(60).toString());
+    }
+
+    @Test
+    void anIdenticalCopyIsNotADifferingCopy() throws IOException {
+        processor.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+        processor.published(processor.poll(FETCHED.plusSeconds(90)).runId());
+
+        processor.accept(withIss(FETCHED.plusSeconds(600), gp -> { }), FETCHED.plusSeconds(660));
+
+        assertThat(processor.poll(FETCHED.plusSeconds(700)).alerts()).isEmpty();
+    }
+
+    @Test
+    void aWatchlistObjectMissingFromTheInputIsListedAsNotInInput() throws IOException {
+        GpProcessor p = new GpProcessor(TopicSchemas.fromClasspath(), Set.of(25544, 99999), OrekitData.utc());
+        p.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+
+        JsonNode run = runOf(p.poll(FETCHED.plusSeconds(90)));
+
+        assertThat(run.get("rejected")).anySatisfy(r -> {
+            assertThat(r.get("catalog_number").asInt()).isEqualTo(99999);
+            assertThat(r.get("role").asString()).isEqualTo("watchlist");
+            assertThat(r.get("code").asString()).isEqualTo("not_in_input");
+        });
+    }
+
+    @Test
+    void elementSetsMoreThanThirtyDaysOlderThanTheWindowAreDropped() throws IOException {
+        processor.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+        Instant muchLater = FETCHED.plusSeconds(40L * 86_400);
+
+        processor.accept(withIss(muchLater, gp -> gp.put("EPOCH", muchLater.minusSeconds(3_600).toString()
+                .replace("Z", ".000000"))), muchLater.plusSeconds(60));
+
+        JsonNode run = runOf(processor.poll(muchLater.plusSeconds(90)));
+        assertThat(run.get("coverage").get("catalog_admitted").asInt()).isEqualTo(1);
+        assertThat(run.get("rejected")).isEmpty();
+    }
+
+    @Test
+    void aWrittenRunIsNeverProducedAgainAndALateElementSetWaitsForTheNextFetch() throws IOException {
+        List<GpProcessor.In> all = stations(FETCHED);
+        processor.accept(all.subList(0, 21), FETCHED.plusSeconds(60));
+        String runId = processor.poll(FETCHED.plusSeconds(90)).runId();
+        processor.published(runId);
+
+        processor.accept(all.subList(21, 22), FETCHED.plusSeconds(200));
+        assertThat(processor.poll(FETCHED.plusSeconds(300)).alerts()).isEmpty();
+
+        processor.accept(withIss(FETCHED.plusSeconds(7_800), gp -> gp.put("EPOCH", "2026-09-27T06:00:00.000000")),
+                FETCHED.plusSeconds(7_860));
+        GpProcessor.Out next = processor.poll(FETCHED.plusSeconds(7_900));
+        assertThat(next.runId()).isNotEqualTo(runId).startsWith(FETCHED.plusSeconds(7_800).toString());
+        assertThat(runOf(next).get("coverage").get("catalog_admitted").asInt()).isEqualTo(22);
     }
 }

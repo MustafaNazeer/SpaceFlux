@@ -68,14 +68,17 @@ public class GpListener implements ConsumerSeekAware {
         }
     }
 
-    /** Publishes the current run once its batch has been quiet for 30 seconds, and again until it is written. */
+    /**
+     * Publishes the current run once its batch has been quiet for 30 seconds, and again until it is written. The run is
+     * computed without holding the lock the raw.gp listener takes, so reading raw.gp never waits for screening.
+     */
     @Scheduled(fixedDelay = 5_000, initialDelay = 5_000)
     public void publishRun() {
+        GpProcessor.Out out = processor.poll(clock.instant());
+        if (out.runId() == null) {
+            return;
+        }
         synchronized (lock) {
-            GpProcessor.Out out = processor.poll(clock.instant());
-            if (out.runId() == null) {
-                return;
-            }
             try {
                 List<GpProcessor.Message> all = new ArrayList<>(out.deadLetters());
                 all.addAll(out.alerts());

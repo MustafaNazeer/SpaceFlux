@@ -66,6 +66,10 @@ class ScreeningJsonTest {
         JsonNode run = events.get(events.size() - 1);
         assertThat(run.get("kind").asString()).isEqualTo("screening_run");
         assertThat(run.get("screening_run").get("suppressed")).isNotEmpty();
+        assertThat(run.get("screening_run").get("suppressed")).allSatisfy(n -> {
+            assertThat(n.get("watchlist_name").asString()).isEqualTo("ISS (ZARYA)");
+            assertThat(n.get("other_name").asString()).isNotBlank();
+        });
         assertThat(run.get("screening_run").get("approach_count").asInt()).isEqualTo(events.size() - 1);
         TopicSchemas schemas = TopicSchemas.fromClasspath();
         for (JsonNode e : events) {

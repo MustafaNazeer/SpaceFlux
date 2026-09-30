@@ -198,7 +198,8 @@ public final class Screening {
         String listedSince = later(stacks.added(x), stacks.added(y));
         String detail = String.format(Locale.ROOT,
                 "not screened for close approaches: both are in the %s stack (pair listed since %s); separation "
-                        + "%.1f to %.1f km at the %.0f s samples from %s to %s",
+                        + "between the members' propagated element sets, not a measured distance, %.1f to %.1f km "
+                        + "at the %.0f s samples from %s to %s",
                 stack, listedSince, s.minM() / 1000, s.maxM() / 1000, ScreeningSettings.SAMPLE_STEP_S, utc(start),
                 utc(spanEnd));
         if (mayBeStale) {

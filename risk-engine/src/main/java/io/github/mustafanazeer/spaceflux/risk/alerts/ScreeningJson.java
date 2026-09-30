@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.orekit.data.DataContext;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.time.TimeScale;
 
@@ -34,7 +35,8 @@ public final class ScreeningJson {
     public static List<JsonNode> write(ScreeningResult result, Map<Integer, String> names, Instant windowStart,
             int rulesVersion, Instant producedAt, TimeScale utc) {
         String start = windowStart.toString();
-        String end = windowStart.plusSeconds((long) ScreeningSettings.WINDOW_S).toString();
+        // The end the screening used, so a leap second inside the window is not a second off.
+        String end = result.end().toInstant(DataContext.getDefault().getTimeScales()).toString();
         String runId = start + "/" + rulesVersion;
         List<JsonNode> events = new ArrayList<>();
         ArrayNode ids = NODES.arrayNode();
@@ -77,7 +79,9 @@ public final class ScreeningJson {
         for (SuppressedPair s : result.suppressed()) {
             ObjectNode n = suppressed.addObject();
             n.put("watchlist_number", s.watchlistNumber());
+            name(n, "watchlist_name", s.watchlistNumber(), names);
             n.put("other_number", s.otherNumber());
+            name(n, "other_name", s.otherNumber(), names);
             n.put("mechanism", code(s.mechanism()));
             n.put("detail", s.detail());
             n.put("min_separation_m", s.minSeparationM());
@@ -89,6 +93,7 @@ public final class ScreeningJson {
         for (ScreeningResult.Rejected r : result.rejected()) {
             ObjectNode n = rejected.addObject();
             n.put("catalog_number", r.catalogNumber());
+            name(n, "name", r.catalogNumber(), names);
             n.put("role", code(r.role()));
             n.put("code", code(r.code()));
             n.put("reason", r.reason());
@@ -97,6 +102,7 @@ public final class ScreeningJson {
         for (ScreeningResult.NotScreened r : result.notScreened()) {
             ObjectNode n = notScreened.addObject();
             n.put("catalog_number", r.catalogNumber());
+            name(n, "name", r.catalogNumber(), names);
             n.put("role", code(r.role()));
             n.put("kind", code(r.kind()));
             n.put("reason", r.reason());
@@ -108,6 +114,7 @@ public final class ScreeningJson {
         for (ScreeningResult.EpochAfterStart r : result.epochAfterStart()) {
             ObjectNode n = after.addObject();
             n.put("catalog_number", r.catalogNumber());
+            name(n, "name", r.catalogNumber(), names);
             n.put("seconds_after_start", r.secondsAfterStart());
         }
         ArrayNode differing = p.putArray("differing_copies");
@@ -137,11 +144,16 @@ public final class ScreeningJson {
 
     private static void object(ObjectNode node, int catalogNumber, Map<Integer, String> names, double ageDays) {
         node.put("catalog_number", catalogNumber);
+        name(node, "name", catalogNumber, names);
+        node.put("element_age_days", ageDays);
+    }
+
+    /** The object's name when its element set has one, so a list can be read without a lookup. */
+    private static void name(ObjectNode node, String field, int catalogNumber, Map<Integer, String> names) {
         String name = names.get(catalogNumber);
         if (name != null && !name.isBlank()) {
-            node.put("name", name);
+            node.put(field, name);
         }
-        node.put("element_age_days", ageDays);
     }
 
     private static String time(AbsoluteDate date, TimeScale utc) {
