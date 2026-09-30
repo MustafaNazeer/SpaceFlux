@@ -1,0 +1,653 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/MustafaNazeer/SpaceFlux/schemas/alerts/v1.schema.json",
+  "title": "alerts event, version 1",
+  "description": "One event published by risk-engine to the alerts topic. kind says which of three event kinds it is, and the object named after the kind carries its content: a space weather level derived from one SWPC value, a close approach found by a screening run, or the summary of one screening run. Every level here is derived mechanically by SpaceFlux from public data; none is an official NOAA scale level, a forecast, or a notice to act. Not related to SWPC's swpc.alerts product: an alerts event is a derived result, never an SWPC alert, watch or warning. See docs/data/topics.md and docs/adr/0007-alerts-topic.md.",
+  "type": "object",
+  "required": ["schema_version", "kind", "rules_version", "event_id", "produced_at"],
+  "properties": {
+    "schema_version": {
+      "description": "Major version of this contract. Always 1 for events written against this file.",
+      "type": "integer",
+      "const": 1
+    },
+    "kind": {
+      "description": "Which kind of event this is. space_weather_level: a derived G, R or S level, none, no data, or the end of a satellite series, for one series, published on a change, a correction, or a periodic refresh. close_approach: one close approach within the report distance found by one screening run. screening_run: what one screening run covered and what it did not screen.",
+      "type": "string",
+      "enum": ["space_weather_level", "close_approach", "screening_run"]
+    },
+    "rules_version": {
+      "description": "Version of the rules the event was derived under, raised by hand whenever a threshold, a rule, or a screening setting changes (docs/risk/space-weather-scales.md and docs/risk/orbital-conventions.md), including any change to the station stack list risk-engine/src/main/resources/screening/stacks.json. It is part of every event_id and of run_id, so reprocessing under new rules publishes new events instead of being dropped as duplicates.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "event_id": {
+      "description": "Identity that consumers deduplicate on, because delivery is at least once. It is built only from fields of the event, so a producer retry or a reprocessing run under the same rules writes the same identity for the same event. It starts with the kind, a slash, rules_version, and a slash. The construction per kind is in docs/data/topics.md.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(space_weather_level|close_approach|screening_run)/[1-9][0-9]*/"
+    },
+    "produced_at": {
+      "description": "RFC 3339 UTC time at which risk-engine produced the event. Always ends in Z. It says when the event was written, not when the data was measured or fetched; see fetched_at and freshness_reference for those.",
+      "$ref": "#/$defs/utc"
+    },
+    "space_weather_level": {
+      "$ref": "#/$defs/spaceWeatherLevel"
+    },
+    "close_approach": {
+      "$ref": "#/$defs/closeApproach"
+    },
+    "screening_run": {
+      "$ref": "#/$defs/screeningRun"
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"kind": {"const": "space_weather_level"}}, "required": ["kind"]},
+      "then": {
+        "required": ["space_weather_level"],
+        "properties": {"event_id": {"pattern": "^space_weather_level/[1-9][0-9]*/"}},
+        "not": {"anyOf": [{"required": ["close_approach"]}, {"required": ["screening_run"]}]}
+      }
+    },
+    {
+      "if": {"properties": {"kind": {"const": "close_approach"}}, "required": ["kind"]},
+      "then": {
+        "required": ["close_approach"],
+        "properties": {"event_id": {"pattern": "^close_approach/[1-9][0-9]*/"}},
+        "not": {"anyOf": [{"required": ["space_weather_level"]}, {"required": ["screening_run"]}]}
+      }
+    },
+    {
+      "if": {"properties": {"kind": {"const": "screening_run"}}, "required": ["kind"]},
+      "then": {
+        "required": ["screening_run"],
+        "properties": {"event_id": {"pattern": "^screening_run/[1-9][0-9]*/"}},
+        "not": {"anyOf": [{"required": ["space_weather_level"]}, {"required": ["close_approach"]}]}
+      }
+    }
+  ],
+  "$defs": {
+    "utc": {
+      "description": "RFC 3339 UTC time ending in Z. The pattern enforces the shape because format is only an annotation by default in draft 2020-12.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
+    },
+    "runId": {
+      "description": "Identity of a screening run: its window_start as written in the event, a slash, and rules_version, for example 2026-09-29T05:20:09Z/1 (docs/data/topics.md).",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z/[1-9][0-9]*$"
+    },
+    "catalogNumber": {
+      "description": "NORAD catalog number, as in raw.gp.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 999999999
+    },
+    "role": {
+      "description": "The role an object was screened in. Every watchlist object is also screened as a catalog object.",
+      "type": "string",
+      "enum": ["watchlist", "catalog"]
+    },
+    "code": {
+      "description": "A lower case code. The known values are listed in docs/data/topics.md. The set is open: a consumer shows an unknown code with its reason text rather than rejecting the event.",
+      "type": "string",
+      "pattern": "^[a-z][a-z_]*$"
+    },
+    "spaceWeatherLevel": {
+      "description": "The state of one series after a change, a correction, or on a periodic refresh: G from planetary Kp (one series, no satellite), R from GOES 0.1-0.8nm X-ray flux, or S from GOES >=10 MeV integral proton flux (one series per satellite for R and S; satellites are never merged). The state is a derived level, none (a valid value below level 1), no data (docs/risk/space-weather-scales.md Section 5.3), or ended (Section 5.4). One event describes one sample or one 3 hour interval, never an event with a start and an end.",
+      "type": "object",
+      "required": ["scale", "product", "state", "derived_label", "trigger", "derived_from", "estimated"],
+      "properties": {
+        "scale": {
+          "description": "NOAA Space Weather Scale the level is derived on: G (geomagnetic, from Kp), R (radio, from X-ray flux) or S (solar radiation, from proton flux).",
+          "type": "string",
+          "enum": ["G", "R", "S"]
+        },
+        "product": {
+          "description": "The raw.swpc product the value came from; fixed by scale.",
+          "type": "string",
+          "enum": ["swpc.kp", "swpc.goes.xrays", "swpc.goes.protons"]
+        },
+        "state": {
+          "description": "level: a valid value at or above level 1, with derived_level set. none: a valid value below level 1. no_data: the newest record was rejected, or the newest time_tag of any record of the series with a usable time_tag is older than the series' age limit (docs/risk/space-weather-scales.md Section 5.3); never to be read as none. ended: R or S only, the series of this satellite stopped because another satellite's records took over SWPC's primary file (Section 5.4); it reads as no data and is no longer the current series of its scale.",
+          "type": "string",
+          "enum": ["level", "none", "no_data", "ended"]
+        },
+        "derived_level": {
+          "description": "The derived level, 1 to 5, present only when state is level. Derived by SpaceFlux from one value with the thresholds in docs/risk/space-weather-scales.md; not SWPC's own issued scale level.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "derived_label": {
+          "description": "Readable form of the state: the scale letter and level (for example G4), none, or no data (used for both no_data and ended).",
+          "type": "string",
+          "pattern": "^([GRS][1-5]|none|no data)$"
+        },
+        "previous_state": {
+          "description": "The state this series (for a new sample) or this Kp interval (for a revision) had before the event. Absent when risk-engine held no earlier state, for example after a restart.",
+          "type": "string",
+          "enum": ["level", "none", "no_data", "ended"]
+        },
+        "previous_derived_level": {
+          "description": "The derived level before the event, present only when previous_state is level.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "trigger": {
+          "description": "level_change: the series' current state differs from its previous state (including a change into or out of no data or ended, and the first state known after a start). revision: SWPC sent a different Kp value for an interval already seen; always published, including a revision to none; G only. When the revised interval is the newest one, the revision also sets the current state and is the only event published for it; a revision of an older interval replaces only that interval's state. restatement: SWPC's value is unchanged, but a later record showed that an earlier sample, published as none, lies on the edge of a zero run, so it is restated as no data (docs/risk/space-weather-scales.md Sections 5.1 and 5.2); R only; it replaces that sample's state and says nothing about the current state. refresh: no change of state; the series' current state repeated with its newest record, so a consumer can tell a quiet current series from a stale one. Published when newer records arrive for the series without changing its state, and by a timer fallback when nothing went out for the series within its interval (docs/risk/space-weather-scales.md Section 5.3); level or none only.",
+          "type": "string",
+          "enum": ["level_change", "revision", "restatement", "refresh"]
+        },
+        "derived_from": {
+          "description": "Readable name of the measurement the state is derived from, including the satellite for R and S, for example SWPC estimated planetary Kp, or GOES-16 X-ray flux 0.1-0.8nm.",
+          "type": "string",
+          "minLength": 1
+        },
+        "estimated": {
+          "description": "True for G: SWPC calls planetary Kp estimated, and a value can be revised, so the level for an interval can change or disappear. False for R and S, whose GOES values SWPC does not label estimated.",
+          "type": "boolean"
+        },
+        "satellite": {
+          "description": "GOES satellite number the value came from, for example 16. Required for R and S; absent for G, which is not measured by one satellite.",
+          "type": "integer"
+        },
+        "band": {
+          "description": "X-ray passband the R level is read from, as SWPC writes it. R only.",
+          "type": "string"
+        },
+        "channel": {
+          "description": "Integral proton energy threshold the S level is read from, as SWPC writes it. S only.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value the state is derived from, as received. Present when state is level or none, and on a restatement.",
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "description": "Unit of value: Kp index (dimensionless, in thirds), W m-2 (X-ray irradiance), or pfu (protons per cm2 s sr).",
+          "type": "string",
+          "enum": ["Kp index", "W m-2", "pfu"]
+        },
+        "xray_class": {
+          "description": "Optional, only on R events in state level from GOES-16 or a later satellite: the X-ray class of value, M or X, truncated rather than rounded to one decimal, for example M1.0, X3.9 or X20.0 (the X number continues past 10). Derived as docs/risk/space-weather-scales.md Section 2.4 defines. Its letter and number agree with derived_level (R1 M1.0 to M4.9, R2 M5.0 to M9.9, R3 X1.0 to X9.9, R4 X10.0 to X19.9, R5 X20.0 and above). It describes this one value, not a flare.",
+          "type": "string",
+          "pattern": "^(M[1-9]|X[1-9][0-9]*)\\.[0-9]$"
+        },
+        "time_tag": {
+          "description": "SWPC's own time_tag of the source record, as sent. For Kp it has no zone designator.",
+          "type": "string",
+          "minLength": 1
+        },
+        "interval_start": {
+          "description": "G only: start of the 3 hour UTC interval the Kp value describes, equal to time_tag read as UTC (docs/risk/space-weather-scales.md Section 1.3).",
+          "$ref": "#/$defs/utc"
+        },
+        "interval_end": {
+          "description": "G only: end of the 3 hour UTC interval, 3 hours after interval_start.",
+          "$ref": "#/$defs/utc"
+        },
+        "sample_time": {
+          "description": "R and S only: the UTC time_tag of the GOES average the value is.",
+          "$ref": "#/$defs/utc"
+        },
+        "averaging_period_s": {
+          "description": "R and S only: length of the average in seconds, 60 for X-ray flux and 300 for proton flux.",
+          "type": "integer"
+        },
+        "fetched_at": {
+          "description": "fetched_at of the raw.swpc event the value came from: when ingest received it. Replayed or archived data therefore shows its real fetch time and is never shown as current.",
+          "$ref": "#/$defs/utc"
+        },
+        "source_url": {
+          "description": "source_url of the raw.swpc event the value came from.",
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "freshness_reference": {
+          "description": "The newest time_tag, as UTC, of any record of this series with a usable time_tag that risk-engine held when it produced the event, including rejected values, zeros and edge values (for G, the newest interval_start); docs/risk/space-weather-scales.md Sections 5.1 and 5.3. A consumer judges staleness by comparing the current time with it against the age limit in Section 5.3. Absent only when the series never had such a record.",
+          "$ref": "#/$defs/utc"
+        },
+        "no_data_since": {
+          "description": "no_data and ended only: the time from which the series has no data, as docs/risk/space-weather-scales.md Sections 5.2 to 5.4 define it. For a rejected newest record, its time_tag, moved back to the first restated edge sample when a zero run restates earlier samples (so it can point at a well formed record); for the age limit, the time the limit was passed, which is not when data stopped, so a surface shows freshness_reference, the last record's time, next to it; for ended, the series' newest time_tag; for a restatement, the restated sample's time.",
+          "$ref": "#/$defs/utc"
+        },
+        "no_data_reason": {
+          "description": "no_data only: rejected when the newest record received for the series was rejected (Section 5.1), which is also the reason at the start of a zero run even when no_data_since points back at a well formed edge sample; zero_run_edge when the sample would be none but lies on the edge of a zero run of X-ray records (Sections 5.1 and 5.2), always the reason on a restatement, and on a level_change in practice only after a restart, since otherwise the series is already in no data from the zeros when an edge value after them arrives; age_limit when the newest time_tag of any record of the series with a usable time_tag is older than the series' age limit (Section 5.3).",
+          "type": "string",
+          "enum": ["rejected", "zero_run_edge", "age_limit"]
+        },
+        "restated_by_time_tag": {
+          "description": "restatement only: UTC time_tag of the first zero record of the run that showed the restated sample was on its edge.",
+          "$ref": "#/$defs/utc"
+        },
+        "timer_refresh_at": {
+          "description": "Timer fallback refresh only: the tick of the fallback timer (docs/risk/space-weather-scales.md Section 5.3) that produced it. Absent on a refresh sent on arrival of newer records. Part of the identity, because a timer refresh repeats the newest record an earlier event already carried.",
+          "$ref": "#/$defs/utc"
+        },
+        "ended_by_satellite": {
+          "description": "ended only: the satellite whose records at or after this series' newest time_tag ended it.",
+          "type": "integer"
+        }
+      },
+      "dependentSchemas": {
+        "xray_class": {
+          "required": ["scale", "state", "satellite", "derived_level"],
+          "properties": {
+            "scale": {"const": "R"},
+            "state": {"const": "level"},
+            "satellite": {"minimum": 16}
+          },
+          "allOf": [
+            {"if": {"properties": {"derived_level": {"const": 1}}}, "then": {"properties": {"xray_class": {"pattern": "^M[1-4]\\.[0-9]$"}}}},
+            {"if": {"properties": {"derived_level": {"const": 2}}}, "then": {"properties": {"xray_class": {"pattern": "^M[5-9]\\.[0-9]$"}}}},
+            {"if": {"properties": {"derived_level": {"const": 3}}}, "then": {"properties": {"xray_class": {"pattern": "^X[1-9]\\.[0-9]$"}}}},
+            {"if": {"properties": {"derived_level": {"const": 4}}}, "then": {"properties": {"xray_class": {"pattern": "^X1[0-9]\\.[0-9]$"}}}},
+            {"if": {"properties": {"derived_level": {"const": 5}}}, "then": {"properties": {"xray_class": {"pattern": "^X([2-9][0-9]|[1-9][0-9]{2,})\\.[0-9]$"}}}}
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"scale": {"const": "G"}}, "required": ["scale"]},
+          "then": {
+            "properties": {
+              "product": {"const": "swpc.kp"},
+              "estimated": {"const": true},
+              "unit": {"const": "Kp index"},
+              "value": {"maximum": 9.005},
+              "derived_label": {"pattern": "^(G[1-5]|none|no data)$"}
+            },
+            "not": {"anyOf": [
+              {"required": ["satellite"]}, {"required": ["band"]}, {"required": ["channel"]},
+              {"required": ["xray_class"]}, {"required": ["sample_time"]}, {"required": ["averaging_period_s"]}
+            ]}
+          }
+        },
+        {
+          "if": {"properties": {"scale": {"const": "R"}}, "required": ["scale"]},
+          "then": {
+            "required": ["satellite"],
+            "properties": {
+              "product": {"const": "swpc.goes.xrays"},
+              "estimated": {"const": false},
+              "unit": {"const": "W m-2"},
+              "band": {"const": "0.1-0.8nm"},
+              "averaging_period_s": {"const": 60},
+              "derived_label": {"pattern": "^(R[1-5]|none|no data)$"}
+            },
+            "not": {"anyOf": [
+              {"required": ["channel"]}, {"required": ["interval_start"]}, {"required": ["interval_end"]}
+            ]}
+          }
+        },
+        {
+          "if": {"properties": {"scale": {"const": "S"}}, "required": ["scale"]},
+          "then": {
+            "required": ["satellite"],
+            "properties": {
+              "product": {"const": "swpc.goes.protons"},
+              "estimated": {"const": false},
+              "unit": {"const": "pfu"},
+              "channel": {"const": ">=10 MeV"},
+              "averaging_period_s": {"const": 300},
+              "derived_label": {"pattern": "^(S[1-5]|none|no data)$"}
+            },
+            "not": {"anyOf": [
+              {"required": ["band"]}, {"required": ["xray_class"]}, {"required": ["interval_start"]},
+              {"required": ["interval_end"]}
+            ]}
+          }
+        },
+        {
+          "if": {"properties": {"state": {"const": "level"}}, "required": ["state"]},
+          "then": {
+            "required": ["derived_level"],
+            "properties": {"derived_label": {"pattern": "^[GRS][1-5]$"}}
+          }
+        },
+        {
+          "if": {"properties": {"state": {"const": "none"}}, "required": ["state"]},
+          "then": {
+            "properties": {"derived_label": {"const": "none"}},
+            "not": {"required": ["derived_level"]}
+          }
+        },
+        {
+          "if": {"properties": {"state": {"enum": ["no_data", "ended"]}}, "required": ["state"]},
+          "then": {
+            "required": ["no_data_since"],
+            "properties": {"derived_label": {"const": "no data"}, "trigger": {"enum": ["level_change", "restatement"]}},
+            "not": {"anyOf": [
+              {"required": ["derived_level"]}, {"required": ["xray_class"]}, {"required": ["interval_start"]},
+              {"required": ["interval_end"]}
+            ]}
+          }
+        },
+        {
+          "if": {
+            "properties": {"state": {"enum": ["no_data", "ended"]}, "trigger": {"const": "level_change"}},
+            "required": ["state", "trigger"]
+          },
+          "then": {"not": {"anyOf": [
+            {"required": ["value"]}, {"required": ["time_tag"]}, {"required": ["sample_time"]},
+            {"required": ["restated_by_time_tag"]}
+          ]}}
+        },
+        {
+          "if": {"properties": {"trigger": {"const": "restatement"}}, "required": ["trigger"]},
+          "then": {
+            "required": [
+              "value", "unit", "time_tag", "sample_time", "averaging_period_s", "band", "fetched_at", "source_url",
+              "restated_by_time_tag", "previous_state", "freshness_reference"
+            ],
+            "properties": {
+              "scale": {"const": "R"},
+              "state": {"const": "no_data"},
+              "no_data_reason": {"const": "zero_run_edge"},
+              "previous_state": {"const": "none"}
+            }
+          },
+          "else": {"not": {"required": ["restated_by_time_tag"]}}
+        },
+        {
+          "if": {"properties": {"state": {"const": "no_data"}}, "required": ["state"]},
+          "then": {"required": ["no_data_reason"], "not": {"required": ["ended_by_satellite"]}}
+        },
+        {
+          "if": {"properties": {"state": {"const": "ended"}}, "required": ["state"]},
+          "then": {
+            "required": ["ended_by_satellite", "satellite"],
+            "properties": {"scale": {"enum": ["R", "S"]}},
+            "not": {"required": ["no_data_reason"]}
+          }
+        },
+        {
+          "if": {"properties": {"state": {"enum": ["level", "none"]}}, "required": ["state"]},
+          "then": {"not": {"anyOf": [
+            {"required": ["no_data_since"]}, {"required": ["no_data_reason"]}, {"required": ["ended_by_satellite"]}
+          ]}}
+        },
+        {
+          "if": {"properties": {"state": {"enum": ["level", "none"]}}, "required": ["state"]},
+          "then": {"required": ["value", "unit", "time_tag", "fetched_at", "source_url", "freshness_reference"]}
+        },
+        {
+          "if": {
+            "properties": {"state": {"enum": ["level", "none"]}, "scale": {"const": "G"}},
+            "required": ["state", "scale"]
+          },
+          "then": {"required": ["interval_start", "interval_end"]}
+        },
+        {
+          "if": {
+            "properties": {"state": {"enum": ["level", "none"]}, "scale": {"const": "R"}},
+            "required": ["state", "scale"]
+          },
+          "then": {"required": ["band", "sample_time", "averaging_period_s"]}
+        },
+        {
+          "if": {
+            "properties": {"state": {"enum": ["level", "none"]}, "scale": {"const": "S"}},
+            "required": ["state", "scale"]
+          },
+          "then": {"required": ["channel", "sample_time", "averaging_period_s"]}
+        },
+        {
+          "if": {"properties": {"trigger": {"const": "revision"}}, "required": ["trigger"]},
+          "then": {"required": ["previous_state"], "properties": {"scale": {"const": "G"}}}
+        },
+        {
+          "if": {"properties": {"trigger": {"const": "refresh"}}, "required": ["trigger"]},
+          "then": {
+            "properties": {"state": {"enum": ["level", "none"]}},
+            "not": {"anyOf": [{"required": ["previous_state"]}, {"required": ["previous_derived_level"]}]}
+          },
+          "else": {"not": {"required": ["timer_refresh_at"]}}
+        },
+        {
+          "if": {"properties": {"no_data_reason": {"const": "zero_run_edge"}}, "required": ["no_data_reason"]},
+          "then": {"properties": {"scale": {"const": "R"}}}
+        },
+        {"if": {"properties": {"derived_level": {"const": 1}}, "required": ["derived_level"]}, "then": {"properties": {"derived_label": {"pattern": "^[GRS]1$"}}}},
+        {"if": {"properties": {"derived_level": {"const": 2}}, "required": ["derived_level"]}, "then": {"properties": {"derived_label": {"pattern": "^[GRS]2$"}}}},
+        {"if": {"properties": {"derived_level": {"const": 3}}, "required": ["derived_level"]}, "then": {"properties": {"derived_label": {"pattern": "^[GRS]3$"}}}},
+        {"if": {"properties": {"derived_level": {"const": 4}}, "required": ["derived_level"]}, "then": {"properties": {"derived_label": {"pattern": "^[GRS]4$"}}}},
+        {"if": {"properties": {"derived_level": {"const": 5}}, "required": ["derived_level"]}, "then": {"properties": {"derived_label": {"pattern": "^[GRS]5$"}}}},
+        {
+          "if": {"properties": {"previous_state": {"const": "level"}}, "required": ["previous_state"]},
+          "then": {"required": ["previous_derived_level"]},
+          "else": {"not": {"required": ["previous_derived_level"]}}
+        }
+      ],
+      "additionalProperties": true
+    },
+    "screenedObject": {
+      "description": "One object of a close approach pair, with the element set age at the time of closest approach.",
+      "type": "object",
+      "required": ["catalog_number", "element_age_days"],
+      "properties": {
+        "catalog_number": {"$ref": "#/$defs/catalogNumber"},
+        "element_age_days": {
+          "description": "Time of closest approach minus the element set epoch, in days. Negative when the epoch is after the time of closest approach. Position uncertainty grows with it (docs/risk/orbital-conventions.md Section 4).",
+          "type": "number"
+        },
+        "name": {
+          "description": "OBJECT_NAME of the element set used, when it has one.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "closeApproach": {
+      "description": "Two public element sets, propagated with SGP4, that come within the report distance of each other in one screening run's window. Not a collision probability and not an operational conjunction assessment (docs/risk/orbital-conventions.md Section 5).",
+      "type": "object",
+      "required": [
+        "run_id",
+        "window_start",
+        "window_end",
+        "watchlist_object",
+        "other_object",
+        "time_of_closest_approach",
+        "miss_distance_m",
+        "relative_speed_m_per_s"
+      ],
+      "properties": {
+        "run_id": {
+          "description": "The screening run that found the approach; its screening_run event carries the same run_id.",
+          "$ref": "#/$defs/runId"
+        },
+        "window_start": {"description": "Start of the run's screening window.", "$ref": "#/$defs/utc"},
+        "window_end": {"description": "End of the run's screening window.", "$ref": "#/$defs/utc"},
+        "watchlist_object": {
+          "description": "The watchlist object the search was run for.",
+          "$ref": "#/$defs/screenedObject"
+        },
+        "other_object": {
+          "description": "The catalog object it came close to, which can itself be on the watchlist.",
+          "$ref": "#/$defs/screenedObject"
+        },
+        "time_of_closest_approach": {"description": "UTC time of closest approach.", "$ref": "#/$defs/utc"},
+        "miss_distance_m": {
+          "description": "Distance between the two propagated positions at the time of closest approach, in metres, at the precision computed. Its uncertainty is at least of the order of kilometres (docs/risk/orbital-conventions.md Sections 4 and 5).",
+          "type": "number",
+          "minimum": 0
+        },
+        "relative_speed_m_per_s": {
+          "description": "Relative speed at the time of closest approach, in metres per second.",
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "screeningRun": {
+      "description": "What one screening run covered, and every object and pair it did not screen, with the reason. The run is stale 24 hours after window_start and always after window_end (docs/risk/orbital-conventions.md). No approaches means only that no searched pair's SGP4 propagation came within report_distance_m; objects not in the input, rejected, not screened, or in a suppressed pair are not covered, and the uncertainty of every distance is of the order of kilometres (docs/risk/orbital-conventions.md Section 5).",
+      "type": "object",
+      "required": [
+        "run_id",
+        "window_start",
+        "window_end",
+        "input_fetched_at",
+        "report_distance_m",
+        "coverage",
+        "approach_count",
+        "approach_event_ids",
+        "suppressed",
+        "rejected",
+        "not_screened",
+        "epoch_after_start",
+        "differing_copies"
+      ],
+      "properties": {
+        "run_id": {
+          "description": "Identity of the run.",
+          "$ref": "#/$defs/runId"
+        },
+        "window_start": {"description": "Start of the screening window: the fetched_at of the newest raw.gp event among the element sets the run used (docs/risk/orbital-conventions.md Section 3.2).", "$ref": "#/$defs/utc"},
+        "window_end": {"description": "End of the screening window, 7 days after window_start.", "$ref": "#/$defs/utc"},
+        "input_fetched_at": {
+          "description": "fetched_at of the newest raw.gp event among the element sets the run used. A run's results are stale 24 hours after window_start, and always after window_end, under the staleness rule for screening results in docs/risk/orbital-conventions.md. Equal to window_start in this version; kept as its own field because it states where the data came from, not how the window was chosen.",
+          "$ref": "#/$defs/utc"
+        },
+        "report_distance_m": {
+          "description": "Miss distance at or below which an approach is reported, in metres (docs/risk/orbital-conventions.md Section 3.5).",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "coverage": {
+          "description": "Counts of what the run covered. Every pair is exactly one of not screenable, suppressed, removed by the prefilter, or searched, so pairs equals pairs_not_screenable plus the length of suppressed plus pairs_removed_by_prefilter plus pairs_searched.",
+          "type": "object",
+          "required": [
+            "watchlist_accepted",
+            "catalog_admitted",
+            "pairs",
+            "pairs_not_screenable",
+            "pairs_removed_by_prefilter",
+            "pairs_searched"
+          ],
+          "properties": {
+            "watchlist_accepted": {"description": "Watchlist objects screened in the watchlist role.", "type": "integer", "minimum": 0},
+            "catalog_admitted": {"description": "Objects admitted in the catalog role, watchlist objects included.", "type": "integer", "minimum": 0},
+            "pairs": {"description": "Distinct pairs formed.", "type": "integer", "minimum": 0},
+            "pairs_not_screenable": {"description": "Pairs with an object that has no usable track in the window.", "type": "integer", "minimum": 0},
+            "pairs_removed_by_prefilter": {"description": "Pairs whose radial bands never come within the report distance.", "type": "integer", "minimum": 0},
+            "pairs_searched": {"description": "Pairs searched for close approaches.", "type": "integer", "minimum": 0}
+          },
+          "additionalProperties": true
+        },
+        "approach_count": {
+          "description": "Number of close_approach events the run published; equals the length of approach_event_ids.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "approach_event_ids": {
+          "description": "event_id of every close_approach event of this run, so a consumer can tell when it holds all of them.",
+          "type": "array",
+          "items": {"type": "string", "pattern": "^close_approach/"},
+          "uniqueItems": true
+        },
+        "suppressed": {
+          "description": "Pairs not screened for close approaches, with the separation sampled over their joint screenable span. The true minimum between samples can be smaller than min_separation_m.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "watchlist_number",
+              "other_number",
+              "mechanism",
+              "detail",
+              "min_separation_m",
+              "min_separation_at",
+              "max_separation_m",
+              "stack_entry_may_be_stale"
+            ],
+            "properties": {
+              "watchlist_number": {"$ref": "#/$defs/catalogNumber"},
+              "other_number": {"$ref": "#/$defs/catalogNumber"},
+              "mechanism": {"description": "Why the pair was not screened; known values in docs/data/topics.md.", "$ref": "#/$defs/code"},
+              "detail": {"description": "Readable explanation, as risk-engine wrote it.", "type": "string", "minLength": 1},
+              "min_separation_m": {"description": "Smallest sampled separation, in metres.", "type": "number", "minimum": 0},
+              "min_separation_at": {"description": "UTC time of the smallest sampled separation.", "$ref": "#/$defs/utc"},
+              "max_separation_m": {"description": "Largest sampled separation, in metres.", "type": "number", "minimum": 0},
+              "stack_entry_may_be_stale": {"description": "True when a pair listed in the same station stack separated beyond the co-orbiting bound.", "type": "boolean"}
+            },
+            "additionalProperties": true
+          }
+        },
+        "rejected": {
+          "description": "Objects rejected before any pair was formed, once per role they were rejected in.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["catalog_number", "role", "code", "reason"],
+            "properties": {
+              "catalog_number": {"$ref": "#/$defs/catalogNumber"},
+              "role": {"$ref": "#/$defs/role"},
+              "code": {"description": "Known values in docs/data/topics.md.", "$ref": "#/$defs/code"},
+              "reason": {"description": "Readable reason, as risk-engine wrote it.", "type": "string", "minLength": 1}
+            },
+            "additionalProperties": true
+          }
+        },
+        "not_screened": {
+          "description": "Admitted objects whose track does not cover the whole window.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["catalog_number", "role", "kind", "reason"],
+            "properties": {
+              "catalog_number": {"$ref": "#/$defs/catalogNumber"},
+              "role": {"$ref": "#/$defs/role"},
+              "kind": {"description": "Known values in docs/data/topics.md.", "$ref": "#/$defs/code"},
+              "screened_until": {"description": "Last good time, present only for kind stopped_in_window.", "$ref": "#/$defs/utc"},
+              "reason": {"description": "Readable reason, as risk-engine wrote it.", "type": "string", "minLength": 1}
+            },
+            "if": {"properties": {"kind": {"const": "stopped_in_window"}}, "required": ["kind"]},
+            "then": {"required": ["screened_until"]},
+            "else": {"not": {"required": ["screened_until"]}},
+            "additionalProperties": true
+          }
+        },
+        "epoch_after_start": {
+          "description": "Objects screened by propagating backward from an element set whose epoch is after the window start.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["catalog_number", "seconds_after_start"],
+            "properties": {
+              "catalog_number": {"$ref": "#/$defs/catalogNumber"},
+              "seconds_after_start": {"description": "Epoch minus window start, in seconds.", "type": "number", "exclusiveMinimum": 0}
+            },
+            "additionalProperties": true
+          }
+        },
+        "differing_copies": {
+          "description": "Differing entries for one catalog number in the inputs; the entry with the newest epoch was used and each other entry is listed.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["catalog_number", "used_epoch", "dropped_epoch", "dropped_from", "elements_differ"],
+            "properties": {
+              "catalog_number": {"$ref": "#/$defs/catalogNumber"},
+              "used_name": {"description": "OBJECT_NAME of the entry used, when it has one.", "type": "string"},
+              "used_epoch": {"description": "Epoch of the element set used.", "$ref": "#/$defs/utc"},
+              "dropped_name": {"description": "OBJECT_NAME of the entry not used, when it has one.", "type": "string"},
+              "dropped_epoch": {"description": "Epoch of the element set not used.", "$ref": "#/$defs/utc"},
+              "dropped_from": {"description": "The input list the entry not used came from.", "$ref": "#/$defs/role"},
+              "elements_differ": {"description": "False when only the name differs.", "type": "boolean"}
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

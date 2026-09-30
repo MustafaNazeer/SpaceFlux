@@ -44,6 +44,7 @@ type deadLetter struct {
 	SourceTopic     string `json:"source_topic"`
 	Service         string `json:"service"`
 	Stage           string `json:"stage"`
+	Check           string `json:"check,omitempty"`
 	Reason          string `json:"reason"`
 	FailedAt        string `json:"failed_at"`
 	SourceURL       string `json:"source_url,omitempty"`
@@ -56,8 +57,9 @@ type deadLetter struct {
 // DeadLetter builds a dead letter for sourceTopic's .dlq topic, validated
 // against its own schema so a broken one surfaces as an error rather than being
 // published. incomplete marks payloads that are partial even when total ==
-// len(payload).
-func DeadLetter(v *schema.Validator, now time.Time, sourceTopic, sourceURL string, key []byte, stage, reason string, payload []byte, total int, incomplete bool) (Message, error) {
+// len(payload). check is "schema" for a topic schema failure and empty when the
+// dead letter does not say which check failed.
+func DeadLetter(v *schema.Validator, now time.Time, sourceTopic, sourceURL string, key []byte, stage, check, reason string, payload []byte, total int, incomplete bool) (Message, error) {
 	if len(payload) > MaxDLQPayload {
 		cut := MaxDLQPayload
 		for cut > MaxDLQPayload-utf8.UTFMax && !utf8.RuneStart(payload[cut]) {
@@ -73,6 +75,7 @@ func DeadLetter(v *schema.Validator, now time.Time, sourceTopic, sourceURL strin
 		SourceTopic:     sourceTopic,
 		Service:         Service,
 		Stage:           stage,
+		Check:           check,
 		Reason:          reason,
 		FailedAt:        now.UTC().Format(time.RFC3339Nano),
 		SourceURL:       sourceURL,

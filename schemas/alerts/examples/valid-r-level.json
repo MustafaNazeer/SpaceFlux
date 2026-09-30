@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "kind": "space_weather_level",
+  "rules_version": 1,
+  "event_id": "space_weather_level/1/R/16/2024-05-10T03:24:00Z/2026-09-27T22:05:20Z",
+  "produced_at": "2026-09-30T18:50:27Z",
+  "space_weather_level": {
+    "scale": "R",
+    "product": "swpc.goes.xrays",
+    "state": "level",
+    "derived_level": 1,
+    "derived_label": "R1",
+    "previous_state": "none",
+    "trigger": "level_change",
+    "derived_from": "GOES-16 X-ray flux 0.1-0.8nm",
+    "estimated": false,
+    "satellite": 16,
+    "band": "0.1-0.8nm",
+    "value": 1.0624149581417441e-05,
+    "unit": "W m-2",
+    "xray_class": "M1.0",
+    "time_tag": "2024-05-10T03:24:00Z",
+    "sample_time": "2024-05-10T03:24:00Z",
+    "averaging_period_s": 60,
+    "fetched_at": "2026-09-27T22:05:20Z",
+    "source_url": "https://data.ngdc.noaa.gov/platforms/solar-space-observing-satellites/goes/goes16/l2/data/xrsf-l2-avg1m/2024/05/dn_xrsf-l2-avg1m_g16_d20240510_v2-2-1.nc",
+    "freshness_reference": "2024-05-10T03:24:00Z"
+  }
+}

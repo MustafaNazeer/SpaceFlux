@@ -182,7 +182,7 @@ func TestInvalidRecordDeadLetteredOthersPublish(t *testing.T) {
 			var raw map[string]any
 			json.Unmarshal(dlq[0].Value, &raw)
 			d.Stage, d.Reason, d.SourceTopic = raw["stage"].(string), raw["reason"].(string), raw["source_topic"].(string)
-			if string(dlq[0].Key) != tc.id || d.Stage != "validate" || d.SourceTopic != TopicRawSWPC || !strings.Contains(d.Reason, tc.wantReason) {
+			if string(dlq[0].Key) != tc.id || d.Stage != "validate" || raw["check"] != "schema" || d.SourceTopic != TopicRawSWPC || !strings.Contains(d.Reason, tc.wantReason) {
 				t.Fatalf("dead letter key=%s %+v", dlq[0].Key, d)
 			}
 		})
@@ -345,13 +345,14 @@ func TestInvalidUTF8RecordDeadLettered(t *testing.T) {
 	}
 	var d struct {
 		Reason, Payload string
-		Encoding        string `json:"payload_encoding"`
+		Encoding        string  `json:"payload_encoding"`
+		Check           *string `json:"check"`
 	}
 	if err := json.Unmarshal(pub.byTopic(TopicRawSWPCDLQ)[0].Value, &d); err != nil {
 		t.Fatalf("dead letter is not valid JSON: %v", err)
 	}
 	raw, err := base64.StdEncoding.DecodeString(d.Payload)
-	if !strings.Contains(d.Reason, "UTF-8") || d.Encoding != "base64" || err != nil || string(raw) != bad {
+	if !strings.Contains(d.Reason, "UTF-8") || d.Encoding != "base64" || d.Check != nil || err != nil || string(raw) != bad {
 		t.Fatalf("dead letter reason=%q encoding=%s: want the original bytes back from base64", d.Reason, d.Encoding)
 	}
 }

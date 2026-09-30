@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "kind": "space_weather_level",
+  "rules_version": 1,
+  "event_id": "space_weather_level/1/R/18/no_data/2026-09-24T08:22:00Z",
+  "produced_at": "2026-09-30T19:40:31Z",
+  "space_weather_level": {
+    "scale": "R",
+    "product": "swpc.goes.xrays",
+    "state": "no_data",
+    "derived_label": "no data",
+    "previous_state": "none",
+    "trigger": "level_change",
+    "derived_from": "GOES-18 X-ray flux 0.1-0.8nm",
+    "estimated": false,
+    "satellite": 18,
+    "band": "0.1-0.8nm",
+    "unit": "W m-2",
+    "no_data_reason": "rejected",
+    "no_data_since": "2026-09-24T08:22:00Z",
+    "freshness_reference": "2026-09-24T08:27:00Z"
+  }
+}

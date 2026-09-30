@@ -36,6 +36,11 @@
       "type": "string",
       "enum": ["fetch", "decode", "validate", "publish"]
     },
+    "check": {
+      "description": "Only with stage validate, and set only when a check rejected the payload. schema: a topic schema check rejected it (in ingest, or in a consumer). rule: the payload matches its schema, but a rule of risk-engine rejected the value, for example a Kp above 9.00. Absent when the payload never reached either check (the UTF-8 and record size dead letters in ingest), when neither check rejected it (a record that passed its topic schema but failed ingest's identity parse, for example an EPOCH that matches the pattern but is not a real date), and on dead letters written before the field existed.",
+      "type": "string",
+      "enum": ["schema", "rule"]
+    },
     "reason": {
       "description": "Human readable error, including validation error paths where there are any.",
       "type": "string",
@@ -70,6 +75,11 @@
     "payload_truncated": {
       "description": "True when payload holds only a prefix of the original bytes, because the original was too large to fit in a Kafka record. payload_bytes still gives the original length. Absent means false.",
       "type": "boolean"
+    }
+  },
+  "dependentSchemas": {
+    "check": {
+      "properties": {"stage": {"const": "validate"}}
     }
   },
   "additionalProperties": true

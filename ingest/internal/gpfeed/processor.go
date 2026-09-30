@@ -64,18 +64,18 @@ func (p *Processor) Process(ctx context.Context, body []byte, fetchedAt time.Tim
 	var fresh []recordID
 	inBatch := map[recordID]bool{}
 
-	add := func(key []byte, stage, reason string, payload []byte) error {
-		m, err := p.deadLetter(key, stage, reason, payload, len(payload), false)
+	add := func(key []byte, stage, check, reason string, payload []byte) error {
+		m, err := p.deadLetter(key, stage, check, reason, payload, len(payload), false)
 		msgs = append(msgs, m)
 		return err
 	}
 
 	if err := json.Unmarshal(body, &records); err != nil {
-		if err := add(nil, "decode", "decode response: "+err.Error(), body); err != nil {
+		if err := add(nil, "decode", "", "decode response: "+err.Error(), body); err != nil {
 			return err
 		}
 	} else if len(records) == 0 {
-		if err := add(nil, "decode", "response contained no records", body); err != nil {
+		if err := add(nil, "decode", "", "response contained no records", body); err != nil {
 			return err
 		}
 	}
@@ -83,27 +83,30 @@ func (p *Processor) Process(ctx context.Context, body []byte, fetchedAt time.Tim
 	for _, rec := range records {
 		key := bestEffortKey(rec)
 		if !utf8.Valid(rec) {
-			if err := add(key, "validate", "record is not valid UTF-8", rec); err != nil {
+			if err := add(key, "validate", "", "record is not valid UTF-8", rec); err != nil {
 				return err
 			}
 			continue
 		}
 		if len(rec) > maxEventBytes {
-			if err := add(key, "validate", fmt.Sprintf("record of %d bytes exceeds the %d byte limit", len(rec), maxEventBytes), rec); err != nil {
+			if err := add(key, "validate", "", fmt.Sprintf("record of %d bytes exceeds the %d byte limit", len(rec), maxEventBytes), rec); err != nil {
 				return err
 			}
 			continue
 		}
+		check := ""
 		value, err := p.envelope(rec, fetchedAt)
 		if err == nil {
-			err = p.Events.Validate(value)
+			if err = p.Events.Validate(value); err != nil {
+				check = "schema"
+			}
 		}
 		var rid recordID
 		if err == nil {
 			rid, err = identity(rec)
 		}
 		if err != nil {
-			if err := add(key, "validate", err.Error(), rec); err != nil {
+			if err := add(key, "validate", check, err.Error(), rec); err != nil {
 				return err
 			}
 			continue
@@ -132,7 +135,7 @@ func (p *Processor) Process(ctx context.Context, body []byte, fetchedAt time.Tim
 // total is the number of bytes received, which may exceed len(prefix); the
 // payload is always marked truncated because the body never arrived whole.
 func (p *Processor) RejectBody(ctx context.Context, reason string, prefix []byte, total int) error {
-	m, err := p.deadLetter(nil, "fetch", reason, prefix, total, true)
+	m, err := p.deadLetter(nil, "fetch", "", reason, prefix, total, true)
 	if err != nil {
 		return err
 	}
@@ -154,8 +157,8 @@ func (p *Processor) envelope(rec json.RawMessage, fetchedAt time.Time) ([]byte, 
 	})
 }
 
-func (p *Processor) deadLetter(key []byte, stage, reason string, payload []byte, total int, incomplete bool) (Message, error) {
-	return events.DeadLetter(p.DeadLetter, p.Now(), TopicRawGP, p.SourceURL, key, stage, reason, payload, total, incomplete)
+func (p *Processor) deadLetter(key []byte, stage, check, reason string, payload []byte, total int, incomplete bool) (Message, error) {
+	return events.DeadLetter(p.DeadLetter, p.Now(), TopicRawGP, p.SourceURL, key, stage, check, reason, payload, total, incomplete)
 }
 
 // identity returns the dedupe key. EPOCH is normalized through time parsing so

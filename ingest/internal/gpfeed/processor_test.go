@@ -81,6 +81,7 @@ type dlqEvent struct {
 	SourceTopic     string `json:"source_topic"`
 	Service         string `json:"service"`
 	Stage           string `json:"stage"`
+	Check           string `json:"check"`
 	Reason          string `json:"reason"`
 	Payload         string `json:"payload"`
 	PayloadEncoding string `json:"payload_encoding"`
@@ -194,7 +195,7 @@ func TestInvalidRecordGoesToDLQAndOthersPublish(t *testing.T) {
 				t.Fatalf("dlq event fails dlq schema: %v", err)
 			}
 			e := decodeDLQ(t, dlq[0])
-			if e.Stage != "validate" || e.SourceTopic != TopicRawGP || e.Service != "ingest" || !strings.Contains(e.Reason, tc.wantReason) {
+			if e.Stage != "validate" || e.Check != "schema" || e.SourceTopic != TopicRawGP || e.Service != "ingest" || !strings.Contains(e.Reason, tc.wantReason) {
 				t.Fatalf("dlq event = %+v", e)
 			}
 			if !strings.Contains(e.Payload, `"OBJECT_NAME":"ISS (ZARYA)"`) || strings.Contains(e.Payload, "CSS (TIANHE)") {
@@ -426,7 +427,7 @@ func TestInvalidUTF8RecordGoesToDLQ(t *testing.T) {
 	if len(dlq) != 1 || len(pub.byTopic(TopicRawGP)) != 0 {
 		t.Fatalf("dlq=%d raw.gp=%d, want 1 and 0", len(dlq), len(pub.byTopic(TopicRawGP)))
 	}
-	if e := decodeDLQ(t, dlq[0]); !strings.Contains(e.Reason, "UTF-8") || e.PayloadEncoding != "base64" {
+	if e := decodeDLQ(t, dlq[0]); !strings.Contains(e.Reason, "UTF-8") || e.PayloadEncoding != "base64" || e.Check != "" {
 		t.Fatalf("dlq event = %+v", e)
 	}
 }

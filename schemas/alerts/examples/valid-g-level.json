@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "kind": "space_weather_level",
+  "rules_version": 1,
+  "event_id": "space_weather_level/1/G/-/2024-05-10T15:00:00/2026-09-27T22:05:05Z",
+  "produced_at": "2026-09-30T18:50:27Z",
+  "space_weather_level": {
+    "scale": "G",
+    "product": "swpc.kp",
+    "state": "level",
+    "derived_level": 4,
+    "derived_label": "G4",
+    "previous_state": "none",
+    "trigger": "level_change",
+    "derived_from": "SWPC estimated planetary Kp",
+    "estimated": true,
+    "value": 7.67,
+    "unit": "Kp index",
+    "time_tag": "2024-05-10T15:00:00",
+    "interval_start": "2024-05-10T15:00:00Z",
+    "interval_end": "2024-05-10T18:00:00Z",
+    "fetched_at": "2026-09-27T22:05:05Z",
+    "source_url": "https://www.ngdc.noaa.gov/stp/space-weather/swpc-products/daily_reports/space_weather_indices/2024/05/20240510dayind.txt",
+    "freshness_reference": "2024-05-10T15:00:00Z"
+  }
+}

@@ -86,14 +86,14 @@ func (p *Processor) Process(ctx context.Context, body []byte, fetchedAt time.Tim
 	var seen []string
 	inBatch := map[string]bool{}
 
-	add := func(stage, reason string, payload []byte) error {
-		m, err := p.deadLetter(stage, reason, payload, len(payload), false)
+	add := func(stage, check, reason string, payload []byte) error {
+		m, err := p.deadLetter(stage, check, reason, payload, len(payload), false)
 		msgs = append(msgs, m)
 		return err
 	}
 	// A bad record stays in the sliding window for hours; dead letter it only
 	// when it first appears, tracked by a hash of its bytes.
-	addRecord := func(reason string, rec []byte) error {
+	addRecord := func(check, reason string, rec []byte) error {
 		sum := sha256.Sum256(rec)
 		id := "invalid:" + hex.EncodeToString(sum[:])
 		seen = append(seen, id)
@@ -101,7 +101,7 @@ func (p *Processor) Process(ctx context.Context, body []byte, fetchedAt time.Tim
 			return nil
 		}
 		inBatch[id] = true
-		return add("validate", reason, rec)
+		return add("validate", check, reason, rec)
 	}
 
 	decodeErr := json.Unmarshal(body, &records)
@@ -124,7 +124,7 @@ func (p *Processor) Process(ctx context.Context, body []byte, fetchedAt time.Tim
 		if decodeErr != nil {
 			reason = "decode response: " + decodeErr.Error()
 		}
-		if err := add("decode", reason, body); err != nil {
+		if err := add("decode", "", reason, body); err != nil {
 			return err
 		}
 		if err := p.Publisher.Publish(ctx, msgs); err != nil {
@@ -137,27 +137,30 @@ func (p *Processor) Process(ctx context.Context, body []byte, fetchedAt time.Tim
 
 	for _, rec := range records {
 		if !utf8.Valid(rec) {
-			if err := addRecord("record is not valid UTF-8", rec); err != nil {
+			if err := addRecord("", "record is not valid UTF-8", rec); err != nil {
 				return err
 			}
 			continue
 		}
 		if len(rec) > maxRecordBytes {
-			if err := addRecord(fmt.Sprintf("record of %d bytes exceeds the %d byte limit", len(rec), maxRecordBytes), rec); err != nil {
+			if err := addRecord("", fmt.Sprintf("record of %d bytes exceeds the %d byte limit", len(rec), maxRecordBytes), rec); err != nil {
 				return err
 			}
 			continue
 		}
+		check := ""
 		value, err := p.envelope(rec, fetchedAt)
 		if err == nil {
-			err = p.Events.Validate(value)
+			if err = p.Events.Validate(value); err != nil {
+				check = "schema"
+			}
 		}
 		var id string
 		if err == nil {
 			id, err = identity(rec, p.Product.identity)
 		}
 		if err != nil {
-			if err := addRecord(err.Error(), rec); err != nil {
+			if err := addRecord(check, err.Error(), rec); err != nil {
 				return err
 			}
 			continue
@@ -181,7 +184,7 @@ func (p *Processor) Process(ctx context.Context, body []byte, fetchedAt time.Tim
 
 // RejectBody dead letters a response whose body failed after a 200 status.
 func (p *Processor) RejectBody(ctx context.Context, reason string, prefix []byte, total int) error {
-	m, err := p.deadLetter("fetch", reason, prefix, total, true)
+	m, err := p.deadLetter("fetch", "", reason, prefix, total, true)
 	if err != nil {
 		return err
 	}
@@ -191,8 +194,8 @@ func (p *Processor) RejectBody(ctx context.Context, reason string, prefix []byte
 	return nil
 }
 
-func (p *Processor) deadLetter(stage, reason string, payload []byte, total int, incomplete bool) (events.Message, error) {
-	return events.DeadLetter(p.DeadLetter, p.Now(), TopicRawSWPC, p.SourceURL, []byte(p.Product.ID), stage, reason, payload, total, incomplete)
+func (p *Processor) deadLetter(stage, check, reason string, payload []byte, total int, incomplete bool) (events.Message, error) {
+	return events.DeadLetter(p.DeadLetter, p.Now(), TopicRawSWPC, p.SourceURL, []byte(p.Product.ID), stage, check, reason, payload, total, incomplete)
 }
 
 // envelope splices the record in verbatim: encoding it as a json.RawMessage

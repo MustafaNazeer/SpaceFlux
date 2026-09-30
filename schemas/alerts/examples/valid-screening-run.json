@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "kind": "screening_run",
+  "rules_version": 1,
+  "event_id": "screening_run/1/2026-09-29T05:20:09Z/1",
+  "produced_at": "2026-09-30T18:50:27Z",
+  "screening_run": {
+    "run_id": "2026-09-29T05:20:09Z/1",
+    "window_start": "2026-09-29T05:20:09Z",
+    "window_end": "2026-10-06T05:20:09Z",
+    "input_fetched_at": "2026-09-29T05:20:09Z",
+    "report_distance_m": 5000,
+    "coverage": {
+      "watchlist_accepted": 1,
+      "catalog_admitted": 2,
+      "pairs": 1,
+      "pairs_not_screenable": 0,
+      "pairs_removed_by_prefilter": 0,
+      "pairs_searched": 1
+    },
+    "approach_count": 1,
+    "approach_event_ids": [
+      "close_approach/1/2026-09-29T05:20:09Z/1/57036/27958/2026-09-30T03:34:37.588Z"
+    ],
+    "suppressed": [],
+    "rejected": [],
+    "not_screened": [],
+    "epoch_after_start": [],
+    "differing_copies": []
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "kind": "space_weather_level",
+  "rules_version": 1,
+  "event_id": "space_weather_level/1/S/13/2017-09-10T16:45:00Z/2026-09-27T22:05:26Z",
+  "produced_at": "2026-09-30T18:50:27Z",
+  "space_weather_level": {
+    "scale": "S",
+    "product": "swpc.goes.protons",
+    "state": "level",
+    "derived_level": 1,
+    "derived_label": "S1",
+    "previous_state": "none",
+    "trigger": "level_change",
+    "derived_from": "GOES-13 >=10 MeV integral proton flux",
+    "estimated": false,
+    "satellite": 13,
+    "channel": ">=10 MeV",
+    "value": 12.344,
+    "unit": "pfu",
+    "time_tag": "2017-09-10T16:45:00Z",
+    "sample_time": "2017-09-10T16:45:00Z",
+    "averaging_period_s": 300,
+    "fetched_at": "2026-09-27T22:05:26Z",
+    "source_url": "https://www.ncei.noaa.gov/data/goes-space-environment-monitor/access/avg/2017/09/goes13/csv/g13_epead_cpflux_5m_20170901_20170930.csv",
+    "freshness_reference": "2017-09-10T16:45:00Z"
+  }
+}

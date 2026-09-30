@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "kind": "close_approach",
+  "rules_version": 1,
+  "event_id": "close_approach/1/2026-09-29T05:20:09Z/1/57036/27958/2026-09-30T03:34:37.588Z",
+  "produced_at": "2026-09-30T18:50:27Z",
+  "close_approach": {
+    "run_id": "2026-09-29T05:20:09Z/1",
+    "window_start": "2026-09-29T05:20:09Z",
+    "window_end": "2026-10-06T05:20:09Z",
+    "watchlist_object": {
+      "catalog_number": 57036,
+      "name": "OBJECT AJ",
+      "element_age_days": 1.5585
+    },
+    "other_object": {
+      "catalog_number": 27958,
+      "name": "SL-12 DEB",
+      "element_age_days": 4.1985
+    },
+    "time_of_closest_approach": "2026-09-30T03:34:37.588Z",
+    "miss_distance_m": 1973.3,
+    "relative_speed_m_per_s": 15727
+  }
+}
