@@ -1,0 +1,14 @@
+[
+{"time_tag": "2024-05-10T00:13:00Z", "satellite": 16, "flux": 1.38868481371901e-05, "xrsb_flag": 0, "swpc_class": "M1.3", "report_line": 13, "report_text": " 0010 0013 0022  3664        M1.3     2200                          "},
+{"time_tag": "2024-05-10T03:29:00Z", "satellite": 16, "flux": 1.450580657547107e-05, "xrsb_flag": 0, "swpc_class": "M1.4", "report_line": 18, "report_text": " 0315 0329 0340  3664        M1.4                                   "},
+{"time_tag": "2024-05-10T06:54:00Z", "satellite": 16, "flux": 0.0003978928434662521, "xrsb_flag": 0, "swpc_class": "X3.9", "report_line": 19, "report_text": " 0627 0654 0706  3664        X3.9     440    900    II/IV           "},
+{"time_tag": "2024-05-10T10:14:00Z", "satellite": 16, "flux": 2.2947060642763972e-05, "xrsb_flag": 0, "swpc_class": "M2.2", "report_line": 22, "report_text": " 1010 1014 1019  3664        M2.2                                   "},
+{"time_tag": "2024-05-10T14:11:00Z", "satellite": 16, "flux": 5.96866593696177e-05, "xrsb_flag": 0, "swpc_class": "M5.9", "report_line": 26, "report_text": " 1358 1411 1423  3664 S14W39 M5.9  1n                               "},
+{"time_tag": "2024-05-10T16:08:00Z", "satellite": 16, "flux": 6.924825356691144e-06, "xrsb_flag": 0, "swpc_class": "C6.9", "report_line": 27, "report_text": " 1559 1608 1612  3664 S15W36 C6.9  Sf 110                           "},
+{"time_tag": "2024-05-10T18:32:00Z", "satellite": 16, "flux": 1.1593207091209479e-05, "xrsb_flag": 0, "swpc_class": "M1.1", "report_line": 31, "report_text": " 1826 1832 1838  3664        M1.1                                   "},
+{"time_tag": "2024-05-10T18:48:00Z", "satellite": 16, "flux": 1.7997697796090506e-05, "xrsb_flag": 0, "swpc_class": "M1.7", "report_line": 32, "report_text": " 1838 1848 1857  3664 S16W44 M1.7  1f                               "},
+{"time_tag": "2024-05-10T19:05:00Z", "satellite": 16, "flux": 2.022428816417232e-05, "xrsb_flag": 0, "swpc_class": "M2.0", "report_line": 33, "report_text": " 1857 1905 1910  3664        M2.0                                   "},
+{"time_tag": "2024-05-10T19:53:00Z", "satellite": 16, "flux": 1.1805874237325042e-05, "xrsb_flag": 0, "swpc_class": "M1.1", "report_line": 35, "report_text": " 1935 1953 1956  3664        M1.1     440                           "},
+{"time_tag": "2024-05-10T20:03:00Z", "satellite": 16, "flux": 1.9490487829898484e-05, "xrsb_flag": 0, "swpc_class": "M1.9", "report_line": 36, "report_text": " 1956 2003 2018  3664        M1.9                                   "},
+{"time_tag": "2024-05-10T21:08:00Z", "satellite": 16, "flux": 3.834960807580501e-05, "xrsb_flag": 0, "swpc_class": "M3.8", "report_line": 38, "report_text": " 2059 2108 2112  3664        M3.8     110                           "}
+]
