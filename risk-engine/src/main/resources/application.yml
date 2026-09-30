@@ -3,6 +3,8 @@
 spaceflux:
   swpc:
     enabled: true
+  screening:
+    enabled: true
 
 spring:
   kafka:
