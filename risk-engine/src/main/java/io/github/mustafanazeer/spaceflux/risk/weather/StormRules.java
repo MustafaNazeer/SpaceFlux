@@ -1,5 +1,7 @@
 package io.github.mustafanazeer.spaceflux.risk.weather;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Optional;
 
 import tools.jackson.databind.JsonNode;
@@ -21,6 +23,13 @@ public final class StormRules {
 
     /** pfu (Section 3.1). */
     private static final double[] S_THRESHOLDS = {10, 100, 1_000, 10_000, 100_000};
+
+    /** The corrected X-ray flux has a 1e-9 W m⁻² minimum; NCEI's valid_max is 0.2 (Sections 5.1 and 5.2). */
+    private static final float R_FLOOR = 1e-9f;
+    private static final float R_MAX = 0.2f;
+
+    /** The first satellite whose irradiances are in physical units, so a class applies (Section 2.4). */
+    private static final int FIRST_GOES_R = 16;
 
     static final String R_BAND = "0.1-0.8nm";
     static final String S_CHANNEL = ">=10 MeV";
@@ -44,7 +53,31 @@ public final class StormRules {
     }
 
     static int rLevel(double flux) {
+        usable("flux", flux);
+        if (flux == 0) {
+            throw new MissingValueException("\"flux\" is 0, SWPC's marker for a missing X-ray measurement");
+        }
+        if ((float) flux < R_FLOOR) {
+            throw new InvalidReadingException("\"flux\" " + flux + " is below the 1e-9 W m-2 minimum");
+        }
+        if ((float) flux > R_MAX) {
+            throw new InvalidReadingException("\"flux\" " + flux + " is above 0.2 W m-2, the largest valid value");
+        }
         return goesLevel(flux, R_THRESHOLDS);
+    }
+
+    /**
+     * The X-ray class of one R1 or higher value from GOES-16 or later: M or X by decade, the number truncated to one
+     * decimal from the shortest decimal of the 32 bit float, so class and level agree at every threshold (Section 2.4).
+     */
+    static Optional<String> xrayClass(double flux, int satellite) {
+        if (satellite < FIRST_GOES_R || rLevel(flux) == 0) {
+            return Optional.empty();
+        }
+        BigDecimal value = new BigDecimal(Float.toString((float) flux));
+        boolean x = value.compareTo(new BigDecimal("1e-4")) >= 0;
+        BigDecimal number = value.divide(new BigDecimal(x ? "1e-4" : "1e-5")).setScale(1, RoundingMode.DOWN);
+        return Optional.of((x ? "X" : "M") + number.toPlainString());
     }
 
     static int sLevel(double flux) {
