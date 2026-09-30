@@ -78,6 +78,7 @@ Items marked **(to be verified)** depend on a tool, library, or provider behavio
 - [ ] `SEC-RSK-05` Feed records are read through Jackson's tree model only, with no polymorphic typing and no binding to `Path`, `Duration`, or `XMLGregorianCalendar`, and the Jackson version in the build has no open advisory. Met today by the risk engine, on Jackson 3.1.7. [T3.4, T11.3]
 - [ ] `SEC-RSK-06` A space weather reading is accepted into its series only when its sample time is no later than the record's `fetched_at` plus a stated tolerance and its satellite number is positive; anything else is dead lettered as a rule failure, with a test. Met today by the risk engine's `raw.swpc` consumer, with a 5 minute tolerance. [T3.5, T1.3]
 - [ ] `SEC-RSK-07` No record content can make a processing call throw: failures while deriving or building a record's events become a dead letter for that record, the scheduled refresh handles each scale on its own, and a test feeds schema valid mutations of recorded payloads through the processor and asserts that none throws and none is dropped without a dead letter or a count. Met today by the risk engine's `raw.swpc` consumer. [T3.5, T2.8, T1.1]
+- [ ] `SEC-RSK-08` An element set is accepted only when its `EPOCH` is no later than its `fetched_at` plus a stated tolerance and neither its `EPOCH` nor its `fetched_at` is later than the consumer's clock plus that tolerance; anything else is dead lettered as a rule failure before it can replace a held element set, with a test. [T3.6, T1.3]
 
 ## query-api
 

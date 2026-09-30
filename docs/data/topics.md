@@ -71,7 +71,7 @@ Every topic's dead letter topic uses the same envelope, [`schemas/dlq/v1.schema.
 | `source_topic` | yes | The topic the payload was meant for or read from, for example `raw.gp` |
 | `service` | yes | Which service dead lettered it. Both the producer and every consumer validate, so the stage alone does not say who failed |
 | `stage` | yes | `fetch`, `decode`, `validate`, or `publish` |
-| `check` | no | Only with `stage` `validate`, and set only when a check rejected the payload: `schema` when a topic schema check (in `ingest` or a consumer) rejected it, `rule` when it matches its schema but a rule of `risk-engine` rejected its value. Absent when the payload never reached either check (the UTF-8 and record size dead letters in `ingest`), when neither check rejected it (a record that passed its topic schema but failed `ingest`'s identity parse, for example an `EPOCH` that matches the pattern but is not a real date), and on dead letters written before the field existed |
+| `check` | no | Only with `stage` `validate`, and set only when a check rejected the payload: `schema` when a topic schema check (in `ingest` or a consumer) rejected it, `rule` when it matches its schema but a rule of `risk-engine` rejected its value. Absent when the payload never reached either check (the UTF-8 and record size dead letters in `ingest`), when neither check rejected it (a record that passed its topic schema but failed `ingest`'s identity parse, for example an `EPOCH` that matches the pattern but is not a real date, or an element set that passes its schema but that `risk-engine` cannot turn into an orbit), and on dead letters written before the field existed |
 | `reason` | yes | Human readable error, including the failing field path for validation errors |
 | `failed_at` | yes | RFC 3339 UTC time of the failure, ending in `Z` |
 | `source_url` | no | The provider URL, when there is one |
@@ -87,6 +87,8 @@ What goes in the payload depends on the stage: for a `fetch` failure (a response
 The key is the source event's key when it is known (a single record that failed validation) and empty otherwise (a body that could not be decoded).
 
 [`schemas/dlq/examples/truncated-body.json`](../../schemas/dlq/examples/truncated-body.json) shows a `decode` failure on a CelesTrak response cut off after 200 bytes. The payload is the first 200 bytes of a recorded response; the truncation itself was made by hand to exercise this path.
+
+`risk-engine` also writes here as the consumer of `raw.gp`. An element set that passes its schema but cannot be turned into an orbit is dead lettered with `stage` `validate` and no `check`, since neither a schema nor a rule check rejected it. An element set whose `EPOCH` is more than 5 minutes after its `fetched_at`, and an event whose `fetched_at` is more than 5 minutes after the risk engine's clock, are rule dead letters with `check` `rule` ([the orbital conventions](../risk/orbital-conventions.md), Section 2.4).
 
 ## `raw.swpc`
 
@@ -194,7 +196,7 @@ Every event has this envelope and exactly one of the three payload objects, the 
 | --- | --- | --- |
 | `schema_version` | integer, always `1` | Major version of the contract the event was written against |
 | `kind` | `space_weather_level`, `close_approach`, or `screening_run` | Which payload object the event carries |
-| `rules_version` | integer, 1 or more | The version of the rules the event was derived under. I raise it by hand whenever a threshold, a rule, or a screening setting changes (anything in [the scales note](../risk/space-weather-scales.md) or [the orbital conventions](../risk/orbital-conventions.md) that can change a derived level, a rejection, or a screening result, and any change to the station stack list `risk-engine/src/main/resources/screening/stacks.json`). It is part of every `event_id` and of `run_id`, so reprocessing under new rules publishes new events rather than being dropped as duplicates |
+| `rules_version` | integer, 1 or more | The version of the rules the event was derived under. I raise it by hand whenever a threshold, a rule, or a screening setting changes (anything in [the scales note](../risk/space-weather-scales.md) or [the orbital conventions](../risk/orbital-conventions.md) that can change a derived level, a rejection, or a screening result, and any change to the station stack list `risk-engine/src/main/resources/screening/stacks.json` or the watchlist `risk-engine/src/main/resources/screening/watchlist.json`). It is part of every `event_id` and of `run_id`, so reprocessing under new rules publishes new events rather than being dropped as duplicates |
 | `event_id` | string starting with the kind, `/`, `rules_version`, and `/` | The identity consumers deduplicate on; see [Deduplication](#deduplication-2) |
 | `produced_at` | RFC 3339 UTC string ending in `Z` | When `risk-engine` wrote the event, not when the data was measured or fetched |
 | `space_weather_level`, `close_approach`, or `screening_run` | object | The payload, below |
@@ -281,24 +283,24 @@ One event per run, published after all of the run's approaches, and published ev
 
 | Field | Meaning |
 | --- | --- |
-| `run_id` | The run's `window_start` as written there, a slash, and `rules_version`, for example `2026-09-29T05:20:09Z/1` |
+| `run_id` | The run's `window_start` as written there, a slash, and `rules_version`, for example `2026-09-29T05:20:09Z/1`. A `run_id` once written is never produced again with other content: element sets that arrive late for a run already written wait for the next newer fetch |
 | `window_start`, `window_end` | The screening window: from the `fetched_at` of the newest `raw.gp` event among the element sets the run used, to 7 days later |
 | `input_fetched_at` | That same `fetched_at`, equal to `window_start`, stated as the data's origin. A run's results are stale 24 hours after `window_start`, and always after `window_end`, under the staleness rule for screening results in [the orbital conventions](../risk/orbital-conventions.md) |
 | `report_distance_m` | `5000` |
 | `coverage` | `watchlist_accepted`, `catalog_admitted`, `pairs`, `pairs_not_screenable`, `pairs_removed_by_prefilter`, `pairs_searched`. Every pair is exactly one of not screenable, suppressed, removed by the prefilter, or searched, so the suppressed count is the length of `suppressed` and `pairs` is `pairs_not_screenable` plus that length plus `pairs_removed_by_prefilter` plus `pairs_searched` |
 | `approach_count`, `approach_event_ids` | How many `close_approach` events the run published, and the `event_id` of each |
-| `suppressed` | Pairs not screened for close approaches: `watchlist_number`, `other_number`, `mechanism`, `detail`, `min_separation_m`, `min_separation_at`, `max_separation_m`, `stack_entry_may_be_stale`. The separations are sampled, so the true minimum can be smaller |
-| `rejected` | Objects rejected before any pair was formed, once per role: `catalog_number`, `role`, `code`, `reason` |
-| `not_screened` | Admitted objects whose track does not cover the window: `catalog_number`, `role`, `kind`, `reason`, and `screened_until` for `stopped_in_window` only |
-| `epoch_after_start` | Objects screened backward from an element set newer than the window start: `catalog_number`, `seconds_after_start` |
-| `differing_copies` | Differing input entries for one catalog number: `catalog_number`, `used_name`, `used_epoch`, `dropped_name`, `dropped_epoch`, `dropped_from`, `elements_differ` |
+| `suppressed` | Pairs not screened for close approaches: `watchlist_number`, `other_number`, `mechanism`, `detail`, `min_separation_m`, `min_separation_at`, `max_separation_m`, `stack_entry_may_be_stale`, and `watchlist_name` and `other_name` when the element sets have one. The separations are between the propagated element sets, sampled, so the true minimum can be smaller |
+| `rejected` | Objects rejected before any pair was formed, once per role: `catalog_number`, `role`, `code`, `reason`, and `name` when the element set has one |
+| `not_screened` | Admitted objects whose track does not cover the window: `catalog_number`, `role`, `kind`, `reason`, `screened_until` for `stopped_in_window` only, and `name` when the element set has one |
+| `epoch_after_start` | Objects screened backward from an element set newer than the window start: `catalog_number`, `seconds_after_start`, and `name` when the element set has one |
+| `differing_copies` | Differing input entries for one catalog number, including copies with the same epoch but other elements or another name (the first copy held is used then): `catalog_number`, `used_name`, `used_epoch`, `dropped_name`, `dropped_epoch`, `dropped_from`, `elements_differ` |
 
 Every list is present, empty when nothing applies. The meaning of each list and count is in [the orbital conventions](../risk/orbital-conventions.md), Sections 3.2 and 3.7. `role` is `watchlist` or `catalog`. The codes are open lists: a consumer shows an unknown value with its `reason` or `detail` instead of rejecting the event. The known values are:
 
 | Field | Known values |
 | --- | --- |
-| `suppressed[].mechanism` | `static_stack` (both objects are listed in the same station stack), `co_orbiting` (separation stayed under the co-orbiting bound over the whole window), `same_elements` (identical element sets) |
-| `rejected[].code` | `deep_space` (a watchlist object propagated with the deep space model), `stale_element_set` (element set older than 10 days at the window start) |
+| `suppressed[].mechanism` | `static_stack` (both objects are listed in the same station stack; its `detail` gives the separation between the members' propagated element sets, not a measured distance), `co_orbiting` (separation stayed under the co-orbiting bound over the whole window), `same_elements` (identical element sets) |
+| `rejected[].code` | `deep_space` (a watchlist object propagated with the deep space model), `stale_element_set` (element set older than 10 days at the window start), `not_in_input` (a configured watchlist object with no element set in the input; role `watchlist`) |
 | `not_screened[].kind` | `cannot_propagate` (no usable state in the window), `stopped_before_window`, `stopped_in_window` |
 
 **Which run is current.** Each run replaces the one before it. The current approaches are those of the newest run, by `window_start`, whose summary has arrived and all of whose `approach_event_ids` have been received.

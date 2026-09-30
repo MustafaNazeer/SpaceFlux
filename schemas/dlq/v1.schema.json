@@ -37,7 +37,7 @@
       "enum": ["fetch", "decode", "validate", "publish"]
     },
     "check": {
-      "description": "Only with stage validate, and set only when a check rejected the payload. schema: a topic schema check rejected it (in ingest, or in a consumer). rule: the payload matches its schema, but a rule of risk-engine rejected the value, for example a Kp above 9.00. Absent when the payload never reached either check (the UTF-8 and record size dead letters in ingest), when neither check rejected it (a record that passed its topic schema but failed ingest's identity parse, for example an EPOCH that matches the pattern but is not a real date), and on dead letters written before the field existed.",
+      "description": "Only with stage validate, and set only when a check rejected the payload. schema: a topic schema check rejected it (in ingest, or in a consumer). rule: the payload matches its schema, but a rule of risk-engine rejected the value, for example a Kp above 9.00. Absent when the payload never reached either check (the UTF-8 and record size dead letters in ingest), when neither check rejected it (a record that passed its topic schema but failed ingest's identity parse, for example an EPOCH that matches the pattern but is not a real date, or an element set that passes its schema but that risk-engine cannot turn into an orbit), and on dead letters written before the field existed.",
       "type": "string",
       "enum": ["schema", "rule"]
     },

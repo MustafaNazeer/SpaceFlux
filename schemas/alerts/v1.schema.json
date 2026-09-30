@@ -17,7 +17,7 @@
       "enum": ["space_weather_level", "close_approach", "screening_run"]
     },
     "rules_version": {
-      "description": "Version of the rules the event was derived under, raised by hand whenever a threshold, a rule, or a screening setting changes (docs/risk/space-weather-scales.md and docs/risk/orbital-conventions.md), including any change to the station stack list risk-engine/src/main/resources/screening/stacks.json. It is part of every event_id and of run_id, so reprocessing under new rules publishes new events instead of being dropped as duplicates.",
+      "description": "Version of the rules the event was derived under, raised by hand whenever a threshold, a rule, or a screening setting changes (docs/risk/space-weather-scales.md and docs/risk/orbital-conventions.md), including any change to the station stack list risk-engine/src/main/resources/screening/stacks.json or the watchlist risk-engine/src/main/resources/screening/watchlist.json. It is part of every event_id and of run_id, so reprocessing under new rules publishes new events instead of being dropped as duplicates.",
       "type": "integer",
       "minimum": 1
     },
@@ -592,7 +592,9 @@
               "watchlist_number": {"$ref": "#/$defs/catalogNumber"},
               "other_number": {"$ref": "#/$defs/catalogNumber"},
               "mechanism": {"description": "Why the pair was not screened; known values in docs/data/topics.md.", "$ref": "#/$defs/code"},
-              "detail": {"description": "Readable explanation, as risk-engine wrote it.", "type": "string", "minLength": 1},
+              "detail": {"description": "Readable explanation, as risk-engine wrote it. For static_stack it gives the separation between the members' propagated element sets, not a measured distance.", "type": "string", "minLength": 1},
+              "watchlist_name": {"description": "OBJECT_NAME of the watchlist object's element set, when it has one.", "type": "string"},
+              "other_name": {"description": "OBJECT_NAME of the other object's element set, when it has one.", "type": "string"},
               "min_separation_m": {"description": "Smallest sampled separation, in metres.", "type": "number", "minimum": 0},
               "min_separation_at": {"description": "UTC time of the smallest sampled separation.", "$ref": "#/$defs/utc"},
               "max_separation_m": {"description": "Largest sampled separation, in metres.", "type": "number", "minimum": 0},
@@ -609,8 +611,9 @@
             "required": ["catalog_number", "role", "code", "reason"],
             "properties": {
               "catalog_number": {"$ref": "#/$defs/catalogNumber"},
+              "name": {"description": "OBJECT_NAME of the element set, when it has one.", "type": "string"},
               "role": {"$ref": "#/$defs/role"},
-              "code": {"description": "Known values in docs/data/topics.md.", "$ref": "#/$defs/code"},
+              "code": {"description": "Known values in docs/data/topics.md, including not_in_input for a configured watchlist object with no element set in the input.", "$ref": "#/$defs/code"},
               "reason": {"description": "Readable reason, as risk-engine wrote it.", "type": "string", "minLength": 1}
             },
             "additionalProperties": true
@@ -624,6 +627,7 @@
             "required": ["catalog_number", "role", "kind", "reason"],
             "properties": {
               "catalog_number": {"$ref": "#/$defs/catalogNumber"},
+              "name": {"description": "OBJECT_NAME of the element set, when it has one.", "type": "string"},
               "role": {"$ref": "#/$defs/role"},
               "kind": {"description": "Known values in docs/data/topics.md.", "$ref": "#/$defs/code"},
               "screened_until": {"description": "Last good time, present only for kind stopped_in_window.", "$ref": "#/$defs/utc"},
@@ -643,13 +647,14 @@
             "required": ["catalog_number", "seconds_after_start"],
             "properties": {
               "catalog_number": {"$ref": "#/$defs/catalogNumber"},
+              "name": {"description": "OBJECT_NAME of the element set, when it has one.", "type": "string"},
               "seconds_after_start": {"description": "Epoch minus window start, in seconds.", "type": "number", "exclusiveMinimum": 0}
             },
             "additionalProperties": true
           }
         },
         "differing_copies": {
-          "description": "Differing entries for one catalog number in the inputs; the entry with the newest epoch was used and each other entry is listed.",
+          "description": "Differing entries for one catalog number in the inputs; the entry with the newest epoch was used (the first copy held, when copies share an epoch but differ in elements or name) and each other entry is listed.",
           "type": "array",
           "items": {
             "type": "object",
