@@ -7,7 +7,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.TreeMap;
+
 import org.junit.jupiter.api.Test;
+
+import io.github.mustafanazeer.spaceflux.risk.kafka.TopicSchemas;
 
 import io.github.mustafanazeer.spaceflux.risk.weather.Scale;
 import tools.jackson.databind.JsonNode;
@@ -74,5 +80,51 @@ class AlertJsonTest {
                 null);
 
         assertThat(AlertJson.write(e, 1, t(expected.get("produced_at").asString()))).isEqualTo(expected);
+    }
+
+    @Test
+    void everyEventTheTrackerProducesPassesTheAlertsSchema() throws IOException {
+        List<LevelEvent> events = new ArrayList<>();
+        String kpUrl = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
+        ScaleTracker g = new ScaleTracker(Scale.G, 1);
+        events.addAll(g.accept(List.of(kp("2024-05-10T15:00:00", 5.0, kpUrl), kp("2024-05-10T18:00:00", 7.67, kpUrl)),
+                t("2024-05-10T21:05:00Z")));
+        events.addAll(g.tick(t("2024-05-10T21:20:00Z")));
+        events.addAll(g.accept(List.of(kp("2024-05-10T15:00:00", 4.33, kpUrl), kp("2024-05-10T18:00:00", 8.0, kpUrl)),
+                t("2024-05-10T21:25:00Z")));
+        events.addAll(g.accept(List.of(kp("2024-05-10T21:00:00", 12.0, kpUrl)), t("2024-05-11T00:05:00Z")));
+        events.addAll(g.tick(t("2024-05-11T08:00:00Z")));
+
+        JsonNode records = JSON.readTree(getClass().getResourceAsStream(
+                "/swpc-xrays/goes18-xrays-7-day-eclipse-2026-09-24.json"));
+        String xrUrl = "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json";
+        TreeMap<Instant, List<Reading>> byPoll = new TreeMap<>();
+        for (JsonNode rec : records) {
+            Reading.of("swpc.goes.xrays", rec, t("2026-09-24T12:00:00Z"), xrUrl).ifPresent(r -> byPoll
+                    .computeIfAbsent(Instant.ofEpochSecond(r.time().getEpochSecond() / 180 * 180),
+                            k -> new ArrayList<>()).add(r));
+        }
+        ScaleTracker r = new ScaleTracker(Scale.R, 1);
+        byPoll.forEach((poll, batch) -> events.addAll(r.accept(batch, poll.plusSeconds(300))));
+        events.addAll(r.tick(t("2026-09-24T10:40:00Z")));
+        String flare = "{\"time_tag\":\"2026-09-24T10:34:00Z\",\"satellite\":19,\"flux\":3.9789e-4,"
+                + "\"observed_flux\":3.9789e-4,\"energy\":\"0.1-0.8nm\"}";
+        events.addAll(r.accept(List.of(Reading.of("swpc.goes.xrays", JSON.readTree(flare), t("2026-09-24T10:36:00Z"),
+                xrUrl).orElseThrow()), t("2026-09-24T10:41:00Z")));
+        events.addAll(r.tick(t("2026-09-24T12:00:00Z")));
+
+        assertThat(events).extracting(LevelEvent::trigger)
+                .contains("level_change", "revision", "restatement", "refresh");
+        assertThat(events).extracting(LevelEvent::state).contains("level", "none", "no_data", "ended");
+        TopicSchemas schemas = TopicSchemas.fromClasspath();
+        for (LevelEvent e : events) {
+            JsonNode json = AlertJson.write(e, 1, t("2026-09-30T20:00:00Z"));
+            assertThat(schemas.check("alerts", json).failure()).as(json.toString()).isNull();
+        }
+    }
+
+    private static Reading kp(String timeTag, double kp, String url) {
+        return Reading.of("swpc.kp", JSON.readTree("{\"time_tag\":\"" + timeTag + "\",\"Kp\":" + kp + "}"),
+                t("2024-05-10T21:04:00Z"), url).orElseThrow();
     }
 }
