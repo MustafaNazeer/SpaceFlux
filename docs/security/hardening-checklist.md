@@ -31,6 +31,7 @@ Items marked **(to be verified)** depend on a tool, library, or provider behavio
 - [ ] `SEC-ALL-03` Every new network endpoint, topic, secret, or third party call is reflected in the threat model in the same pull request. [section 9]
 - [ ] `SEC-ALL-04` Input from outside the process is validated against an explicit schema or type before use. [T1.1, T4.1, T8.2]
 - [ ] `SEC-ALL-05` Error responses and log lines added in the diff contain no credential, full request URL with query string, or stack trace sent to a client. [T1.5, T5.5]
+- [ ] `SEC-ALL-06` Every dependency version added or changed in the diff, including transitive ones, has been checked against a vulnerability database; each open advisory is either fixed by a version override or recorded in the threat model with the reason it is not reachable. [T11.3]
 
 ## ingest
 
@@ -60,12 +61,21 @@ Items marked **(to be verified)** depend on a tool, library, or provider behavio
 - [ ] `SEC-KFK-04` Every consumer is idempotent on the feed's epoch and ID fields, with a test that delivers the same event twice. [T2.3]
 - [ ] `SEC-KFK-05` Every consumer has bounded retries followed by a `.dlq` publish. [T2.2]
 - [ ] `SEC-KFK-06` Kafka headers are used only for trace context and schema version, never for authorization or query input. [T2.4]
+- [ ] `SEC-KFK-07` Java consumers read values as bytes and keys as strings and parse the JSON themselves; no type header driven deserializer, delegating deserializer, header mapper with trusted packages, or retry topic is configured. [T2.7]
+- [ ] `SEC-KFK-08` A Java service builds each dead letter itself as a dead letter schema event, with the payload caps and base64 fallback of `SEC-ING-12`, validates it before publish, and adds no exception stack trace header; schema and rule failures are not retried. [T2.8, T1.1]
+- [ ] `SEC-KFK-09` Producers set `enable.idempotence=true` and `acks=all` explicitly and bound `max.block.ms` and `delivery.timeout.ms`; consumers set `enable.auto.commit=false` and `allow.auto.create.topics=false`; bootstrap servers and every security setting come from configuration, with no credential in a committed file. [T2.1, T2.2]
+- [ ] `SEC-KFK-10` Before the first cloud deployment, each client's `security.protocol` and credentials match the recorded decision on broker authentication, and the credentials come from the secret store. [T2.1, T9.4]
+- [ ] `SEC-KFK-11` The JSON Schema validator loads schemas only from this repository's `schemas/` files: no remote loader, an allow rule limited to the project's schema IRIs, and the schema picked by topic, never by event content; a test shows that a remote `$ref` fails without any network connection. [T2.5]
+- [ ] `SEC-KFK-12` Every validation call turns any `Throwable` from the validator, `StackOverflowError` included, into a failed validation and a dead letter; a test runs every `pattern` in `schemas/` against long adversarial strings in a thread with the default stack size. [T2.6]
+- [ ] `SEC-KFK-13` Each record is parsed once from its bytes by the service's own JSON parser with an explicit maximum document length, the parsed tree is what the validator checks, and format assertions are enabled so `format` is checked as it is in `ingest`. [T1.1, T2.6]
 
 ## risk-engine
 
 - [ ] `SEC-RSK-01` Orbital elements are validated before propagation, including a positive mean motion and an epoch within a plausible window of the current time, and a test covers rejection of out of range elements. [T3.1, T1.3]
 - [ ] `SEC-RSK-02` Propagation and screening per event have a time budget, and exceeding it is logged and counted. [T3.1]
 - [ ] `SEC-RSK-03` Every alert carries the IDs and epochs of the events that produced it. [T3.2]
+- [ ] `SEC-RSK-04` Processing of one poll finishes well inside `max.poll.interval.ms` at catalog scale, shown by a measurement, or screening runs off the poll thread and offsets are committed only after its events are acknowledged. [T3.3]
+- [ ] `SEC-RSK-05` Feed records are read through Jackson's tree model only, with no polymorphic typing and no binding to `Path`, `Duration`, or `XMLGregorianCalendar`, and the Jackson version in the build has no open advisory. [T3.4, T11.3]
 
 ## query-api
 

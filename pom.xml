@@ -23,6 +23,9 @@
   <properties>
     <java.version>21</java.version>
     <orekit.version>13.1.8</orekit.version>
+    <jackson-bom.version>3.1.7</jackson-bom.version>
+    <kafka.version>4.2.2</kafka.version>
+    <json-schema-validator.version>3.0.8</json-schema-validator.version>
   </properties>
 
   <dependencyManagement>
@@ -31,6 +34,11 @@
         <groupId>org.orekit</groupId>
         <artifactId>orekit</artifactId>
         <version>${orekit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.networknt</groupId>
+        <artifactId>json-schema-validator</artifactId>
+        <version>${json-schema-validator.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
