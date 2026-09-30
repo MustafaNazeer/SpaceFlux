@@ -90,4 +90,15 @@ class ReadingTest {
                 Instant.parse("2026-09-20T12:04:00Z"), URL, now).orElseThrow().outcome())
                 .isEqualTo(Reading.Outcome.NONE);
     }
+
+    @Test
+    void aGoesRecordWithoutItsBandCannotBePlacedInASeries() {
+        Reading r = Reading.of("swpc.goes.xrays", JSON.readTree(
+                "{\"time_tag\":\"2026-09-20T00:00:00Z\",\"satellite\":18,\"flux\":2e-7,\"observed_flux\":2e-7}"),
+                Instant.parse("2026-09-20T00:03:00Z"), URL).orElseThrow();
+
+        assertThat(r.outcome()).isEqualTo(Reading.Outcome.REJECTED);
+        assertThat(r.reason()).contains("energy");
+        assertThat(r.placeable()).isFalse();
+    }
 }

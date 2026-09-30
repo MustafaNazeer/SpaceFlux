@@ -94,8 +94,10 @@ public record Reading(Scale scale, String product, Integer satellite, String tim
             if (scale != Scale.G && !readsScale(scale, record)) {
                 return Optional.empty();
             }
-            return Optional.of(new Reading(scale, product, satellite, timeTag, time, Outcome.REJECTED, 0, null, null,
-                    e.getMessage(), fetchedAt, sourceUrl));
+            // Without its band a GOES record cannot be attributed to a series (Section 5.1), so it is not placed.
+            Instant placedAt = scale != Scale.G && !record.has("energy") ? null : time;
+            return Optional.of(new Reading(scale, product, satellite, timeTag, placedAt, Outcome.REJECTED, 0, null,
+                    null, e.getMessage(), fetchedAt, sourceUrl));
         }
     }
 
