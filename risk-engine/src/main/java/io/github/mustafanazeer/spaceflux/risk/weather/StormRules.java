@@ -70,7 +70,7 @@ public final class StormRules {
      * The X-ray class of one R1 or higher value from GOES-16 or later: M or X by decade, the number truncated to one
      * decimal from the shortest decimal of the 32 bit float, so class and level agree at every threshold (Section 2.4).
      */
-    static Optional<String> xrayClass(double flux, int satellite) {
+    public static Optional<String> xrayClass(double flux, int satellite) {
         if (satellite < FIRST_GOES_R || rLevel(flux) == 0) {
             return Optional.empty();
         }
