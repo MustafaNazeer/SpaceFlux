@@ -6,7 +6,7 @@ Designed around data from CelesTrak, NOAA SWPC, and NASA DONKI, which are public
 
 ## Status
 
-**Work in progress. Only the ingest service is built so far.** Everything else in this README is planned and is marked that way. Features, benchmarks, and evaluation results are added here only once they exist in the code and can be reproduced from a committed script and dataset.
+**Work in progress. The ingest service and the risk engine are built; the query API, dashboard, and assistant are not.** Everything else in this README is planned and is marked that way. Features, benchmarks, and evaluation results are added here only once they exist in the code and can be reproduced from a committed script and dataset.
 
 ### Built: the ingest service
 
@@ -21,11 +21,20 @@ The local stack is a Docker Compose `core` profile with a single Kafka broker, a
 
 To build, test, and run it, see [docs/setup-guide.md](docs/setup-guide.md).
 
+### Built: the risk engine
+
+`risk-engine` is a Java 21 Spring Boot service that consumes `raw.gp` and `raw.swpc` and publishes everything it derives to the `alerts` topic. The contract is in [ADR 0007](docs/adr/0007-alerts-topic.md) and [docs/data/topics.md](docs/data/topics.md).
+
+* **Space weather levels.** Each SWPC sample is mapped onto the G, R, and S levels of the NOAA Space Weather Scales, using the thresholds and plausibility checks in [docs/risk/space-weather-scales.md](docs/risk/space-weather-scales.md). A level is derived mechanically from one measurement and is never an official NOAA scale level or a forecast.
+* **Close approach screening.** Orbits are propagated with SGP4 through Orekit, and each batch of element sets on `raw.gp` (the CelesTrak `stations` group) is screened for approaches within 5 km of the watchlist, currently the ISS, over a 7 day window. Each run publishes one event per approach and a run summary. The propagation is checked against published SGP4 verification cases and the screening against a dense brute force scan, as recorded in [docs/risk/orbital-conventions.md](docs/risk/orbital-conventions.md). A close approach here is two public element sets coming within 5 km, not an operational conjunction assessment.
+
+Every event is checked against its topic schema before it is written, and a record that fails a schema or rule check goes to a dead letter topic with the reason attached. The risk engine has no container image yet, so it is not part of the Compose stack.
+
 ## What it is meant to do
 
 1. Poll public orbital and space weather feeds and publish every payload as a versioned event on Kafka. (Built for CelesTrak and SWPC.)
-2. Propagate orbits for a watchlist of satellites (starting with the ISS) and screen them for close approaches against the public catalog.
-3. Map space weather observations onto the NOAA Space Weather Scales and raise alerts when a level is reached.
+2. Propagate orbits for a watchlist of satellites (starting with the ISS) and screen them for close approaches against the public catalog. (Built against the `stations` group.)
+3. Map space weather observations onto the NOAA Space Weather Scales and raise alerts when a level is reached. (Built; alerts are events on the `alerts` topic.)
 4. Serve the catalog, alerts, and space weather context to an operator dashboard over REST and GraphQL, with a live alert subscription.
 5. Answer questions about current conditions through an LLM assistant that retrieves space weather reports, pulls live numbers through read only tools, and cites its sources.
 
@@ -34,7 +43,7 @@ To build, test, and run it, see [docs/setup-guide.md](docs/setup-guide.md).
 | Component | Stack | State | Job |
 |---|---|---|---|
 | `ingest` | Go | Built | One poller per feed with its own interval and backoff; validates, deduplicates, and publishes raw events |
-| `risk-engine` | Java, Spring Boot, Orekit | Planned | Consumes orbital and space weather events, runs SGP4 propagation and close approach screening, applies storm rules, emits alerts |
+| `risk-engine` | Java, Spring Boot, Orekit | Built | Consumes orbital and space weather events, runs SGP4 propagation and close approach screening, applies storm rules, emits alerts |
 | `query-api` | Java, Spring Boot | Planned | REST and GraphQL over MySQL and MongoDB; hosts the archiver that stores raw feed documents |
 | `assistant` | Java, Spring AI | Planned | Retrieval over space weather text plus tool calls to `query-api` through a read only MCP tool server, with citations |
 | `dashboard` | Angular | Planned | Read only operator console showing alerts, passes, and space weather context |
@@ -45,7 +54,7 @@ The full design, including why each service scales differently and how delivery,
 
 ## Planned
 
-* Risk engine with SGP4 propagation built test first against published verification cases
+* A container image for the risk engine and its place in the Compose stack
 * Query API with MySQL, the MongoDB archiver, and contract tests
 * Angular dashboard with GraphQL and a live alert subscription
 * Container images, CI, and a Terraform environment on EKS that is brought up for demos and torn down afterwards
