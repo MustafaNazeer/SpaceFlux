@@ -182,4 +182,24 @@ class RiskEngineKafkaIntegrationTest {
                     .as("the screening consumer never commits").isEmpty();
         }
     }
+
+    @Test
+    void anElementSetThatFailsItsSchemaReachesRawGpDlq() throws Exception {
+        Properties p = new Properties();
+        p.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
+        try (KafkaProducer<String, byte[]> producer =
+                new KafkaProducer<>(p, new StringSerializer(), new ByteArraySerializer())) {
+            producer.send(new ProducerRecord<>("raw.gp", "99999", "{\"schema_version\":1}".getBytes(
+                    java.nio.charset.StandardCharsets.UTF_8))).get();
+        }
+
+        List<ConsumerRecord<String, byte[]>> dead = read("raw.gp.dlq", 1, r -> "99999".equals(r.key()));
+
+        assertThat(dead).singleElement().satisfies(r -> {
+            JsonNode d = JSON.readTree(r.value());
+            assertThat(d.get("check").asString()).isEqualTo("schema");
+            assertThat(d.get("source_topic").asString()).isEqualTo("raw.gp");
+            assertThat(d.get("service").asString()).isEqualTo("risk-engine");
+        });
+    }
 }

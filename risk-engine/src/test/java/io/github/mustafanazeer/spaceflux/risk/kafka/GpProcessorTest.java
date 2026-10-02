@@ -538,4 +538,22 @@ class GpProcessorTest {
 
         assertThat(runOf(processor.poll(FETCHED.plusSeconds(150))).get("differing_copies")).hasSize(1);
     }
+
+    /** An alerts schema that refuses every event, so the branch that dead letters a run's own events is exercised. */
+    @Test
+    void runEventsThatFailTheAlertsSchemaGoToAlertsDlqUnderTheRunId() throws IOException {
+        GpProcessor p = new GpProcessor(schemasWith("alerts", t -> "{\"maxProperties\": 0," + t.trim().substring(1)),
+                Set.of(25544), OrekitData.utc());
+        p.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+
+        GpProcessor.Out out = p.poll(FETCHED.plusSeconds(90));
+
+        assertThat(out.runId()).isEqualTo(FETCHED + "/1");
+        assertThat(out.alerts()).isEmpty();
+        assertThat(out.deadLetters()).isNotEmpty().allSatisfy(m -> {
+            assertThat(m.topic()).isEqualTo("alerts.dlq");
+            assertThat(m.key()).isEqualTo(FETCHED + "/1");
+            assertThat(JSON.readTree(m.value()).get("check").asString()).isEqualTo("schema");
+        });
+    }
 }

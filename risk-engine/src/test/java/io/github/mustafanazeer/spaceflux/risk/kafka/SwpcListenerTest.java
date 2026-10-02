@@ -136,4 +136,32 @@ class SwpcListenerTest {
         assertThatThrownBy(() -> listener.onBatch(batch)).isInstanceOf(IllegalStateException.class);
         assertThat(calls).hasValue(1);
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void aClockCheckWhoseWriteFailedIsComputedAgainOnTheNextCheck() throws Exception {
+        KafkaTemplate<String, byte[]> kafka = mock(KafkaTemplate.class);
+        AtomicBoolean fail = new AtomicBoolean();
+        List<JsonNode> sent = new ArrayList<>();
+        when(kafka.send(anyString(), any(), any())).thenAnswer(inv -> {
+            if (fail.get()) {
+                return CompletableFuture.failedFuture(new IllegalStateException("broker down"));
+            }
+            sent.add(JSON.readTree((byte[]) inv.getArgument(2)).get("space_weather_level"));
+            return CompletableFuture.completedFuture((SendResult<String, byte[]>) null);
+        });
+        SettableClock clock = new SettableClock();
+        SwpcListener listener = new SwpcListener(kafka, clock);
+        clock.now.set(Instant.parse("2026-09-20T03:05:00Z"));
+        listener.onBatch(List.of(kp(0, "2026-09-20T00:00:00", 3.0, "2026-09-20T03:04:00Z")));
+        sent.clear();
+        clock.now.set(Instant.parse("2026-09-20T12:00:00Z"));
+
+        fail.set(true);
+        listener.tick();
+        fail.set(false);
+        listener.tick();
+
+        assertThat(sent).extracting(n -> n.get("state").asString()).containsExactly("no_data");
+    }
 }
