@@ -125,6 +125,8 @@ class GpElementSetsTest {
     static Stream<Arguments> invalidRecords() {
         return Stream.of(
                 Arguments.of("EPOCH", MAPPER.getNodeFactory().textNode("not a date"), "EPOCH"),
+                Arguments.of("EPOCH", MAPPER.getNodeFactory().textNode("2026-09-27T24:00:00"), "EPOCH"),
+                Arguments.of("EPOCH", MAPPER.getNodeFactory().textNode("2026-09-27T24:00:00.000000"), "EPOCH"),
                 Arguments.of("MEAN_MOTION", MAPPER.getNodeFactory().numberNode(0.0), "MEAN_MOTION"),
                 Arguments.of("MEAN_MOTION", MAPPER.getNodeFactory().numberNode(-1.0), "MEAN_MOTION"),
                 Arguments.of("ECCENTRICITY", MAPPER.getNodeFactory().numberNode(1.0), "ECCENTRICITY"),

@@ -12,6 +12,7 @@ import java.util.Optional;
 import io.github.mustafanazeer.spaceflux.risk.alerts.AlertJson;
 import io.github.mustafanazeer.spaceflux.risk.alerts.LevelEvent;
 import io.github.mustafanazeer.spaceflux.risk.alerts.Reading;
+import io.github.mustafanazeer.spaceflux.risk.alerts.UtcTimes;
 import io.github.mustafanazeer.spaceflux.risk.alerts.ScaleTracker;
 import io.github.mustafanazeer.spaceflux.risk.weather.Scale;
 import org.slf4j.Logger;
@@ -71,7 +72,16 @@ public final class SwpcProcessor {
                 continue;
             }
             JsonNode event = checked.node();
-            Optional<Reading> reading = read(event, now);
+            String url = event.get("source_url").asString();
+            Instant fetchedAt;
+            try {
+                fetchedAt = UtcTimes.parse(event.get("fetched_at").asString());
+            } catch (DateTimeParseException e) {
+                dead.add(deadLetter(in, url, "rule", "\"fetched_at\" is not a valid UTC time", now));
+                continue;
+            }
+            Optional<Reading> reading = Reading.of(event.get("product").asString(), event.get("record"), fetchedAt,
+                    url, now);
             if (reading.isEmpty()) {
                 continue;
             }
@@ -129,17 +139,6 @@ public final class SwpcProcessor {
             }
         }
         return new Out(alerts, dead, 0);
-    }
-
-    private static Optional<Reading> read(JsonNode event, Instant now) {
-        Instant fetchedAt;
-        try {
-            fetchedAt = Instant.parse(event.get("fetched_at").asString());
-        } catch (DateTimeParseException e) {
-            return Optional.empty();
-        }
-        return Reading.of(event.get("product").asString(), event.get("record"), fetchedAt,
-                event.get("source_url").asString(), now);
     }
 
     private static boolean sameBatch(Reading a, Reading b) {

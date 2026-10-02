@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -207,6 +209,43 @@ class SwpcProcessorTest {
             assertThat(v.has("source_url")).isFalse();
             assertThat(JSON.readTree(v.get("payload").asString()).get("kind").asString())
                     .isEqualTo("space_weather_level");
+        });
+    }
+
+    /** The pattern allows any number of fraction digits and Java reads at most nine; such a record never vanishes. */
+    @ParameterizedTest(name = "fetched_at {0}")
+    @ValueSource(strings = {"2026-09-20T03:04:00.1234567890Z", "2026-09-20T24:00:00Z"})
+    void aFetchedAtThatIsNotAPlainUtcTimeIsDeadLettered(String fetchedAt) throws IOException {
+        ObjectNode event = kp("2026-09-20T00:00:00", 2.0);
+        event.put("fetched_at", fetchedAt);
+
+        SwpcProcessor.Out out = processor.process(List.of(in("swpc.kp", event)),
+                Instant.parse("2026-09-20T03:10:00Z"));
+
+        assertThat(out.alerts()).isEmpty();
+        assertThat(out.deadLetters()).singleElement().satisfies(m -> {
+            JsonNode d = JSON.readTree(m.value());
+            assertThat(d.get("check").asString()).isEqualTo("schema");
+            assertThat(d.get("reason").asString()).contains("fetched_at");
+        });
+    }
+
+    /** The parse check behind the schema's date-time format: a rule dead letter if the format check were ever lost. */
+    @ParameterizedTest(name = "fetched_at {0}")
+    @ValueSource(strings = {"2026-09-20T03:04:00.1234567890Z", "2026-09-20T24:00:00Z"})
+    void withoutTheFormatCheckAnUnreadableFetchedAtIsARuleDeadLetter(String fetchedAt) throws IOException {
+        SwpcProcessor p = new SwpcProcessor(GpProcessorTest.schemasWith("raw.swpc",
+                t -> t.replace("\"format\": \"date-time\",", "")));
+        ObjectNode event = kp("2026-09-20T00:00:00", 2.0);
+        event.put("fetched_at", fetchedAt);
+
+        SwpcProcessor.Out out = p.process(List.of(in("swpc.kp", event)), Instant.parse("2026-09-20T03:10:00Z"));
+
+        assertThat(out.alerts()).isEmpty();
+        assertThat(out.deadLetters()).singleElement().satisfies(m -> {
+            JsonNode d = JSON.readTree(m.value());
+            assertThat(d.get("check").asString()).isEqualTo("rule");
+            assertThat(d.get("reason").asString()).contains("\"fetched_at\" is not a valid UTC time");
         });
     }
 }

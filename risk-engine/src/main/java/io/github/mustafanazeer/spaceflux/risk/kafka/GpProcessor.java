@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.github.mustafanazeer.spaceflux.risk.alerts.ScreeningJson;
+import io.github.mustafanazeer.spaceflux.risk.alerts.UtcTimes;
 import io.github.mustafanazeer.spaceflux.risk.orbit.GpElementSets;
 import io.github.mustafanazeer.spaceflux.risk.screening.Role;
 import io.github.mustafanazeer.spaceflux.risk.screening.Screening;
@@ -102,7 +103,7 @@ public final class GpProcessor {
             String url = event.get("source_url").asString();
             Instant fetchedAt;
             try {
-                fetchedAt = Instant.parse(event.get("fetched_at").asString());
+                fetchedAt = UtcTimes.parse(event.get("fetched_at").asString());
             } catch (DateTimeParseException e) {
                 dead.add(deadLetter(in, url, "rule", "\"fetched_at\" is not a valid UTC time", now));
                 continue;

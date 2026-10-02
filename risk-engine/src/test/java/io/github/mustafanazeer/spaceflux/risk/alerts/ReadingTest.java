@@ -101,4 +101,35 @@ class ReadingTest {
         assertThat(r.reason()).contains("energy");
         assertThat(r.placeable()).isFalse();
     }
+
+    /** ISO 8601 allows 24:00:00 for the end of a day, and Java reads it as 00:00 the next day; Section 5.1 rejects it. */
+    @Test
+    void anHourOf24IsRejectedEvenAtMidnight() {
+        Reading kp = kp("2026-09-20T24:00:00", "2026-09-21T12:00:00Z");
+        Reading goes = xray("2026-09-20T24:00:00Z", "2026-09-21T00:00:00Z", 18);
+
+        assertThat(kp.outcome()).isEqualTo(Reading.Outcome.REJECTED);
+        assertThat(kp.reason()).contains("time_tag");
+        assertThat(goes.outcome()).isEqualTo(Reading.Outcome.REJECTED);
+        assertThat(xray("2026-09-20t24:00:00Z", "2026-09-21T00:00:00Z", 18).outcome())
+                .isEqualTo(Reading.Outcome.REJECTED);
+    }
+
+    /** A second of 60 is read only at 23:59:60, as 23:59:59 of that date, on any date (Section 5.1, item 3). */
+    @Test
+    void aSecondOf60IsAcceptedOnlyAtTheLastMinuteOfADay() {
+        Reading leap = xray("2016-12-31T23:59:60Z", "2017-01-01T00:00:00Z", 18);
+        Reading anyDate = xray("2026-09-20T23:59:60Z", "2026-09-21T00:00:00Z", 18);
+        Reading otherMinute = xray("2026-09-20T23:58:60Z", "2026-09-21T00:00:00Z", 18);
+        Reading kp = kp("2016-12-31T23:59:60", "2017-01-01T03:00:00Z");
+
+        assertThat(leap.outcome()).isEqualTo(Reading.Outcome.NONE);
+        assertThat(leap.time()).isEqualTo(Instant.parse("2016-12-31T23:59:59Z"));
+        assertThat(anyDate.outcome()).isEqualTo(Reading.Outcome.NONE);
+        assertThat(anyDate.time()).isEqualTo(Instant.parse("2026-09-20T23:59:59Z"));
+        assertThat(otherMinute.outcome()).isEqualTo(Reading.Outcome.REJECTED);
+        assertThat(otherMinute.reason()).contains("time_tag");
+        assertThat(kp.outcome()).isEqualTo(Reading.Outcome.REJECTED);
+        assertThat(kp.reason()).contains("3 hour");
+    }
 }

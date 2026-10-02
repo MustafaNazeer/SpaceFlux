@@ -4,13 +4,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 
 import ch.qos.logback.classic.Logger;
@@ -411,5 +417,70 @@ class GpProcessorTest {
         JsonNode run = runOf(processor.poll(muchLater.plusSeconds(90)));
         assertThat(run.get("coverage").get("catalog_admitted").asInt()).isEqualTo(1);
         assertThat(run.get("differing_copies_over_cap")).isEmpty();
+    }
+
+    @ParameterizedTest(name = "fetched_at {0}")
+    @ValueSource(strings = {"2026-09-27T05:00:00.1234567890Z", "2026-09-27T24:00:00Z"})
+    void aFetchedAtThatIsNotAPlainUtcTimeIsDeadLetteredAndNotHeld(String fetchedAt) throws IOException {
+        GpProcessor.In in = stations(FETCHED).get(0);
+        ObjectNode e = (ObjectNode) JSON.readTree(in.value());
+        e.put("fetched_at", fetchedAt);
+
+        GpProcessor.Out out = processor.accept(List.of(new GpProcessor.In(in.key(), JSON.writeValueAsBytes(e))),
+                FETCHED.plusSeconds(86_400));
+
+        assertThat(out.deadLetters()).singleElement().satisfies(m -> {
+            JsonNode d = JSON.readTree(m.value());
+            assertThat(d.get("check").asString()).isEqualTo("schema");
+            assertThat(d.get("reason").asString()).contains("fetched_at");
+        });
+        assertThat(processor.poll(FETCHED.plusSeconds(90_000)).alerts()).isEmpty();
+    }
+
+    /** A real leap second passes the date-time format check and is held as 23:59:59 (orbital conventions 2.4). */
+    @Test
+    void aFetchedAtAtARealLeapSecondIsHeldAsTheSecondBefore() throws IOException {
+        GpProcessor.In in = stations(FETCHED).stream().filter(i -> i.key().equals("25544")).findFirst().orElseThrow();
+        ObjectNode e = (ObjectNode) JSON.readTree(in.value());
+        e.put("fetched_at", "2016-12-31T23:59:60Z");
+        ((ObjectNode) e.get("gp")).put("EPOCH", "2016-12-31T23:00:00.000000");
+
+        GpProcessor.Out out = processor.accept(List.of(new GpProcessor.In(in.key(), JSON.writeValueAsBytes(e))),
+                Instant.parse("2017-01-01T00:00:30Z"));
+
+        assertThat(out.deadLetters()).isEmpty();
+        JsonNode run = runOf(processor.poll(Instant.parse("2017-01-01T00:01:00Z")));
+        assertThat(run.get("window_start").asString()).isEqualTo("2016-12-31T23:59:59Z");
+        assertThat(run.get("coverage").get("watchlist_accepted").asInt()).isEqualTo(1);
+    }
+
+    /** The committed schemas with one topic's text edited, to reach checks the real schemas stop first. */
+    static TopicSchemas schemasWith(String topic, java.util.function.UnaryOperator<String> edit) throws IOException {
+        Map<String, String> files = new HashMap<>();
+        for (String t : List.of("raw.gp", "raw.swpc", "alerts", "dlq")) {
+            files.put(t, Files.readString(Path.of("..", "schemas", t, "v1.schema.json")));
+        }
+        files.put(topic, edit.apply(files.get(topic)));
+        return TopicSchemas.of(files);
+    }
+
+    /** The parse check behind the schema's date-time format: a rule dead letter if the format check were ever lost. */
+    @ParameterizedTest(name = "fetched_at {0}")
+    @ValueSource(strings = {"2026-09-27T05:00:00.1234567890Z", "2026-09-27T24:00:00Z"})
+    void withoutTheFormatCheckAnUnreadableFetchedAtIsARuleDeadLetter(String fetchedAt) throws IOException {
+        GpProcessor p = new GpProcessor(schemasWith("raw.gp", t -> t.replace("\"format\": \"date-time\",", "")),
+                Set.of(25544), OrekitData.utc());
+        GpProcessor.In in = stations(FETCHED).get(0);
+        ObjectNode e = (ObjectNode) JSON.readTree(in.value());
+        e.put("fetched_at", fetchedAt);
+
+        GpProcessor.Out out = p.accept(List.of(new GpProcessor.In(in.key(), JSON.writeValueAsBytes(e))),
+                FETCHED.plusSeconds(86_400));
+
+        assertThat(out.deadLetters()).singleElement().satisfies(m -> {
+            JsonNode d = JSON.readTree(m.value());
+            assertThat(d.get("check").asString()).isEqualTo("rule");
+            assertThat(d.get("reason").asString()).contains("\"fetched_at\" is not a valid UTC time");
+        });
     }
 }

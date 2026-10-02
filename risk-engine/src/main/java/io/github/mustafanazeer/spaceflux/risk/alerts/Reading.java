@@ -150,7 +150,7 @@ public record Reading(Scale scale, String product, Integer satellite, String tim
             return null;
         }
         try {
-            return Instant.parse(scale == Scale.G ? timeTag + "Z" : timeTag);
+            return UtcTimes.parse(scale == Scale.G ? timeTag + "Z" : timeTag);
         } catch (DateTimeParseException e) {
             return null;
         }
