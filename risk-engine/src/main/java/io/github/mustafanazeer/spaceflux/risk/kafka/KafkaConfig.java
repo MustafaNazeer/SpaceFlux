@@ -1,5 +1,8 @@
 package io.github.mustafanazeer.spaceflux.risk.kafka;
 
+import java.util.function.LongConsumer;
+
+import org.apache.kafka.clients.consumer.Consumer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
@@ -7,6 +10,7 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.util.backoff.BackOff;
 import org.springframework.util.backoff.ExponentialBackOff;
 
@@ -22,7 +26,7 @@ class KafkaConfig {
 
     @Bean
     CommonErrorHandler kafkaErrorHandler() {
-        return new DefaultErrorHandler(retryUntilWritten());
+        return waitingHandler(KafkaConfig::sleep);
     }
 
     /**
@@ -36,11 +40,15 @@ class KafkaConfig {
         f.setConsumerFactory((ConsumerFactory<String, byte[]>) consumers);
         f.setBatchListener(true);
         f.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
-        DefaultErrorHandler neverCommit = new DefaultErrorHandler(retryUntilWritten());
+        DefaultErrorHandler neverCommit = waitingHandler(KafkaConfig::sleep);
         // The default commits a batch's offsets after a retry succeeds; this consumer never commits.
         neverCommit.setAckAfterHandle(false);
         f.setCommonErrorHandler(neverCommit);
         return f;
+    }
+
+    static DefaultErrorHandler waitingHandler(LongConsumer sleep) {
+        return new WaitingErrorHandler(retryUntilWritten(), sleep);
     }
 
     static BackOff retryUntilWritten() {
@@ -48,5 +56,36 @@ class KafkaConfig {
         b.setMaxInterval(60_000);
         b.setMaxElapsedTime(Long.MAX_VALUE);
         return b;
+    }
+
+    private static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * An error with no record behind it, such as a fetch that cannot be decompressed, is rethrown by the default
+     * handler and the container polls again at once, which repeats the error as fast as the broker answers. Waiting
+     * first keeps a persistent fault to one log line every few seconds.
+     */
+    static final class WaitingErrorHandler extends DefaultErrorHandler {
+
+        static final long WAIT_MS = 5_000;
+        private final LongConsumer sleep;
+
+        WaitingErrorHandler(BackOff backOff, LongConsumer sleep) {
+            super(backOff);
+            this.sleep = sleep;
+        }
+
+        @Override
+        public void handleOtherException(Exception thrownException, Consumer<?, ?> consumer,
+                MessageListenerContainer container, boolean batchListener) {
+            sleep.accept(WAIT_MS);
+            super.handleOtherException(thrownException, consumer, container, batchListener);
+        }
     }
 }
