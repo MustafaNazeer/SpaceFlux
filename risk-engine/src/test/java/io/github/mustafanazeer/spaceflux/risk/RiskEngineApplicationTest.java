@@ -21,6 +21,12 @@ class RiskEngineApplicationTest {
         assertThat(context.getBean(RiskEngineApplication.class)).isNotNull();
     }
 
+    /** Set by the build, so a test that forgets its own broker reaches nothing rather than a developer's live one. */
+    @Test
+    void aContextWithoutItsOwnBrokerPointsAtAnAddressThatReachesNothing() {
+        assertThat(context.getEnvironment().getProperty("spring.kafka.bootstrap-servers")).isEqualTo("127.0.0.1:1");
+    }
+
     @Test
     void checksEveryCompressionCodecAtStartup() {
         assertThat(context.getBean(CompressionCheck.class)).isNotNull();

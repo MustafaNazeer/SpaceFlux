@@ -84,6 +84,11 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <argLine>@{argLine} -Xshare:off -javaagent:${org.mockito:mockito-core:jar}</argLine>
+          <!-- application.yml falls back to localhost:9092, the local Compose broker; a test that does not set its
+               own broker must reach nothing instead. -->
+          <systemPropertyVariables>
+            <KAFKA_BROKERS>127.0.0.1:1</KAFKA_BROKERS>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
       <plugin>
