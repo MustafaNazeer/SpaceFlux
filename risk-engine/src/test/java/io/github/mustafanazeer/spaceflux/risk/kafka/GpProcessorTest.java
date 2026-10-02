@@ -16,6 +16,7 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 
@@ -280,17 +281,19 @@ class GpProcessorTest {
         assertThat(runOf(next).get("coverage").get("catalog_admitted").asInt()).isEqualTo(22);
     }
 
-    /** Synthetic: values the schema allows but a two line element set cannot hold (Orekit formats lines lazily). */
+    /**
+     * Synthetic: a same epoch copy with a B* no line can hold. Comparing it must not format lines, which Orekit refuses
+     * for such values; the copy is listed and the run is written.
+     */
     @Test
-    void aSameEpochCopyWhoseElementsCannotBeWrittenAsLinesIsDeadLetteredWithoutACheck() throws IOException {
+    void aSameEpochCopyWhoseElementsCannotBeWrittenAsLinesIsListedWithoutStoppingTheRun() throws IOException {
         processor.accept(stations(FETCHED), FETCHED.plusSeconds(60));
 
         GpProcessor.Out out = processor.accept(withIss(FETCHED.plusSeconds(60), gp -> gp.put("BSTAR", 1e30)),
                 FETCHED.plusSeconds(120));
 
-        assertThat(out.deadLetters()).singleElement()
-                .satisfies(m -> assertThat(JSON.readTree(m.value()).has("check")).isFalse());
-        assertThat(runOf(processor.poll(FETCHED.plusSeconds(150))).get("differing_copies")).isEmpty();
+        assertThat(out.deadLetters()).isEmpty();
+        assertThat(runOf(processor.poll(FETCHED.plusSeconds(150))).get("differing_copies")).hasSize(1);
     }
 
     /** Synthetic: a same epoch copy of the recorded ISS element set without OBJECT_NAME. */
@@ -482,5 +485,57 @@ class GpProcessorTest {
             assertThat(d.get("check").asString()).isEqualTo("rule");
             assertThat(d.get("reason").asString()).contains("\"fetched_at\" is not a valid UTC time");
         });
+    }
+
+    /** Synthetic: fields the schema allows that a two line element set cannot hold, which SGP4 still propagates. */
+    @ParameterizedTest(name = "{0} = {1}")
+    @CsvSource({"REV_AT_EPOCH, 100000", "MEAN_MOTION_DOT, 10", "MEAN_MOTION_DOT, -1"})
+    void anElementSetBeyondTheLineFormatIsHeldAndScreened(String field, String value) throws IOException {
+        List<GpProcessor.In> batch = new ArrayList<>(stations(FETCHED));
+        batch.removeIf(in -> in.key().equals("25544"));
+        batch.addAll(withIss(FETCHED, gp -> gp.set(field, JSON.readTree(value))));
+
+        GpProcessor.Out out = processor.accept(batch, FETCHED.plusSeconds(60));
+
+        assertThat(out.deadLetters()).isEmpty();
+        assertThat(runOf(processor.poll(FETCHED.plusSeconds(90))).get("coverage").get("watchlist_accepted").asInt())
+                .isEqualTo(1);
+    }
+
+    /** Synthetic: a catalog number above 339999, which no two line element set can carry, on a stations record. */
+    @Test
+    void aCatalogNumberBeyondTheLineFormatIsHeldAndScreened() throws IOException {
+        GpProcessor baseline = new GpProcessor(TopicSchemas.fromClasspath(), Set.of(25544), OrekitData.utc());
+        baseline.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+        JsonNode before = runOf(baseline.poll(FETCHED.plusSeconds(90))).get("coverage");
+        List<GpProcessor.In> batch = new ArrayList<>(stations(FETCHED));
+        GpProcessor.In other = batch.stream().filter(in -> !in.key().equals("25544")).findFirst().orElseThrow();
+        ObjectNode e = (ObjectNode) JSON.readTree(other.value());
+        ((ObjectNode) e.get("gp")).put("NORAD_CAT_ID", 340_000);
+        batch.add(new GpProcessor.In("340000", JSON.writeValueAsBytes(e)));
+
+        GpProcessor.Out out = processor.accept(batch, FETCHED.plusSeconds(60));
+
+        assertThat(out.deadLetters()).isEmpty();
+        JsonNode run = runOf(processor.poll(FETCHED.plusSeconds(90)));
+        assertThat(run.get("coverage").get("catalog_admitted").asInt())
+                .isEqualTo(before.get("catalog_admitted").asInt() + 1);
+        assertThat(run.get("coverage").get("pairs").asInt()).isEqualTo(before.get("pairs").asInt() + 1);
+        assertThat(run.get("coverage").get("pairs_not_screenable").asInt())
+                .isEqualTo(before.get("pairs_not_screenable").asInt());
+        assertThat(run.get("rejected").findValues("catalog_number")).noneMatch(n -> n.asInt() == 340_000);
+        assertThat(run.get("not_screened").findValues("catalog_number")).noneMatch(n -> n.asInt() == 340_000);
+    }
+
+    /** Synthetic: a same epoch copy whose mean motion differs below the eight decimals a line would carry. */
+    @Test
+    void aCopyDifferingBelowLinePrecisionIsStillListed() throws IOException {
+        processor.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+        double mm = JSON.readTree(withIss(FETCHED, gp -> { }).get(0).value()).get("gp").get("MEAN_MOTION").asDouble();
+
+        processor.accept(withIss(FETCHED.plusSeconds(60), gp -> gp.put("MEAN_MOTION", mm + 1e-10)),
+                FETCHED.plusSeconds(120));
+
+        assertThat(runOf(processor.poll(FETCHED.plusSeconds(150))).get("differing_copies")).hasSize(1);
     }
 }

@@ -119,10 +119,6 @@ public final class GpProcessor {
                 JsonNode name = gp.get("OBJECT_NAME");
                 object = new TrackedObject(name != null && name.isString() ? cut(name.asString()) : null,
                         GpElementSets.toTle(gp));
-                // Orekit formats the lines lazily and throws for values a two line element set cannot hold; copies
-                // are compared by their lines, so that has to fail here rather than later.
-                object.tle().getLine1();
-                object.tle().getLine2();
             } catch (RuntimeException e) {
                 dead.add(deadLetter(in, url, null, "element set cannot be read: " + e.getMessage(), now));
                 continue;
@@ -177,9 +173,13 @@ public final class GpProcessor {
         return name.substring(0, name.offsetByCodePoints(0, MAX_NAME_CODE_POINTS - 3)) + "...";
     }
 
+    /**
+     * Compared field by field, never through formatted lines: Orekit builds lines lazily and refuses values a line
+     * cannot hold, and a line rounds away differences below its precision. TLE.equals compares exactly the fields of
+     * orbital conventions 2.4, "Copies with the held epoch".
+     */
     private static boolean same(TrackedObject a, TrackedObject b) {
-        return Objects.equals(a.name(), b.name()) && a.tle().getLine1().equals(b.tle().getLine1())
-                && a.tle().getLine2().equals(b.tle().getLine2());
+        return Objects.equals(a.name(), b.name()) && a.tle().equals(b.tle());
     }
 
     /**
