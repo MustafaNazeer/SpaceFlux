@@ -322,4 +322,94 @@ class GpProcessorTest {
 
         assertThat(logs.list).hasSize(1);
     }
+
+    /** Synthetic: a same epoch copy of the recorded ISS element set with a 200,000 code point name, 800 kB in UTF-8. */
+    @Test
+    void aNameLongerThanSixtyFourCodePointsIsCutOnArrival() throws IOException {
+        processor.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+
+        processor.accept(withIss(FETCHED.plusSeconds(60), gp -> gp.put("OBJECT_NAME", "\uD83D\uDE80".repeat(200_000))),
+                FETCHED.plusSeconds(120));
+
+        String name = runOf(processor.poll(FETCHED.plusSeconds(150))).get("differing_copies").get(0)
+                .get("dropped_name").asString();
+        assertThat(name.codePointCount(0, name.length())).isEqualTo(64);
+        assertThat(name).isEqualTo("\uD83D\uDE80".repeat(61) + "...");
+    }
+
+    /** Synthetic: five same epoch copies of the recorded ISS element set, each with another mean motion. */
+    @Test
+    void atMostThreeDifferingCopiesAreHeldAndLaterOnesAreCountedWithoutDelayingTheRun() throws IOException {
+        processor.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+        for (int i = 0; i < 3; i++) {
+            double mm = 15.40 + i / 100.0;
+            processor.accept(withIss(FETCHED.plusSeconds(60), gp -> gp.put("MEAN_MOTION", mm)),
+                    FETCHED.plusSeconds(120));
+        }
+        for (int i = 3; i < 5; i++) {
+            double mm = 15.40 + i / 100.0;
+            processor.accept(withIss(FETCHED.plusSeconds(60), gp -> gp.put("MEAN_MOTION", mm)),
+                    FETCHED.plusSeconds(145));
+        }
+
+        JsonNode run = runOf(processor.poll(FETCHED.plusSeconds(150)));
+
+        assertThat(run.get("differing_copies")).hasSize(3);
+        assertThat(run.get("differing_copies_over_cap")).singleElement().satisfies(o -> {
+            assertThat(o.get("catalog_number").asInt()).isEqualTo(25544);
+            assertThat(o.get("records_not_listed").asInt()).isEqualTo(2);
+            assertThat(o.get("epoch").asString()).isEqualTo(run.get("differing_copies").get(0).get("used_epoch")
+                    .asString());
+        });
+        assertThat(run.get("omitted").get("differing_copies").asInt()).isZero();
+    }
+
+    private static List<GpProcessor.In> withObject(int norad, Instant fetchedAt,
+            java.util.function.Consumer<ObjectNode> change) throws IOException {
+        List<GpProcessor.In> out = new ArrayList<>();
+        for (GpProcessor.In in : stations(fetchedAt)) {
+            ObjectNode e = (ObjectNode) JSON.readTree(in.value());
+            if (e.get("gp").get("NORAD_CAT_ID").asInt() == norad) {
+                change.accept((ObjectNode) e.get("gp"));
+                out.add(new GpProcessor.In(in.key(), JSON.writeValueAsBytes(e)));
+            }
+        }
+        return out;
+    }
+
+    private void overTheCopyCap(int norad, Instant fetchedAt, Instant now) throws IOException {
+        for (int i = 0; i < 5; i++) {
+            double mm = 15.40 + i / 100.0;
+            processor.accept(withObject(norad, fetchedAt, gp -> gp.put("MEAN_MOTION", mm)), now);
+        }
+    }
+
+    /** Synthetic: copies over the cap, then the recorded ISS element set with a newer epoch from a later fetch. */
+    @Test
+    void aNewerEpochClearsTheOverCapCount() throws IOException {
+        processor.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+        overTheCopyCap(25544, FETCHED.plusSeconds(60), FETCHED.plusSeconds(120));
+
+        processor.accept(withIss(FETCHED.plusSeconds(7_800), gp -> gp.put("EPOCH", "2026-09-27T06:00:00.000000")),
+                FETCHED.plusSeconds(7_860));
+
+        JsonNode run = runOf(processor.poll(FETCHED.plusSeconds(7_900)));
+        assertThat(run.get("differing_copies")).isEmpty();
+        assertThat(run.get("differing_copies_over_cap")).isEmpty();
+    }
+
+    /** Synthetic: POISK over the copy cap, then only a newer ISS element set 40 days later, so POISK ages out. */
+    @Test
+    void anObjectOverTheCopyCapThatAgesOutLeavesNoCount() throws IOException {
+        processor.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+        overTheCopyCap(36086, FETCHED.plusSeconds(60), FETCHED.plusSeconds(120));
+        Instant muchLater = FETCHED.plusSeconds(40L * 86_400);
+
+        processor.accept(withIss(muchLater, gp -> gp.put("EPOCH", muchLater.minusSeconds(3_600).toString()
+                .replace("Z", ".000000"))), muchLater.plusSeconds(60));
+
+        JsonNode run = runOf(processor.poll(muchLater.plusSeconds(90)));
+        assertThat(run.get("coverage").get("catalog_admitted").asInt()).isEqualTo(1);
+        assertThat(run.get("differing_copies_over_cap")).isEmpty();
+    }
 }

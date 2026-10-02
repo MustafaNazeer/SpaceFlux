@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -22,6 +23,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Schema checks on read and before publish (ADR 0002, ADR 0008), under the conditions of the dependency review in
@@ -55,6 +57,58 @@ class TopicSchemasTest {
 
         assertThat(r.node()).isNull();
         assertThat(r.failure()).contains("Kp");
+    }
+
+    private static TopicSchemas.Result screeningRunWith(Consumer<ObjectNode> change) throws IOException {
+        ObjectMapper json = new ObjectMapper();
+        ObjectNode e = (ObjectNode) json.readTree(
+                Files.readString(SCHEMAS.resolve("alerts/examples/valid-screening-run.json")));
+        change.accept((ObjectNode) e.get("screening_run"));
+        return SCHEMAS_ON_CLASSPATH.check("alerts", json.writeValueAsBytes(e));
+    }
+
+    private static ObjectNode rejectedNamed(ObjectNode run, String name) {
+        ObjectNode r = run.putArray("rejected").addObject();
+        r.put("catalog_number", 99999);
+        r.put("name", name);
+        r.put("role", "watchlist");
+        r.put("code", "not_in_input");
+        r.put("reason", "no element set for this watchlist object in the input, so it was not screened");
+        return r;
+    }
+
+    @Test
+    void anAlertsNameIsLimitedToSixtyFourCodePoints() throws IOException {
+        String astral = new String(Character.toChars(0x1F680));
+
+        assertThat(screeningRunWith(run -> rejectedNamed(run, astral.repeat(64))).failure()).isNull();
+        assertThat(screeningRunWith(run -> rejectedNamed(run, "N".repeat(65))).failure()).isNotNull();
+    }
+
+    @Test
+    void anOmittedCountCannotBeNegative() throws IOException {
+        TopicSchemas.Result r = screeningRunWith(run -> {
+            ObjectNode o = run.putObject("omitted");
+            for (String k : List.of("approach_event_ids", "suppressed", "rejected", "not_screened",
+                    "epoch_after_start", "differing_copies", "differing_copies_over_cap")) {
+                o.put(k, 0);
+            }
+            o.put("suppressed", -1);
+        });
+
+        assertThat(r.failure()).contains("suppressed");
+    }
+
+    @Test
+    void anOverCapEntryListsAtLeastOneRecord() throws IOException {
+        TopicSchemas.Result r = screeningRunWith(run -> {
+            ObjectNode o = run.putArray("differing_copies_over_cap").addObject();
+            o.put("catalog_number", 25544);
+            o.put("epoch", "2026-09-27T04:10:50.460Z");
+            o.put("records_not_listed", 0);
+        });
+
+        assertThat(r.failure()).contains("records_not_listed");
     }
 
     @Test

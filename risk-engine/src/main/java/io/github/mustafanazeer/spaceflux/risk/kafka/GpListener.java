@@ -26,7 +26,8 @@ import io.github.mustafanazeer.spaceflux.risk.screening.Watchlist;
 /**
  * Reads raw.gp and publishes a screening run once each batch has arrived. It never commits offsets: on every start it
  * reads raw.gp from the beginning and rebuilds the newest element set per object, and because a run's window starts at
- * the newest fetched_at, a restart reproduces the same run and event identities, which consumers deduplicate (ADR 0008).
+ * the newest fetched_at, a restart rebuilds the newest run under the same run id, which consumers deduplicate; the
+ * content can differ when an element set arrived late for a run already written (ADR 0007 decision 12, ADR 0008).
  * A run's events are marked written only after every write was acknowledged; otherwise the next check writes them again.
  */
 @Component

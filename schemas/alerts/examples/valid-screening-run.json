@@ -26,6 +26,16 @@
     "rejected": [],
     "not_screened": [],
     "epoch_after_start": [],
-    "differing_copies": []
+    "differing_copies": [],
+    "differing_copies_over_cap": [],
+    "omitted": {
+      "approach_event_ids": 0,
+      "suppressed": 0,
+      "rejected": 0,
+      "not_screened": 0,
+      "epoch_after_start": 0,
+      "differing_copies": 0,
+      "differing_copies_over_cap": 0
+    }
   }
 }

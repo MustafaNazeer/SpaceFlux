@@ -90,6 +90,11 @@
       "type": "string",
       "enum": ["watchlist", "catalog"]
     },
+    "objectName": {
+      "description": "OBJECT_NAME of an element set as risk-engine holds it. A name of up to 64 Unicode code points is kept as it is; a longer one is cut to its first 61 code points followed by the three characters ..., so it is 64 code points long. Two element sets whose names differ only after the cut are held as the same name.",
+      "type": "string",
+      "maxLength": 64
+    },
     "code": {
       "description": "A lower case code. The known values are listed in docs/data/topics.md. The set is open: a consumer shows an unknown code with its reason text rather than rejecting the event.",
       "type": "string",
@@ -460,7 +465,7 @@
         },
         "name": {
           "description": "OBJECT_NAME of the element set used, when it has one.",
-          "type": "string"
+          "$ref": "#/$defs/objectName"
         }
       },
       "additionalProperties": true
@@ -542,7 +547,7 @@
           "exclusiveMinimum": 0
         },
         "coverage": {
-          "description": "Counts of what the run covered. Every pair is exactly one of not screenable, suppressed, removed by the prefilter, or searched, so pairs equals pairs_not_screenable plus the length of suppressed plus pairs_removed_by_prefilter plus pairs_searched.",
+          "description": "Counts of what the run covered. Every pair is exactly one of not screenable, suppressed, removed by the prefilter, or searched, so pairs equals pairs_not_screenable plus the number of suppressed pairs plus pairs_removed_by_prefilter plus pairs_searched. The number of suppressed pairs is the length of suppressed plus omitted.suppressed (omitted.suppressed is 0 when omitted is absent).",
           "type": "object",
           "required": [
             "watchlist_accepted",
@@ -563,18 +568,18 @@
           "additionalProperties": true
         },
         "approach_count": {
-          "description": "Number of close_approach events the run published; equals the length of approach_event_ids.",
+          "description": "Number of close_approach events the run published. Equals the length of approach_event_ids plus omitted.approach_event_ids (0 when omitted is absent). A consumer holds the whole run once it holds this many distinct close_approach events carrying the run_id.",
           "type": "integer",
           "minimum": 0
         },
         "approach_event_ids": {
-          "description": "event_id of every close_approach event of this run, so a consumer can tell when it holds all of them.",
+          "description": "event_id of the run's close_approach events, in the order they were published. Every one is listed unless the summary had to be cut to its size budget; then the first ones are kept and omitted.approach_event_ids counts the rest. Every close_approach event is published either way.",
           "type": "array",
           "items": {"type": "string", "pattern": "^close_approach/"},
           "uniqueItems": true
         },
         "suppressed": {
-          "description": "Pairs not screened for close approaches, with the separation sampled over their joint screenable span. The true minimum between samples can be smaller than min_separation_m.",
+          "description": "Pairs not screened for close approaches, with the separation sampled over their joint screenable span. The true minimum between samples can be smaller than min_separation_m. Entries can be cut from the end to keep the summary within its size budget; omitted.suppressed counts them.",
           "type": "array",
           "items": {
             "type": "object",
@@ -593,8 +598,8 @@
               "other_number": {"$ref": "#/$defs/catalogNumber"},
               "mechanism": {"description": "Why the pair was not screened; known values in docs/data/topics.md.", "$ref": "#/$defs/code"},
               "detail": {"description": "Readable explanation, as risk-engine wrote it. For static_stack it gives the separation between the members' propagated element sets, not a measured distance.", "type": "string", "minLength": 1},
-              "watchlist_name": {"description": "OBJECT_NAME of the watchlist object's element set, when it has one.", "type": "string"},
-              "other_name": {"description": "OBJECT_NAME of the other object's element set, when it has one.", "type": "string"},
+              "watchlist_name": {"description": "OBJECT_NAME of the watchlist object's element set, when it has one.", "$ref": "#/$defs/objectName"},
+              "other_name": {"description": "OBJECT_NAME of the other object's element set, when it has one.", "$ref": "#/$defs/objectName"},
               "min_separation_m": {"description": "Smallest sampled separation, in metres.", "type": "number", "minimum": 0},
               "min_separation_at": {"description": "UTC time of the smallest sampled separation.", "$ref": "#/$defs/utc"},
               "max_separation_m": {"description": "Largest sampled separation, in metres.", "type": "number", "minimum": 0},
@@ -604,14 +609,14 @@
           }
         },
         "rejected": {
-          "description": "Objects rejected before any pair was formed, once per role they were rejected in.",
+          "description": "Objects rejected before any pair was formed, once per role they were rejected in, watchlist role entries first. Entries can be cut from the end to keep the summary within its size budget; omitted.rejected counts them.",
           "type": "array",
           "items": {
             "type": "object",
             "required": ["catalog_number", "role", "code", "reason"],
             "properties": {
               "catalog_number": {"$ref": "#/$defs/catalogNumber"},
-              "name": {"description": "OBJECT_NAME of the element set, when it has one.", "type": "string"},
+              "name": {"description": "OBJECT_NAME of the element set, when it has one.", "$ref": "#/$defs/objectName"},
               "role": {"$ref": "#/$defs/role"},
               "code": {"description": "Known values in docs/data/topics.md, including not_in_input for a configured watchlist object with no element set in the input.", "$ref": "#/$defs/code"},
               "reason": {"description": "Readable reason, as risk-engine wrote it.", "type": "string", "minLength": 1}
@@ -620,14 +625,14 @@
           }
         },
         "not_screened": {
-          "description": "Admitted objects whose track does not cover the whole window.",
+          "description": "Admitted objects whose track does not cover the whole window, watchlist role entries first. Entries can be cut from the end to keep the summary within its size budget; omitted.not_screened counts them.",
           "type": "array",
           "items": {
             "type": "object",
             "required": ["catalog_number", "role", "kind", "reason"],
             "properties": {
               "catalog_number": {"$ref": "#/$defs/catalogNumber"},
-              "name": {"description": "OBJECT_NAME of the element set, when it has one.", "type": "string"},
+              "name": {"description": "OBJECT_NAME of the element set, when it has one.", "$ref": "#/$defs/objectName"},
               "role": {"$ref": "#/$defs/role"},
               "kind": {"description": "Known values in docs/data/topics.md.", "$ref": "#/$defs/code"},
               "screened_until": {"description": "Last good time, present only for kind stopped_in_window.", "$ref": "#/$defs/utc"},
@@ -640,36 +645,73 @@
           }
         },
         "epoch_after_start": {
-          "description": "Objects screened by propagating backward from an element set whose epoch is after the window start.",
+          "description": "Objects screened by propagating backward from an element set whose epoch is after the window start. Entries can be cut from the end to keep the summary within its size budget; omitted.epoch_after_start counts them.",
           "type": "array",
           "items": {
             "type": "object",
             "required": ["catalog_number", "seconds_after_start"],
             "properties": {
               "catalog_number": {"$ref": "#/$defs/catalogNumber"},
-              "name": {"description": "OBJECT_NAME of the element set, when it has one.", "type": "string"},
+              "name": {"description": "OBJECT_NAME of the element set, when it has one.", "$ref": "#/$defs/objectName"},
               "seconds_after_start": {"description": "Epoch minus window start, in seconds.", "type": "number", "exclusiveMinimum": 0}
             },
             "additionalProperties": true
           }
         },
         "differing_copies": {
-          "description": "Differing entries for one catalog number in the inputs; the entry with the newest epoch was used (the first copy held, when copies share an epoch but differ in elements or name) and each other entry is listed.",
+          "description": "Differing entries for one catalog number in the inputs; the entry with the newest epoch was used (the first copy held, when copies share an epoch but differ in elements or name). Each other entry held is listed, unless the summary had to be cut to its size budget; omitted.differing_copies counts the entries cut. At most 3 differing copies of the held epoch are held per catalog number; further ones are counted in differing_copies_over_cap and not listed here.",
           "type": "array",
           "items": {
             "type": "object",
             "required": ["catalog_number", "used_epoch", "dropped_epoch", "dropped_from", "elements_differ"],
             "properties": {
               "catalog_number": {"$ref": "#/$defs/catalogNumber"},
-              "used_name": {"description": "OBJECT_NAME of the entry used, when it has one.", "type": "string"},
+              "used_name": {"description": "OBJECT_NAME of the entry used, when it has one.", "$ref": "#/$defs/objectName"},
               "used_epoch": {"description": "Epoch of the element set used.", "$ref": "#/$defs/utc"},
-              "dropped_name": {"description": "OBJECT_NAME of the entry not used, when it has one.", "type": "string"},
+              "dropped_name": {"description": "OBJECT_NAME of the entry not used, when it has one.", "$ref": "#/$defs/objectName"},
               "dropped_epoch": {"description": "Epoch of the element set not used.", "$ref": "#/$defs/utc"},
               "dropped_from": {"description": "The input list the entry not used came from.", "$ref": "#/$defs/role"},
               "elements_differ": {"description": "False when only the name differs.", "type": "boolean"}
             },
             "additionalProperties": true
           }
+        },
+        "differing_copies_over_cap": {
+          "description": "Catalog numbers that already held 3 differing copies of their held epoch when further differing records arrived. Those records were not held, not screened, and not listed in differing_copies. Sorted by catalog number. Cut from the end after differing_copies when the summary is over its size budget; omitted.differing_copies_over_cap counts the entries cut. Absent on summaries written before this field existed.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["catalog_number", "epoch", "records_not_listed"],
+            "properties": {
+              "catalog_number": {"$ref": "#/$defs/catalogNumber"},
+              "epoch": {"description": "Epoch of the held element set the further records shared.", "$ref": "#/$defs/utc"},
+              "records_not_listed": {"description": "Records that arrived for this catalog number and epoch, differed from the entry used and from every listed copy, and were not held. Each arrival is counted, so one record read twice counts twice.", "type": "integer", "minimum": 1}
+            },
+            "additionalProperties": true
+          }
+        },
+        "omitted": {
+          "description": "How many entries were cut from the end of each list to keep the summary within its size budget of 900,000 bytes (docs/data/topics.md). Lists are cut in this order, each emptied before the next is touched: differing_copies, differing_copies_over_cap, epoch_after_start, approach_event_ids, suppressed, not_screened, rejected. Within rejected and not_screened, watchlist role entries come first, so catalog role entries are cut first. Every count is 0 when nothing was cut. Absent on summaries written before this field existed, which were never cut.",
+          "type": "object",
+          "required": [
+            "approach_event_ids",
+            "suppressed",
+            "rejected",
+            "not_screened",
+            "epoch_after_start",
+            "differing_copies",
+            "differing_copies_over_cap"
+          ],
+          "properties": {
+            "approach_event_ids": {"description": "event_id values of published close_approach events not listed in approach_event_ids.", "type": "integer", "minimum": 0},
+            "suppressed": {"description": "Suppressed pairs not listed in suppressed.", "type": "integer", "minimum": 0},
+            "rejected": {"description": "Rejections not listed in rejected.", "type": "integer", "minimum": 0},
+            "not_screened": {"description": "Entries not listed in not_screened.", "type": "integer", "minimum": 0},
+            "epoch_after_start": {"description": "Entries not listed in epoch_after_start.", "type": "integer", "minimum": 0},
+            "differing_copies": {"description": "Entries not listed in differing_copies.", "type": "integer", "minimum": 0},
+            "differing_copies_over_cap": {"description": "Entries not listed in differing_copies_over_cap.", "type": "integer", "minimum": 0}
+          },
+          "additionalProperties": true
         }
       },
       "additionalProperties": true

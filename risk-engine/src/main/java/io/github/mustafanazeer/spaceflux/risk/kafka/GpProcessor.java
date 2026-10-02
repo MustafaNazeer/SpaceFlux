@@ -33,8 +33,9 @@ import tools.jackson.databind.json.JsonMapper;
  * finished arriving: the element sets of one fetch share its fetched_at, and a run starts once no new element set has
  * arrived for 30 seconds. The window starts at the newest fetched_at among the element sets held, so the same input
  * always gives the same run and the same event identities (ADR 0007, ADR 0008). A run's events are kept until the
- * caller reports them written, and a run id that was written is never produced again with other content. The run is
- * computed without holding the state lock, so reading raw.gp never waits for a screening run.
+ * caller reports them written, and within one process a run id that was written is never produced again with other
+ * content; after a restart, a run that gained a late element set is rebuilt under the same id (ADR 0007 decision 12).
+ * The run is computed without holding the state lock, so reading raw.gp never waits for a screening run.
  */
 public final class GpProcessor {
 
@@ -44,6 +45,10 @@ public final class GpProcessor {
     static final Duration FUTURE_TOLERANCE = Duration.ofMinutes(5);
     /** Element sets this much older than the window start are dropped from the held catalog. */
     static final Duration KEEP = Duration.ofDays(30);
+    /** Names are cut to this many code points on arrival, so the held state and every event stay bounded. */
+    static final int MAX_NAME_CODE_POINTS = 64;
+    /** Differing same epoch copies held per object; later distinct ones are only counted (ADR 0007 decision 15). */
+    static final int MAX_COPIES = 3;
     private static final Logger LOG = LoggerFactory.getLogger(GpProcessor.class);
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
@@ -55,6 +60,7 @@ public final class GpProcessor {
     private final Map<Integer, TrackedObject> newest = new TreeMap<>();
     /** Element sets with the same epoch as the held one but other elements or name, listed as differing copies. */
     private final Map<Integer, List<TrackedObject>> copies = new TreeMap<>();
+    private final Map<Integer, Integer> overCap = new TreeMap<>();
     private final Set<String> writtenRuns = new HashSet<>();
     private Instant newestFetched;
     private Instant lastArrival;
@@ -73,7 +79,7 @@ public final class GpProcessor {
     }
 
     private record Input(List<TrackedObject> watched, List<TrackedObject> catalog, Map<Integer, String> names,
-            Instant windowStart, long generation) {
+            List<ScreeningJson.OverCap> overCap, Instant windowStart, long generation) {
     }
 
     public GpProcessor(TopicSchemas schemas, Set<Integer> watchlist, TimeScale utc) {
@@ -110,7 +116,7 @@ public final class GpProcessor {
             try {
                 JsonNode gp = event.get("gp");
                 JsonNode name = gp.get("OBJECT_NAME");
-                object = new TrackedObject(name != null && name.isString() ? name.asString() : null,
+                object = new TrackedObject(name != null && name.isString() ? cut(name.asString()) : null,
                         GpElementSets.toTle(gp));
                 // Orekit formats the lines lazily and throws for values a two line element set cannot hold; copies
                 // are compared by their lines, so that has to fail here rather than later.
@@ -145,6 +151,7 @@ public final class GpProcessor {
         if (held == null || object.tle().getDate().isAfter(held.tle().getDate())) {
             newest.put(n, object);
             copies.remove(n);
+            overCap.remove(n);
             return true;
         }
         if (!object.tle().getDate().equals(held.tle().getDate()) || same(held, object)) {
@@ -154,8 +161,19 @@ public final class GpProcessor {
         if (list.stream().anyMatch(c -> same(c, object))) {
             return false;
         }
+        if (list.size() >= MAX_COPIES) {
+            overCap.merge(n, 1, Integer::sum);
+            return false;
+        }
         list.add(object);
         return true;
+    }
+
+    static String cut(String name) {
+        if (name.codePointCount(0, name.length()) <= MAX_NAME_CODE_POINTS) {
+            return name;
+        }
+        return name.substring(0, name.offsetByCodePoints(0, MAX_NAME_CODE_POINTS - 3)) + "...";
     }
 
     private static boolean same(TrackedObject a, TrackedObject b) {
@@ -196,7 +214,7 @@ public final class GpProcessor {
         }
     }
 
-    /** The run's events were written; it is not produced again, and its id is never reused. */
+    /** The run's events were written; in this process it is not produced again, and its id is never reused. */
     public synchronized void published(String runId) {
         writtenRuns.add(runId);
         if (pending != null && pending.runId().equals(runId)) {
@@ -209,13 +227,17 @@ public final class GpProcessor {
         AbsoluteDate oldest = new AbsoluteDate(newestFetched.minus(KEEP), utc);
         newest.values().removeIf(o -> o.tle().getDate().isBefore(oldest));
         copies.keySet().retainAll(newest.keySet());
+        overCap.keySet().retainAll(newest.keySet());
         List<TrackedObject> held = new ArrayList<>(newest.values());
         List<TrackedObject> catalog = new ArrayList<>(held);
         copies.values().forEach(catalog::addAll);
         List<TrackedObject> watched = held.stream().filter(o -> watchlist.contains(o.catalogNumber())).toList();
         Map<Integer, String> names = new HashMap<>();
         catalog.forEach(o -> names.putIfAbsent(o.catalogNumber(), o.name()));
-        return new Input(watched, catalog, names, newestFetched, generation);
+        List<ScreeningJson.OverCap> over = overCap.entrySet().stream()
+                .map(e -> new ScreeningJson.OverCap(e.getKey(), newest.get(e.getKey()).tle().getDate(), e.getValue()))
+                .toList();
+        return new Input(watched, catalog, names, over, newestFetched, generation);
     }
 
     private static Out empty() {
@@ -229,8 +251,8 @@ public final class GpProcessor {
     private Out run(Input in, Instant now) {
         ScreeningResult result = withMissingWatchlist(
                 screening.run(in.watched(), in.catalog(), new AbsoluteDate(in.windowStart(), utc)), in);
-        List<JsonNode> events = ScreeningJson.write(result, in.names(), in.windowStart(), SwpcProcessor.RULES_VERSION,
-                now, utc);
+        List<JsonNode> events = ScreeningJson.write(result, in.names(), in.overCap(), in.windowStart(),
+                SwpcProcessor.RULES_VERSION, now, utc);
         String runId = runId(in.windowStart());
         List<Message> alerts = new ArrayList<>();
         List<Message> dead = new ArrayList<>();
