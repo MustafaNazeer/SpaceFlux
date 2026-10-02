@@ -91,7 +91,7 @@
       "enum": ["watchlist", "catalog"]
     },
     "objectName": {
-      "description": "OBJECT_NAME of an element set as risk-engine holds it. A name of up to 64 Unicode code points is kept as it is; a longer one is cut to its first 61 code points followed by the three characters ..., so it is 64 code points long. Two element sets whose names differ only after the cut are held as the same name.",
+      "description": "OBJECT_NAME of an element set as risk-engine holds it. A name of up to 64 Unicode code points is kept as it is; a longer one is cut to its first 61 code points followed by the three characters ..., so it is 64 code points long. Two element sets whose names differ only after the cut are held as the same name. A name is for display only; the catalog number identifies the object. A cut name ends in ..., but a name sent that way could too, so the ending does not show that a name was cut.",
       "type": "string",
       "maxLength": 64
     },
@@ -513,7 +513,7 @@
       "additionalProperties": true
     },
     "screeningRun": {
-      "description": "What one screening run covered, and every object and pair it did not screen, with the reason. The run is stale 24 hours after window_start and always after window_end (docs/risk/orbital-conventions.md). No approaches means only that no searched pair's SGP4 propagation came within report_distance_m; objects not in the input, rejected, not screened, or in a suppressed pair are not covered, and the uncertainty of every distance is of the order of kilometres (docs/risk/orbital-conventions.md Section 5).",
+      "description": "What one screening run covered, and every object and pair it did not screen, with the reason, unless the summary was cut to its size budget, in which case omitted counts the entries left out. The run is stale 24 hours after window_start and always after window_end (docs/risk/orbital-conventions.md). No approaches means only that no searched pair's SGP4 propagation came within report_distance_m; objects not in the input, rejected, not screened, or in a suppressed pair are not covered, and the uncertainty of every distance is of the order of kilometres (docs/risk/orbital-conventions.md Section 5).",
       "type": "object",
       "required": [
         "run_id",
@@ -535,8 +535,8 @@
           "description": "Identity of the run.",
           "$ref": "#/$defs/runId"
         },
-        "window_start": {"description": "Start of the screening window: the fetched_at of the newest raw.gp event among the element sets the run used (docs/risk/orbital-conventions.md Section 3.2).", "$ref": "#/$defs/utc"},
-        "window_end": {"description": "End of the screening window, 7 days after window_start.", "$ref": "#/$defs/utc"},
+        "window_start": {"description": "Start of the screening window: the fetched_at of the newest raw.gp event among the element sets the run used (docs/risk/orbital-conventions.md Section 3.2). Written with that fetched_at's full precision, as are window_end, input_fetched_at and run_id; the other times in the close_approach and screening_run payloads are written to the millisecond.", "$ref": "#/$defs/utc"},
+        "window_end": {"description": "End of the screening window: window_start plus 604,800 SI seconds (7 days of 86,400 seconds). When a leap second falls inside the window, it is one second short of the same clock time 7 days after window_start.", "$ref": "#/$defs/utc"},
         "input_fetched_at": {
           "description": "fetched_at of the newest raw.gp event among the element sets the run used. A run's results are stale 24 hours after window_start, and always after window_end, under the staleness rule for screening results in docs/risk/orbital-conventions.md. Equal to window_start in this version; kept as its own field because it states where the data came from, not how the window was chosen.",
           "$ref": "#/$defs/utc"
@@ -568,7 +568,7 @@
           "additionalProperties": true
         },
         "approach_count": {
-          "description": "Number of close_approach events the run published. Equals the length of approach_event_ids plus omitted.approach_event_ids (0 when omitted is absent). A consumer holds the whole run once it holds this many distinct close_approach events carrying the run_id.",
+          "description": "Number of close_approach events the run published. Equals the length of approach_event_ids plus omitted.approach_event_ids (0 when omitted is absent). When omitted.approach_event_ids is 0, or omitted is absent, the run is exactly the close_approach events whose event_id the kept summary lists in approach_event_ids: a close_approach with this run_id whose event_id the kept summary does not list belongs to a run rebuilt under the same run_id (docs/adr/0007-alerts-topic.md, decision 12) and is not part of this run. Only when ids were cut does a consumer count instead: it holds the whole run once it holds this many distinct close_approach events carrying the run_id, and it cannot tell an approach of a rebuilt run from an unlisted approach of this one.",
           "type": "integer",
           "minimum": 0
         },
@@ -685,7 +685,7 @@
             "properties": {
               "catalog_number": {"$ref": "#/$defs/catalogNumber"},
               "epoch": {"description": "Epoch of the held element set the further records shared.", "$ref": "#/$defs/utc"},
-              "records_not_listed": {"description": "Records that arrived for this catalog number and epoch, differed from the entry used and from every listed copy, and were not held. Each arrival is counted, so one record read twice counts twice.", "type": "integer", "minimum": 1}
+              "records_not_listed": {"description": "Records that arrived for this catalog number and epoch, differed from the entry used and from every listed copy, and were not held. Each arrival is counted, so one record read twice counts twice. The count is not per run: it covers every such arrival for the held epoch since the risk engine began reading raw.gp, across runs, until a newer epoch is held for the catalog number or the held element set leaves the held catalog because its EPOCH is more than 30 days before a run's window start (docs/risk/orbital-conventions.md Section 2.4).", "type": "integer", "minimum": 1}
             },
             "additionalProperties": true
           }

@@ -57,6 +57,12 @@ public final class ScreeningJson {
 
     public static List<JsonNode> write(ScreeningResult result, Map<Integer, String> names, List<OverCap> overCap,
             Instant windowStart, int rulesVersion, Instant producedAt, TimeScale utc) {
+        return write(result, names, overCap, windowStart, rulesVersion, producedAt, utc, SUMMARY_BUDGET_BYTES);
+    }
+
+    /** A smaller budget lets a test build a cut summary small enough to commit as an example. */
+    static List<JsonNode> write(ScreeningResult result, Map<Integer, String> names, List<OverCap> overCap,
+            Instant windowStart, int rulesVersion, Instant producedAt, TimeScale utc, int budgetBytes) {
         String start = windowStart.toString();
         // The end the screening used, so a leap second inside the window is not a second off.
         String end = result.end().toInstant(DataContext.getDefault().getTimeScales()).toString();
@@ -158,7 +164,7 @@ public final class ScreeningJson {
             n.put("epoch", time(o.epoch(), utc));
             n.put("records_not_listed", o.recordsNotListed());
         }
-        fit(e, p, producedAt);
+        fit(e, p, producedAt, budgetBytes);
         events.add(e);
         return events;
     }
@@ -172,14 +178,14 @@ public final class ScreeningJson {
      * counts them in omitted. Compact JSON separates array entries by one comma, so each removal, and each digit the
      * count in omitted gains, is accounted for exactly.
      */
-    private static void fit(ObjectNode event, ObjectNode run, Instant producedAt) {
+    private static void fit(ObjectNode event, ObjectNode run, Instant producedAt, int budgetBytes) {
         ObjectNode omitted = run.putObject("omitted");
         OMITTED_KEYS.forEach(k -> omitted.put(k, 0));
         long size = MAPPER.writeValueAsBytes(event).length + PRODUCED_AT_MAX_CHARS - producedAt.toString().length();
         for (String list : CUT_ORDER) {
             ArrayNode entries = (ArrayNode) run.get(list);
             int cut = 0;
-            while (size > SUMMARY_BUDGET_BYTES && !entries.isEmpty()) {
+            while (size > budgetBytes && !entries.isEmpty()) {
                 JsonNode last = entries.remove(entries.size() - 1);
                 size -= MAPPER.writeValueAsBytes(last).length + (entries.isEmpty() ? 0 : 1);
                 // The count in omitted grows by a digit at 10, 100 and so on.

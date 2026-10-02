@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "kind": "screening_run",
+  "rules_version": 1,
+  "event_id": "screening_run/1/2026-09-29T07:30:00Z/1",
+  "produced_at": "2026-09-30T18:50:27Z",
+  "screening_run": {
+    "run_id": "2026-09-29T07:30:00Z/1",
+    "window_start": "2026-09-29T07:30:00Z",
+    "window_end": "2026-10-06T07:30:00Z",
+    "input_fetched_at": "2026-09-29T07:30:00Z",
+    "report_distance_m": 5000,
+    "coverage": {
+      "watchlist_accepted": 1,
+      "catalog_admitted": 8,
+      "pairs": 7,
+      "pairs_not_screenable": 0,
+      "pairs_removed_by_prefilter": 0,
+      "pairs_searched": 4
+    },
+    "approach_count": 1,
+    "approach_event_ids": [],
+    "suppressed": [
+      {
+        "watchlist_number": 25544,
+        "watchlist_name": "ISS (ZARYA)",
+        "other_number": 49044,
+        "mechanism": "static_stack",
+        "detail": "not screened for close approaches: both are in the International Space Station stack (pair listed since 2026-09-27); separation between the members' propagated element sets, not a measured distance, 0.0 to 0.1 km at the 10 s samples from 2026-09-29T07:30:00Z to 2026-10-06T07:30:00Z",
+        "min_separation_m": 41.2,
+        "min_separation_at": "2026-09-29T08:30:00.000Z",
+        "max_separation_m": 58.9,
+        "stack_entry_may_be_stale": false
+      }
+    ],
+    "rejected": [
+      {
+        "catalog_number": 99999,
+        "role": "watchlist",
+        "code": "not_in_input",
+        "reason": "no element set for this watchlist object in the input, so it was not screened"
+      },
+      {
+        "catalog_number": 43205,
+        "role": "catalog",
+        "code": "stale_element_set",
+        "reason": "element set is 12.4 days old at the window start, over the 10 day limit; not screened as a catalog object"
+      }
+    ],
+    "not_screened": [],
+    "epoch_after_start": [],
+    "differing_copies": [],
+    "differing_copies_over_cap": [],
+    "omitted": {
+      "approach_event_ids": 1,
+      "suppressed": 2,
+      "rejected": 0,
+      "not_screened": 0,
+      "epoch_after_start": 2,
+      "differing_copies": 1,
+      "differing_copies_over_cap": 0
+    }
+  }
+}
