@@ -94,22 +94,33 @@ Items marked **(to be verified)** depend on a tool, library, or provider behavio
 - [ ] `SEC-API-04` Every list field and endpoint has a maximum page size enforced server side. [T5.1]
 - [ ] `SEC-API-05` The GraphQL introspection setting for the cloud environment matches the recorded ADR decision. [T5.2]
 - [ ] `SEC-API-06` Subscriptions have a per client connection cap, an idle timeout, and an origin check on the handshake. [T5.3]
-- [ ] `SEC-API-07` CORS allows only the dashboard origin, and never combines a wildcard origin with credentials. [T5.4]
+- [ ] `SEC-API-07` CORS allows only the dashboard origin, and never combines a wildcard origin with credentials. While the dashboard is served from the same origin as the API ([ADR 0009](../adr/0009-alert-acknowledgement-auth.md)), no CORS configuration exists at all. [T5.4]
 - [ ] `SEC-API-08` Error handlers return a generic body with a correlation ID; stack traces are logged, not returned. [T5.5]
 - [ ] `SEC-API-09` A per client rate limit applies in the cloud environment, at the ingress or in the service. [T5.6]
 - [ ] `SEC-API-10` No endpoint returns raw CDM content; CDM derived responses expose flags and derived fields only, with a test asserting it. [T4.5]
 - [ ] `SEC-API-11` Management and health endpoints that expose environment, configuration, or heap data are disabled or unreachable from outside the cluster. [T9.3]
+- [ ] `SEC-API-12` `query-api` configures no Tomcat authenticator, realm, or servlet security constraint; authentication is Spring Security's filter chain alone. The build overrides `tomcat.version` to 11.0.26 while the Spring Boot parent manages 11.0.24, which has advisories fixed in 11.0.25. [T11.3]
 
 ## ack
 
-- [ ] `SEC-ACK-01` The authentication design is recorded in an ADR before the endpoint is merged. [section 8]
+- [ ] `SEC-ACK-01` The authentication design is recorded in an ADR before the endpoint is merged. Met: [ADR 0009](../adr/0009-alert-acknowledgement-auth.md), a server side session cookie with form login. [section 8]
 - [ ] `SEC-ACK-02` Unauthenticated requests are rejected before any database access, with a test. [T6.1]
 - [ ] `SEC-ACK-03` If a cookie carries the session: CSRF protection is on, and the cookie is `Secure`, `HttpOnly`, and `SameSite`. If a bearer token is used: it is not stored in `localStorage`. [T6.2]
 - [ ] `SEC-ACK-04` Login attempts are rate limited, and any stored password uses a slow password hashing function. [T6.3]
-- [ ] `SEC-ACK-05` The request body is allowlisted to the alert ID and an optional bounded length note; the principal and timestamp are set by the server. [T6.5]
-- [ ] `SEC-ACK-06` Acknowledgement rows are append only and record principal, timestamp, and alert ID. [T6.4]
+- [ ] `SEC-ACK-05` The request body is allowlisted to an optional `note` of at most 500 Unicode code points (counted with `String.codePointCount`, matching the `VARCHAR(500)` column); a longer note and any unknown field, `principal` and `acted_at` included, are refused with `400` by an explicit setting with a test; the alert ID comes from the path, `principal` is set from the security context, and `acted_at` by the database at insert. [T6.5]
+- [ ] `SEC-ACK-06` `alert_acknowledgement` rows are append only and record `event_id`, `action`, `principal`, `acted_at`, and `note`; unacknowledging writes a new row with `action` `unacknowledge`. [T6.4]
 - [ ] `SEC-ACK-07` The identity used by the MCP tool server is rejected by this endpoint, with a test. [T8.7]
-- [ ] `SEC-ACK-08` Demo credentials are created per environment from the secret store and never appear in the repo or in recordings. [T6.6]
+- [ ] `SEC-ACK-08` Demo credentials are created per environment from the secret store and never appear in the repo or in recordings. The secret is a bcrypt hash generated offline; the plain password is never stored in `.env`, Secrets Manager, or the container environment. [T6.6]
+- [ ] `SEC-ACK-09` No default user exists: the service defines its own authentication beans, and a test asserts that Spring Boot's "Using generated security password" line never appears in the startup log. [T6.7, T9.3]
+- [ ] `SEC-ACK-10` Without a configured operator username and password hash, the acknowledgement endpoint answers `403` for every request and the rest of the API starts and serves normally, with a test. [T6.1, T6.7]
+- [ ] `SEC-ACK-11` The session cookie is `Secure`, `HttpOnly`, and `SameSite=Strict` in the cloud profile; the session ID changes at login; logout invalidates the session and sends `Clear-Site-Data`; at most one operator session exists. [T6.2]
+- [ ] `SEC-ACK-12` A session ends after 30 minutes idle and 8 hours after login, whichever comes first; the absolute lifetime is measured from the recorded login instant, with a test. [T6.2]
+- [ ] `SEC-ACK-13` CSRF is configured with `csrf.spa()`, and a test shows an acknowledgement without a valid `X-XSRF-TOKEN` header is refused. [T6.2]
+- [ ] `SEC-ACK-14` Anonymous requests never create a session: the request cache is `NullRequestCache`, with a test that a refused anonymous request sets no session cookie. [T6.1]
+- [ ] `SEC-ACK-15` Login throttling uses backoff, never a hard lockout of the only account; a blocked attempt answers `429` with `Retry-After` without running the password check; per client address 3 consecutive failures are free, then the address is blocked for 2 seconds after the 4th failure, doubling with each further failure up to 15 minutes, and reset by a successful login or 1 hour with no failure; across all addresses at most 30 failures in any 10 minute window, above which every login attempt is refused until the window has fewer; at most 2 password checks run at once, and a third concurrent attempt answers `429` with `Retry-After: 1` at once; at most 10,000 addresses are tracked, oldest evicted first ([ADR 0009](../adr/0009-alert-acknowledgement-auth.md), decision 8); tests cover the backoff, the global window, and the `429` path. [T6.3]
+- [ ] `SEC-ACK-16` Only `close_approach` events and `space_weather_level` events in state `level` can be acknowledged; a `screening_run`, a refresh, a "no data" event, or an unknown alert ID is refused, with a test for each. [T6.5]
+- [ ] `SEC-ACK-17` Append only is enforced by grants, not triggers, matching the [database users](../data/mysql-schema.md#database-users): the API user keeps `SELECT` on the tables it serves and its only write privilege is `INSERT` on `alert_acknowledgement`, limited to `event_id`, `action`, `principal`, and `note`; it has no `UPDATE` or `DELETE` anywhere; the consumer user has no privilege on `alert_acknowledgement`; the migration user is used only by Flyway. Checked against the grants as created. [T6.4, T4.3]
+- [ ] `SEC-ACK-18` Responses to anonymous requests carry only `action` and `acted_at` of acknowledgement rows, with no display name; `note` and `principal` are left out of the response, not hidden by the page, with a test. [T6.4]
 
 ## dashboard
 
@@ -144,11 +155,17 @@ Items marked **(to be verified)** depend on a tool, library, or provider behavio
 
 ## data
 
-- [ ] `SEC-DAT-01` Separate database users exist for migrations (DDL) and for the application (no DDL). [T4.3]
+- [ ] `SEC-DAT-01` Separate database users exist for migrations (DDL) and for the application (no DDL). For MySQL there are exactly three, matching [database users](../data/mysql-schema.md#database-users): the migration user holds `CREATE`, `ALTER`, `DROP`, `INDEX`, `REFERENCES`, `SELECT`, `INSERT`, and `UPDATE` on `spaceflux.*` with `GRANT OPTION`, plus `DELETE` on `spaceflux.flyway_schema_history` only, and no global privilege and nothing on the `mysql` schema; the consumer and API users hold only the grants listed there and never `GRANT OPTION`. Any privilege added to the migration user needs a new security review. [T4.3, T4.6]
 - [ ] `SEC-DAT-02` The archiver's Mongo user can write only the raw document collections; the retrieval user can only read the vector collection. How Atlas free tier roles can be scoped **(to be verified)**. [T4.3]
 - [ ] `SEC-DAT-03` The Atlas network access list does not include an allow all entry. [T4.4]
 - [ ] `SEC-DAT-04` Raw CDM documents live in a collection that no public endpoint, tool, or embedding job reads. [T4.5, T7.9]
-- [ ] `SEC-DAT-05` Database connections use TLS where the server supports it (Atlas requires it; local Compose MySQL is loopback only). [T4.4]
+- [ ] `SEC-DAT-05` Database connections use TLS where the server supports it (Atlas requires it). MySQL runs with `require_secure_transport=ON`, every MySQL account is created with `REQUIRE SSL`, and clients set `sslMode=REQUIRED` locally and `VERIFY_CA` or `VERIFY_IDENTITY` in the cloud, with a test that a plain connection is refused. [T4.4, T4.7]
+- [ ] `SEC-DAT-06` Only the migrate container holds the migration password: `query-api` has no Flyway dependency on its runtime classpath and runs with `spring.flyway.enabled=false`, and no `query-api` configuration, environment, or mounted secret names the migration user. [T4.3, T4.6]
+- [ ] `SEC-DAT-07` At startup each `query-api` connection pool runs `SHOW GRANTS` for its own user and refuses to start if the result differs from the expected grants, with a test that an extra privilege stops the start. [T4.6]
+- [ ] `SEC-DAT-08` The migrate container refuses to run unless every user name placeholder matches `^[a-z][a-z0-9_]{0,31}$`, with a test that a name containing a quote is refused before Flyway starts; account host parts are written in the migration, not taken from a placeholder. [T4.8]
+- [ ] `SEC-DAT-09` The account creation script reads passwords only from `/run/secrets/`, refuses any password that is not at least 32 characters of `[A-Za-z0-9]`, never enables shell tracing, never passes a password on a command line, and never prints one. [T4.9]
+- [ ] `SEC-DAT-10` MySQL accounts use `caching_sha2_password`; `mysql_native_password` is not enabled on the server; no connection string sets `allowPublicKeyRetrieval`, `allowLoadLocalInfile`, or `allowUrlInLocalInfile` to `true`. [T4.7, T4.10]
+- [ ] `SEC-DAT-11` The MySQL image is pinned by digest (`mysql:8.4.11@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242` today), as is the migrate container's image; Compose publishes the MySQL port only on `127.0.0.1`, or not at all; and the migrate container exits after it runs and publishes no port. [T2.1, T11.4, T4.3]
 
 ## secrets
 

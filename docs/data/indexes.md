@@ -1,0 +1,117 @@
+# MySQL indexes
+
+* **Status:** decided on 2026-10-02. No migration exists yet, so nothing on this page has been checked with `EXPLAIN`. Each index below names the query it is for, and the [proof section](#how-each-index-is-proven) describes how each one will be checked once the migrations exist. No plan output is quoted here because none has been produced.
+* **Applies to:** the schema in [mysql-schema.md](mysql-schema.md), on MySQL 8.4 LTS with InnoDB. The query numbers (Q1 to Q9) are the rows of its [Queries the API needs](mysql-schema.md#queries-the-api-needs) table.
+
+## Rules I follow
+
+1. **Every secondary index exists for a named query.** An index no query uses costs a write on every insert and gets dropped. Where this page proposes an index the schema page does not list, or leaves out one it does, the [differences](#differences-from-the-schema-page) section says so.
+2. **The primary key is part of every secondary index.** In InnoDB, "each record in a secondary index contains the primary key columns for the row, as well as the columns specified for the secondary index" ([InnoDB clustered and secondary indexes](https://dev.mysql.com/doc/refman/8.4/en/innodb-index-types.html)). An index on (`scale`, `alert_seq`) of a table whose primary key is `alert_seq` therefore orders by `alert_seq` within each `scale` whether or not `alert_seq` is named. I name it anyway where the order matters to the query, so the definition says what the query relies on.
+3. **Key length stays inside the InnoDB limit.** The index key limit is 3072 bytes for the `DYNAMIC` row format ([InnoDB limits](https://dev.mysql.com/doc/refman/8.4/en/innodb-limits.html)), which is the default row format ([`innodb_default_row_format`](https://dev.mysql.com/doc/refman/8.4/en/innodb-parameters.html#sysvar_innodb_default_row_format)). The longest key here is `event_id` at `VARCHAR(512)` in `utf8mb4`, 2,048 bytes, and the longest composite key, (`event_id`, `ack_id`), is 2,056 bytes.
+4. **A foreign key needs an index on the child whose first columns are the foreign key columns**, and MySQL creates one if none exists ([foreign key constraints](https://dev.mysql.com/doc/refman/8.4/en/create-table-foreign-keys.html)). Every foreign key below is already covered by the primary key or a listed index, so no index is created implicitly.
+5. **Paging is by key, not by offset.** Lists are paged with `WHERE key < ? ORDER BY key DESC LIMIT n` (or the ascending form), so a page costs the same whatever its position. `OFFSET` reads and discards every skipped row.
+
+## Indexes by table
+
+### `alert_event`
+
+| Index | Columns | Used by | Why |
+| --- | --- | --- | --- |
+| Primary key | `alert_seq` | Q3, the kind tables' joins | Newest first by a backward scan of the clustered index; every kind table joins on it |
+| Unique | `event_id` | Idempotent insert; Q3 and Q8 joins from `alert_acknowledgement`; Q4 completeness | The duplicate key on this index is what turns a redelivered event into a no op. It is also the parent key of the acknowledgement foreign key |
+| Secondary | (`kind`, `alert_seq`) | Q3 when filtered by kind | Newest events of one kind without reading the others |
+
+### `space_weather_event`
+
+| Index | Columns | Used by | Why |
+| --- | --- | --- | --- |
+| Primary key | `alert_seq` | Join to `alert_event` | Also the foreign key to `alert_event` |
+| Secondary | (`scale`, `satellite`, `interval_start`, `alert_seq`) | Q2 for G | Range on `interval_start` within a scale, with the latest `alert_seq` per interval read from the same index. G rows have a null `satellite`; the condition is `satellite IS NULL`, which an index can serve ([IS NULL optimization](https://dev.mysql.com/doc/refman/8.4/en/is-null-optimization.html)) |
+| Secondary | (`scale`, `satellite`, `sample_time`, `alert_seq`) | Q2 for R and S | The same for GOES samples, per satellite |
+| Secondary | (`scale`, `alert_seq`) | Newest events of a scale | Recent history of one scale regardless of key |
+
+**A candidate, not yet proposed:** (`state`, `alert_seq`). Q3 asks for the newest alerts, and only events in state `level` count as space weather alerts, while the schema page expects about twelve events an hour for each R and S series whatever their state. If the list is read newest first from `alert_event` and joined to this table, the scan passes every event in another state on the way to each `level` event. Whether that matters depends on the exact definition of the alert list in the REST contract and on the row counts, so it is decided by the `EXPLAIN ANALYZE` check below, not here.
+
+### `space_weather_series`
+
+| Index | Columns | Used by | Why |
+| --- | --- | --- | --- |
+| Primary key | (`scale`, `series_satellite`) | Q1; every consumer update | One row per series, a handful of rows in all. Q1 reads the rows of one scale by the key prefix and picks the newest `freshness_reference` among those not `ended`; no further index is useful at this size |
+
+### `close_approach`
+
+| Index | Columns | Used by | Why |
+| --- | --- | --- | --- |
+| Primary key | `alert_seq` | Join to `alert_event` | |
+| Secondary | `run_id` | Q4 when a run's approach ids were cut | Counting the distinct approaches of one run |
+| Secondary | (`watchlist_number`, `time_of_closest_approach`) | Q6 | An object's approaches as the watchlist side, in time order |
+| Secondary | (`other_number`, `time_of_closest_approach`) | Q6 | The same as the other side |
+
+Q6 asks for an object's approaches in either role. I write it as a `UNION` of two queries, one per index, rather than one `WHERE watchlist_number = ? OR other_number = ?`, so each half has a plain index range to use. `UNION` rather than `UNION ALL`, so a row that matched both halves would still be returned once; whether `UNION ALL` is safe depends on the screening never pairing an object with itself, which this page does not rely on.
+
+### `screening_run`
+
+| Index | Columns | Used by | Why |
+| --- | --- | --- | --- |
+| Primary key | `alert_seq` | Parent of the list tables | |
+| Unique | `run_id` | Insert; joining approaches to their run | One summary per run |
+| Secondary | (`window_start`, `rules_version`) | Q4 | The newest run is the last entry of this index; a backward index scan reads it first ([descending indexes](https://dev.mysql.com/doc/refman/8.4/en/descending-indexes.html) shows the plan note "Backward index scan"). The current run is the newest complete one, so the scan continues past runs still incomplete, which are at most the last one or two |
+
+### Run list tables
+
+All four are keyed by (`run_alert_seq`, `position`), which serves Q5 (one run's list in order) and covers the foreign key to `screening_run`.
+
+| Table | Secondary index | Used by | Why |
+| --- | --- | --- | --- |
+| `screening_run_approach` | `approach_event_id` | Q4, Q6 | Whether a stored approach is listed by the kept summary of its run |
+| `screening_run_suppressed` | (`watchlist_number`, `run_alert_seq`) and (`other_number`, `run_alert_seq`) | Q6 | Whether an object was in a suppressed pair of the current run, from either side |
+| `screening_run_rejected` | (`catalog_number`, `run_alert_seq`) | Q6 | Whether an object was rejected in the current run |
+| `screening_run_not_screened` | (`catalog_number`, `run_alert_seq`) | Q6 | Whether an object was not screened in the current run |
+
+Q6 asks about one object in one run, so both values are known and the lookup is an equality on both columns. With the catalog number alone, the index finds every run that ever listed the object and filters them by run afterwards; with the run alone (the primary key prefix), it reads the whole list of that run, which can hold an entry for most of the catalog.
+
+### `catalog_object`
+
+| Index | Columns | Used by | Why |
+| --- | --- | --- | --- |
+| Primary key | `norad_cat_id` | Q6, Q7, Q9; every consumer update | Q9 pages the catalog by this key |
+
+No index on `object_name`. None of the queries searches by name. If a search is added, the index comes with it.
+
+### `watchlist_object`
+
+| Index | Columns | Used by | Why |
+| --- | --- | --- | --- |
+| Primary key | `catalog_number` | Q7 | Joined to `catalog_object` by primary key on both sides |
+
+### `alert_acknowledgement`
+
+| Index | Columns | Used by | Why |
+| --- | --- | --- | --- |
+| Primary key | `ack_id` | Insert order | |
+| Secondary | (`event_id`, `ack_id`) | Q3, Q8 | The latest action for an alert is the last entry for its `event_id`; its history is the whole range. Also covers the foreign key to `alert_event.event_id` |
+
+No index on (`principal`, `acted_at`). None of the queries reads by principal, and there is one operator.
+
+### Flyway's history table
+
+Flyway creates and indexes `flyway_schema_history` itself. No application query reads it.
+
+## Differences from the schema page
+
+These differed from the first draft of [mysql-schema.md](mysql-schema.md) and were settled on 2026-10-02; the schema page now lists the indexes as below:
+
+1. The run list tables index (`catalog_number`, `run_alert_seq`) and (`watchlist_number`, `run_alert_seq`), (`other_number`, `run_alert_seq`), not the catalog number alone, because Q6 always names the run.
+2. `alert_acknowledgement` has no (`principal`, `acted_at`) index until a query needs it.
+3. `catalog_object` has no `object_name` index until a name search exists.
+4. Q9 pages by key, not by offset.
+
+## How each index is proven
+
+The bar is that every hot query has an index justified by an `EXPLAIN` plan. Once the migrations exist:
+
+1. **A test database at a realistic size.** Plans depend on row counts: on a table of a few rows the optimizer can rightly prefer a full scan, which would prove nothing. A generator with a fixed seed fills an empty schema, applied by the same migrations, through the same insert code the consumers use, at volumes stated beside the results: for example a year of space weather events at the rates in the schema page's expected volume, some thousands of screening runs, and a catalog of the size of the polled groups. The generator, its seed and its volumes are committed with the results.
+2. **Statistics first.** `ANALYZE TABLE` on every table before any plan is taken, so the plans do not depend on when statistics were last sampled.
+3. **One plan per query, taken as the user that runs it.** For each of Q1 to Q9, and for the consumers' write path lookups, the exact SQL from the repository code is run with `EXPLAIN FORMAT=TREE` ([EXPLAIN](https://dev.mysql.com/doc/refman/8.4/en/explain.html)) as the database user that issues it in production. `EXPLAIN` needs the same privileges as the statement it explains, so this also checks the grants.
+4. **What a plan must show.** The index named on this page is the one chosen, and no table that grows with time is read by a full table scan. Where the timing matters (Q3 and the candidate index on `space_weather_event`), `EXPLAIN ANALYZE` adds actual rows read and time; those timings are reported with the machine, the data volume and the script that produced them, and are not general claims.
+5. **Committed evidence.** The plans are committed as text next to this page, and a test asserts the chosen index for each query, so a later change to a query or an index that loses its plan fails the build instead of going unnoticed.

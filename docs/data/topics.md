@@ -61,6 +61,17 @@ Because the `EPOCH` pattern allows different numbers of fractional digits, compa
 
 [`schemas/raw.gp/examples/valid-iss.json`](../../schemas/raw.gp/examples/valid-iss.json) is the ISS (ZARYA) record from a recorded CelesTrak `GROUP=stations` response, byte for byte, with `fetched_at` set to that response's capture time.
 
+### Consumers
+
+Two consumer groups read `raw.gp`, independently of each other:
+
+| Consumer group | Service | What it does with each element set | Offsets |
+| --- | --- | --- | --- |
+| `risk-engine-screening` | `risk-engine` | Holds the newest element set per object and screens the watchlist against them ([ADR 0008](../adr/0008-java-kafka-client-and-schema-validator.md), decision 6) | Never committed; the topic is read from the beginning on every start |
+| `query-api-catalog` | `query-api` | Keeps the newest element set per object in the catalog table ([the MySQL schema](mysql-schema.md#catalog_object)) | Committed after the database transaction for the record has committed |
+
+Both validate every event against the schema and dead letter what fails to `raw.gp.dlq` under their own `service` name. Both deduplicate by keeping, per object, the element set with the latest `EPOCH`, and the first copy held when an `EPOCH` repeats, so a redelivered or older element set changes nothing.
+
 ## `raw.gp.dlq`
 
 Every topic's dead letter topic uses the same envelope, [`schemas/dlq/v1.schema.json`](../../schemas/dlq/v1.schema.json). Nothing that fails is dropped silently; it lands here with the reason attached.
