@@ -121,8 +121,8 @@ Space-Track conjunction data messages are planned as a second signal: they raise
 
 * **Polling:** pollers respect each provider's published polling guidance and back off exponentially with full jitter where that guidance allows retries. The cadence and error rules for CelesTrak and SWPC are set in [ADR 0004](adr/0004-celestrak-polling-and-error-handling.md) and [ADR 0005](adr/0005-swpc-polling-and-error-handling.md) and summarized under [Ingest](#ingest).
 * **Malformed payloads** go to the topic's dead letter topic with the failure reason attached. Nothing is dropped silently.
-* **Probes:** every service exposes liveness and readiness probes. Readiness fails when a required dependency is down. `ingest` does this today; its readiness also fails while any feed is halted. `risk-engine` has no health endpoints yet.
-* **Stale data:** the dashboard shows a per feed stale data banner when a feed's newest event is older than its expected cadence.
+* **Probes:** every service is to expose liveness and readiness probes, with readiness failing when a required dependency is down. `ingest` does this today; its readiness also fails while any feed is halted. `risk-engine` has no health endpoints yet.
+* **Stale data (planned):** the dashboard will show a per feed stale data banner when a feed's newest event is older than its expected cadence.
 * **Absence is an error, not a value.** A missing feed, an empty catalog, or a missing evaluation file raises a visible warning instead of falling back to a plausible default.
 
 ## Security posture
@@ -136,9 +136,11 @@ The full threat model is in [security/threat-model.md](security/threat-model.md)
 
 ## Observability
 
-* **Tracing:** OpenTelemetry trace context propagates through Kafka message headers, so a single trace spans the poller, the topic, the risk engine, and the resulting alert.
-* **Metrics:** Prometheus scrapes consumer lag, feed freshness, alert rate, and assistant evaluation scores.
-* **Dashboards:** Grafana dashboards will be committed to the repo as JSON.
+Nothing in this section is built yet.
+
+* **Tracing (planned):** OpenTelemetry trace context will propagate through Kafka message headers, so a single trace spans the poller, the topic, the risk engine, and the resulting alert.
+* **Metrics (planned):** Prometheus will scrape consumer lag, feed freshness, alert rate, and assistant evaluation scores.
+* **Dashboards (planned):** Grafana dashboards will be committed to the repo as JSON.
 
 ## Assistant
 
