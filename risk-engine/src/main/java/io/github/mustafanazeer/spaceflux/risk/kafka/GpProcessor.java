@@ -112,6 +112,10 @@ public final class GpProcessor {
                 JsonNode name = gp.get("OBJECT_NAME");
                 object = new TrackedObject(name != null && name.isString() ? name.asString() : null,
                         GpElementSets.toTle(gp));
+                // Orekit formats the lines lazily and throws for values a two line element set cannot hold; copies
+                // are compared by their lines, so that has to fail here rather than later.
+                object.tle().getLine1();
+                object.tle().getLine2();
             } catch (RuntimeException e) {
                 dead.add(deadLetter(in, url, null, "element set cannot be read: " + e.getMessage(), now));
                 continue;
@@ -177,6 +181,7 @@ public final class GpProcessor {
             if (writtenRuns.contains(runId)) {
                 LOG.info("element sets arrived for the written run {}; they are screened with the next newer fetch",
                         runId);
+                changed = false;
                 return empty();
             }
             input = snapshot();

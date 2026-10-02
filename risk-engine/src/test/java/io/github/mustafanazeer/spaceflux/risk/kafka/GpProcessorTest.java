@@ -11,6 +11,11 @@ import java.util.Objects;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
+
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 
 import io.github.mustafanazeer.spaceflux.risk.orbit.OrekitData;
 import tools.jackson.databind.JsonNode;
@@ -267,5 +272,54 @@ class GpProcessorTest {
         GpProcessor.Out next = processor.poll(FETCHED.plusSeconds(7_900));
         assertThat(next.runId()).isNotEqualTo(runId).startsWith(FETCHED.plusSeconds(7_800).toString());
         assertThat(runOf(next).get("coverage").get("catalog_admitted").asInt()).isEqualTo(22);
+    }
+
+    /** Synthetic: values the schema allows but a two line element set cannot hold (Orekit formats lines lazily). */
+    @Test
+    void aSameEpochCopyWhoseElementsCannotBeWrittenAsLinesIsDeadLetteredWithoutACheck() throws IOException {
+        processor.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+
+        GpProcessor.Out out = processor.accept(withIss(FETCHED.plusSeconds(60), gp -> gp.put("BSTAR", 1e30)),
+                FETCHED.plusSeconds(120));
+
+        assertThat(out.deadLetters()).singleElement()
+                .satisfies(m -> assertThat(JSON.readTree(m.value()).has("check")).isFalse());
+        assertThat(runOf(processor.poll(FETCHED.plusSeconds(150))).get("differing_copies")).isEmpty();
+    }
+
+    /** Synthetic: a same epoch copy of the recorded ISS element set without OBJECT_NAME. */
+    @Test
+    void aDifferingCopyWithoutANameStillGivesASchemaValidRun() throws IOException {
+        processor.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+
+        processor.accept(withIss(FETCHED.plusSeconds(60), gp -> gp.remove("OBJECT_NAME")),
+                FETCHED.plusSeconds(120));
+        GpProcessor.Out out = processor.poll(FETCHED.plusSeconds(150));
+
+        assertThat(out.deadLetters()).isEmpty();
+        assertThat(runOf(out).get("differing_copies")).singleElement()
+                .satisfies(d -> assertThat(d.has("dropped_name")).isFalse());
+    }
+
+    @Test
+    void aLateElementSetForAWrittenRunIsLoggedOnceAndNotRecomputed() throws IOException {
+        List<GpProcessor.In> all = stations(FETCHED);
+        processor.accept(all.subList(0, 21), FETCHED.plusSeconds(60));
+        processor.published(processor.poll(FETCHED.plusSeconds(90)).runId());
+        processor.accept(all.subList(21, 22), FETCHED.plusSeconds(200));
+
+        ListAppender<ILoggingEvent> logs = new ListAppender<>();
+        logs.start();
+        Logger logger = (Logger) LoggerFactory.getLogger(GpProcessor.class);
+        logger.addAppender(logs);
+        try {
+            for (int i = 0; i < 5; i++) {
+                assertThat(processor.poll(FETCHED.plusSeconds(300 + 5L * i)).alerts()).isEmpty();
+            }
+        } finally {
+            logger.detachAppender(logs);
+        }
+
+        assertThat(logs.list).hasSize(1);
     }
 }

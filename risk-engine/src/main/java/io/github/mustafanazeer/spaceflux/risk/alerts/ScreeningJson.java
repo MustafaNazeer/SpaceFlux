@@ -121,9 +121,9 @@ public final class ScreeningJson {
         for (ScreeningResult.DifferingCopy d : result.differingCopies()) {
             ObjectNode n = differing.addObject();
             n.put("catalog_number", d.catalogNumber());
-            n.put("used_name", d.usedName());
+            putName(n, "used_name", d.usedName());
             n.put("used_epoch", time(d.usedEpoch(), utc));
-            n.put("dropped_name", d.droppedName());
+            putName(n, "dropped_name", d.droppedName());
             n.put("dropped_epoch", time(d.droppedEpoch(), utc));
             n.put("dropped_from", code(d.droppedFrom()));
             n.put("elements_differ", d.elementsDiffer());
@@ -150,7 +150,10 @@ public final class ScreeningJson {
 
     /** The object's name when its element set has one, so a list can be read without a lookup. */
     private static void name(ObjectNode node, String field, int catalogNumber, Map<Integer, String> names) {
-        String name = names.get(catalogNumber);
+        putName(node, field, names.get(catalogNumber));
+    }
+
+    private static void putName(ObjectNode node, String field, String name) {
         if (name != null && !name.isBlank()) {
             node.put(field, name);
         }
