@@ -1,0 +1,96 @@
+screening cost on risk-engine/src/test/resources/celestrak/gp-stations.json (22 objects)
+started 2026-10-02T00:58:09.172634596Z; window start 2026-09-27T05:00:00Z, 604800 s window, 10 s samples
+java 21.0.11 (OpenJDK 64-Bit Server VM), 8 available processors, max heap 3816 MiB
+warm up 3 runs, then 10 measured runs per figure; times in ms
+host load average at start: 4.87 3.70 2.77 15/1357 317263
+
+1. Whole run as the service does it: watchlist ISS, catalog the whole fixture, named stacks
+  coverage: 1 watchlist, 22 catalog, 21 pairs, 0 not screenable, 7 suppressed, 14 removed by the prefilter, 0 searched, 0 approaches
+  whole run: median 1271.3, min 1148.8, max 1410.7, mean 1261.3, stdev 95.6; runs [1378.1, 1327.7, 1257.3, 1162.4, 1157.4, 1148.8, 1285.3, 1303.3, 1182.3, 1410.7]
+
+2. The same run split into its stages (each stage timed alone, same inputs)
+  per object track (latch from epoch to window start, then the window), median of runs:
+    norad    age_at_start_d  latch_samples window_samples  median_ms
+    25544           0.034            295          60481      30.30
+    36086           0.034            295          60481      31.63
+    48274           0.333           2878          60481      41.49
+    49044           0.034            295          60481      39.56
+    49271           1.509          13035          60481      52.31
+    53239           0.333           2878          60481      44.83
+    54216           0.333           2878          60481      48.95
+    66052           0.440           3800          60481      50.01
+    66515           0.556           4807          60481      55.86
+    66906           0.018            157          60481      50.11
+    67683           2.288          19766          60481      65.75
+    67685           1.062           9177          60481      56.95
+    67686           0.417           3607          60481      49.58
+    67687           0.841           7270          60481      46.09
+    67688           2.287          19756          60481      55.39
+    67796           0.357           3083          60481      45.87
+    68689           0.357           3083          60481      48.23
+    68837           0.357           3083          60481      49.99
+    69049           0.717           6196          60481      37.46
+    69180           0.717           6196          60481      37.46
+    100057          0.357           3083          60481      50.85
+    100712          0.357           3083          60481      37.48
+  sum of per object track medians: 1026.2 ms
+  7 stack pairs: full window separation for the suppression record, sum of medians 459.3 ms (65.6 ms per pair)
+  14 pairs removed by the radial prefilter: sum of medians 0.0042 ms
+
+3. Growth with the number of pairs on the same fixture: the first k objects of the fixture are the watchlist, the whole fixture is the catalog
+    k    pairs suppressed  prefiltered  searched  approaches    median       min       max     stdev
+    1       21          7           14         0           0    1333.2    1278.1    1645.6     108.1
+    2       41         13           28         0           0    1659.0    1540.0    1845.1      97.0
+    4       78         22           56         0           0    2338.8    2204.2    2872.1     234.8
+    8      140         27          113         0           0    2530.2    2416.8    3203.2     244.4
+    16     216         31          176         9           0    3143.8    3014.8    3587.8     169.0
+    22     231         38          184         9           0    3435.2    3351.5    3766.0     139.1
+
+4. Searched pairs in the all against all run: closest approach search per pair
+  9 searched pairs: sum of medians 287.3 ms; per pair median 31.4 ms, min 27.8 ms, max 37.1 ms
+
+5. Co-orbiting check: sampled separation with the 500 km early exit versus the full window, for every pair of the fixture that passes the prefilter and has distinct element sets, as the check would see them without the named stacks (named stack pairs are marked)
+    a        b        exits_early   with_exit_ms   full_window_ms
+    25544    36086         false         59.566             59.9  (named stack pair)
+    25544    49044         false         57.801             57.7  (named stack pair)
+    25544    67796         false         60.968             59.9  (named stack pair)
+    25544    68689         false         56.938             56.8  (named stack pair)
+    25544    68837         false         56.906             56.9  (named stack pair)
+    25544    100057        false         60.027             57.8  (named stack pair)
+    25544    100712        false         62.683             77.9  (named stack pair)
+    36086    67796         false         83.187             78.5  (named stack pair)
+    36086    68689         false         80.946             85.6  (named stack pair)
+    36086    68837         false         69.702             82.6  (named stack pair)
+    36086    100057        false         78.372             65.5  (named stack pair)
+    36086    100712        false         61.194             81.5  (named stack pair)
+    48274    69049         false         66.743             78.6  (named stack pair)
+    48274    69180         false         60.258             61.5  (named stack pair)
+    49044    67796         false         59.297             56.9  (named stack pair)
+    49044    68689         false         57.483             57.7  (named stack pair)
+    49044    68837         false         60.505             58.1  (named stack pair)
+    49044    100057        false         56.921             56.7  (named stack pair)
+    49044    100712        false         56.968             57.0  (named stack pair)
+    53239    69049         false         60.549             80.8  (named stack pair)
+    53239    69180         false         92.419             84.3  (named stack pair)
+    54216    69049         false         92.206             80.5  (named stack pair)
+    54216    69180         false         85.054             77.2  (named stack pair)
+    66515    67686          true          0.004             74.7
+    66515    67687          true          0.007             72.1
+    66515    67688          true          0.004             61.4
+    66906    67683          true          0.004             73.9
+    66906    67685          true          0.007             79.0
+    67683    67685          true          0.006             96.0
+    67685    67687          true          0.004             79.3
+    67686    67688          true          0.005             74.0
+    67687    67688          true          0.007             94.1
+  9 pairs exit early (sum 0.05 ms with the exit); 23 run the whole window; full window sum over all of them 2274.3 ms
+
+6. Latch cost against element set age: ISS track with the window start moved to epoch plus d days
+    d       latch_samples window_samples    median       min       max     stdev
+    0.0                 0          60481      39.9      36.3      52.2       5.4
+    1.0              8640          60481      42.7      41.4      43.7       0.7
+    2.5             21600          60481      67.1      50.6      70.0       8.4
+    5.0             43200          60481      63.6      58.2      75.3       6.0
+    10.0            86400          60481      96.5      84.2     113.3       8.8
+
+host load average at end: 4.67 3.99 3.17 3/1319 334600

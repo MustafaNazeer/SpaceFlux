@@ -1,16 +1,17 @@
 # Local memory of the core Compose profile
 
-This page records how much memory the `core` Compose profile uses on my development machine, how I measured it, and the container limits I recommend from that measurement. Every memory number below comes from one of three runs of [`deploy/measure-ram.sh`](../../deploy/measure-ram.sh), and the raw samples and the printed summary of each are committed next to this page (one `.tsv` row per container per sample, and the script's `.summary.txt` output):
+This page records how much memory the `core` Compose profile uses on my development machines, how I measured it, and the container limits I recommend from that measurement. Every memory number below comes from one of four runs of [`deploy/measure-ram.sh`](../../deploy/measure-ram.sh), and the raw samples and the printed summary of each are committed next to this page (one `.tsv` row per container per sample, and the script's `.summary.txt` output):
 
 * Run 1, before any limits: [`data/local-memory-20260927T164650Z.tsv`](data/local-memory-20260927T164650Z.tsv), [`.summary.txt`](data/local-memory-20260927T164650Z.summary.txt)
 * Run 2, limits applied: [`data/local-memory-20260927T170652Z.tsv`](data/local-memory-20260927T170652Z.tsv), [`.summary.txt`](data/local-memory-20260927T170652Z.summary.txt)
 * Run 3, limits applied, ingest rebuilt from the final code: [`data/local-memory-20260927T173407Z.tsv`](data/local-memory-20260927T173407Z.tsv), [`.summary.txt`](data/local-memory-20260927T173407Z.summary.txt)
+* Run 4, the risk engine added to the profile, on a second machine: [`data/local-memory-20261002T004545Z.tsv`](data/local-memory-20261002T004545Z.tsv), [`.summary.txt`](data/local-memory-20261002T004545Z.summary.txt)
 
-Three short runs under changing configurations are not enough to state run to run variance, so treat the figures as observations, not a distribution. The Configuration and Results sections describe run 1.
+Four short runs under changing configurations, on two machines, are not enough to state run to run variance, so treat the figures as observations, not a distribution. The Configuration and Results sections describe run 1. Runs 1 to 3 were made on a machine with 7.1 GiB of RAM and run 4 on a laptop with 14 GiB; each summary file records its host's kernel, Docker version, and total memory and swap.
 
 ## Budget
 
-The machine has 7.1 GiB of RAM, and the whole stack is never meant to run on it at once. The budget I set for the core local profile is roughly 3 GiB resident once it holds Kafka, MySQL, one JVM service, and the Go ingest service. Today the profile holds only Kafka and ingest (plus a one shot topic creation container), so this run measures that subset. MySQL and the JVM services are not built yet and are not included in any number here.
+The machine of runs 1 to 3, the smaller of the two, has 7.1 GiB of RAM, and the whole stack is never meant to run on it at once. The budget I set for the core local profile is roughly 3 GiB resident once it holds Kafka, MySQL, one JVM service, and the Go ingest service. Runs 1 to 3 measured Kafka and ingest only (plus a one shot topic creation container). Run 4 adds the risk engine, the first JVM service, and is described in [Run with the risk engine](#run-with-the-risk-engine). MySQL and `query-api` are not built yet and are not included in any number here.
 
 ## Method
 
@@ -97,11 +98,12 @@ The `1g` Kafka limit with a 512 MiB heap and the `128m` ingest limit below are a
 | kafka | `1g`, with `KAFKA_HEAP_OPTS: "-Xmx512m -Xms512m"` | 512 | A 512 MiB heap is about 2.9 times the 178 MiB left after young collections, and 1 GiB leaves 512 MiB for metaspace (about 10 MiB observed), thread stacks, code cache, direct buffers, and the log segment page cache, which counts toward the limit but is reclaimable. 512 threads is about 3.2 times the 158 observed. |
 | kafka, if the default heap stays | no lower than `1536m` | 512 | With `-Xms1G` the whole 1 GiB heap can become resident, so the limit needs the heap plus non heap memory on top of it. |
 | ingest | `128m` | 64 | The observed peak is 15.7 MiB with only SWPC enabled. The CelesTrak path buffers bodies of up to 8 MiB and has not been measured, so the headroom is deliberately wide until a run with CelesTrak enabled confirms it. 64 threads is 6.4 times the 10 observed. |
+| risk-engine | `512m` | 128 | Set before any measurement and kept after run 4: the risk engine peaked at 176.3 MiB (34 percent of the limit) and its `memory.peak` since start, page cache included, was 176.6 MiB, with 23 threads (128 is about 5.6 times that). The JVM, not this limit, sets the heap ceiling: no heap option is passed, so Java 21 sizes the heap at 25 percent of the container limit, 128 MiB, with the serial collector (see run 4). That measurement covered a 22 object catalog; how heap use grows with a larger catalog has not been measured. |
 | topics | not measured | not measured | The topic creation container ran and exited before sampling started, so I have no number for it. |
 
 **Swap under a limit.** Docker's resource constraints documentation says that when `--memory` is set and `--memory-swap` is not, the container can also use as much swap as the memory setting. Setting only `mem_limit` in Compose therefore allows each container up to that amount again in swap. `deploy/compose.yaml` sets `memswap_limit` equal to `mem_limit`, which disables swap for the container and makes the limit a hard bound on RAM, at the cost of the kernel killing the process sooner under pressure.
 
-With the Kafka limit above, the profile's limits total 1152 MiB (1 GiB plus 128 MiB) before MySQL and the JVM services are added. That is a sum of limits, not a measurement.
+With the Kafka limit above, the profile's limits total 1152 MiB (1 GiB plus 128 MiB) for Kafka and ingest, and 1664 MiB with the risk engine's 512 MiB, before MySQL and `query-api` are added. That is a sum of limits, not a measurement.
 
 ## Run with the limits applied
 
@@ -123,7 +125,42 @@ Run 3, 2026-09-27 17:34:07Z to 17:41:17Z, 420 s at a 5 s interval, 83 samples, s
 | ingest | 7.5 MiB | 9.2 MiB | 12.7 MiB | 0 | 10 |
 | both | 478.8 MiB | 482.3 MiB | 590.0 MiB | 0 | |
 
-At its maximum Kafka used about 57 percent of its limit and ingest about 10 percent. One SWPC poll (about 73 KB received at 17:38:36Z) falls inside the window. The host was under memory pressure from other applications during all three runs, with about 2.5 to 2.6 GiB of host swap in use.
+At its maximum Kafka used about 57 percent of its limit and ingest about 10 percent. One SWPC poll (about 73 KB received at 17:38:36Z) falls inside the window. The host was under memory pressure from other applications during all three runs, with host swap in use peaking at 2.4 to 2.6 GiB per run (2486.2 to 2657.4 MiB in the summaries).
+
+## Run with the risk engine
+
+Run 4, 2026-10-02 00:45:45Z to 00:51:55Z, 360 s at a 5 s interval, 71 samples, on a different machine from runs 1 to 3: a laptop with 14 GiB of RAM and 4 GiB of swap, the same kernel (6.17.0-41-generic) and Docker Engine (29.1.3, cgroup v2, systemd driver). Raw samples and summary: [`data/local-memory-20261002T004545Z.tsv`](data/local-memory-20261002T004545Z.tsv) and [`.summary.txt`](data/local-memory-20261002T004545Z.summary.txt).
+
+**Configuration.** The images were built from the committed code at commit `59885e7` and the two services recreated with
+
+```sh
+INGEST_FEEDS=swpc docker compose -f deploy/compose.yaml --profile core up --build -d
+deploy/measure-ram.sh
+```
+
+| Item | Value |
+|---|---|
+| Kafka image | `apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837`, up since 00:07:03Z |
+| Ingest image | locally built `spaceflux-ingest`, image id `sha256:b96a86cb6397fdf45d61b14cbcb239613d0d5ca9b0c4d3ebc5a2b00c31da2ef5`, started 00:45:31Z |
+| Risk engine image | locally built `spaceflux-risk-engine`, image id `sha256:a0c7dcb53acb7844c23675955b43f3859b9093f9b60591ebbf0d20ae8153f59e`, started 00:45:31Z |
+| `INGEST_FEEDS` | `swpc` |
+| Limits in effect | as in `deploy/compose.yaml`: Kafka `1g`, ingest `128m`, risk engine `512m`, each without swap; pids 512, 64, 128 |
+| Risk engine JVM | Java 21.0.12.1 from the distroless image; `JAVA_TOOL_OPTIONS` carries only the two native library directories, so no heap option is set |
+
+**A screening run inside the window.** The screening consumer reads `raw.gp` from the beginning on every start and publishes a run about 30 seconds after the newest batch stops growing. The risk engine container started at 00:45:31Z, about 13 seconds before the measurement started at 00:45:45Z and 18 seconds before the first sample at 00:45:50Z (the start time is in the summary file, the sample times in the `.tsv`). The details of the screening run come from a one off read of the live stack's Kafka topics after the run, and that output is not committed: `raw.gp` held one CelesTrak stations fetch (fetched 2026-10-01T23:40:11Z), so no new CelesTrak request was needed; the `screening_run` event for run `2026-10-01T23:40:11.638297494Z/1` on the `alerts` topic had `produced_at` 2026-10-02T00:46:09.664Z, 24 seconds into the window, and record timestamp 00:46:11.097Z; that run admitted 22 catalog objects and formed 21 pairs, 7 suppressed by the named station stacks, 14 removed by the radial prefilter, none searched, no approaches; and the three dead letter topics were empty. Between the samples at 00:46:06Z and 00:46:11Z the risk engine's usage rose from 158.7 to 163.0 MiB. A 5 second interval can miss a shorter peak, so the `memory.peak` figure below, which the kernel keeps for the whole life of the container, is the better bound. One SWPC poll (71,206 bytes received by ingest in the interval ending 00:50:34Z) also falls inside the window.
+
+| Container | usage min | median | max | swap max | threads max |
+|---|---|---|---|---|---|
+| kafka | 459.8 MiB | 460.9 MiB | 659.7 MiB | 0 | 162 |
+| ingest | 8.8 MiB | 9.7 MiB | 13.7 MiB | 0 | 14 |
+| risk-engine | 158.2 MiB | 164.2 MiB | 176.3 MiB | 0 | 23 |
+| all three | 631.6 MiB | 638.3 MiB | 837.0 MiB | 0 | |
+
+`memory.peak` since container start, page cache included: Kafka 726.4 MiB, ingest 16.4 MiB, risk engine 176.6 MiB. The host had no swap in use at any sample. At its maximum the risk engine used about 34 percent of its 512 MiB limit and Kafka about 64 percent of its 1 GiB limit. Kafka's maximum is higher than in runs 2 and 3 (546.2 and 580.8 MiB); this host was not under memory pressure, while runs 1 to 3 had host swap in use peaking at 2.4 to 2.6 GiB, so the two hosts are not directly comparable. The risk engine's usage climbed slowly across the window, from about 164 MiB a minute in to 176 MiB at the end, so six minutes is too short to say where it levels off.
+
+**The risk engine's heap.** With no heap option, the JVM picks its heap from the container limit. I checked what it picks with the same image and the same limit in a separate, short lived container (`docker run --rm --memory 512m --memory-swap 512m --entrypoint /usr/bin/java spaceflux-risk-engine -XX:+PrintFlagsFinal -version`, a one off check whose output is not committed): `MaxRAMPercentage` 25, `MaxHeapSize` 134217728 bytes (128 MiB), `InitialHeapSize` 8 MiB, and the serial collector. So a heap that outgrows 128 MiB fails with an `OutOfMemoryError` inside the JVM long before the container reaches 512 MiB. I did not record the live heap after collections, as I did for Kafka, so the share of the 176.3 MiB that is heap is not known from this run.
+
+**Does the core profile fit the budget?** The three containers together peaked at 837.0 MiB, within the roughly 3 GiB budget, with MySQL and `query-api` still to be added. This holds for a 22 object catalog and a single watchlist object.
 
 ## Reproducing
 
