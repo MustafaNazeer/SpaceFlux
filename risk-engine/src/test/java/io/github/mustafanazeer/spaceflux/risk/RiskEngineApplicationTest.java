@@ -8,6 +8,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.orekit.time.TimeScale;
 
+import io.github.mustafanazeer.spaceflux.risk.kafka.CompressionCheck;
+
 @SpringBootTest(properties = {"spaceflux.swpc.enabled=false", "spaceflux.screening.enabled=false"})
 class RiskEngineApplicationTest {
 
@@ -17,6 +19,11 @@ class RiskEngineApplicationTest {
     @Test
     void contextStartsWithTheApplicationConfiguration() {
         assertThat(context.getBean(RiskEngineApplication.class)).isNotNull();
+    }
+
+    @Test
+    void checksEveryCompressionCodecAtStartup() {
+        assertThat(context.getBean(CompressionCheck.class)).isNotNull();
     }
 
     @Test
