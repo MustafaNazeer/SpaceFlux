@@ -17,7 +17,7 @@ Designed around data from CelesTrak, NOAA SWPC, and NASA DONKI, which are public
 
 The CelesTrak feed and each SWPC product run in their own poller, so one halted poller does not stop the others. Every event is validated against a JSON Schema file in [`schemas/`](schemas/) before it is published. A payload that fails decoding or validation goes to the topic's dead letter topic (`raw.gp.dlq` or `raw.swpc.dlq`) with the reason attached, and nothing is dropped silently. Records already published are skipped, so an unchanged feed does not produce new events. The service exposes liveness and readiness endpoints; readiness reports Kafka, publishing, and each feed separately. Topics, keys, and schemas are described in [docs/data/topics.md](docs/data/topics.md).
 
-The local stack is a Docker Compose `core` profile with a single Kafka broker, a one shot topic creation container, and `ingest`. With the container limits in place and the current code, one 7 minute run with only the SWPC feed enabled measured Kafka and `ingest` together at a median of 482.3 MiB and a maximum of 590.0 MiB. That is a single run on one machine, and the CelesTrak path was not part of it; the method, raw samples, and caveats are in [docs/perf/local-memory.md](docs/perf/local-memory.md).
+The local stack is a Docker Compose `core` profile with a single Kafka broker, a one shot topic creation container, `ingest`, and the risk engine described below. Before the risk engine joined it, with the container limits in place, one 7 minute run with only the SWPC feed enabled measured Kafka and `ingest` together at a median of 482.3 MiB and a maximum of 590.0 MiB. That is a single run on one machine, and the CelesTrak path was not part of it; the method, raw samples, and caveats are in [docs/perf/local-memory.md](docs/perf/local-memory.md). A measurement with the risk engine in the stack has not been recorded yet.
 
 To build, test, and run it, see [docs/setup-guide.md](docs/setup-guide.md).
 
@@ -28,7 +28,7 @@ To build, test, and run it, see [docs/setup-guide.md](docs/setup-guide.md).
 * **Space weather levels.** Each SWPC sample is mapped onto the G, R, and S levels of the NOAA Space Weather Scales, using the thresholds and plausibility checks in [docs/risk/space-weather-scales.md](docs/risk/space-weather-scales.md). A level is derived mechanically from one measurement and is never an official NOAA scale level or a forecast.
 * **Close approach screening.** Orbits are propagated with SGP4 through Orekit, and each batch of element sets on `raw.gp` (the CelesTrak `stations` group) is screened for approaches within 5 km of the watchlist, currently the ISS, over a 7 day window. Each run publishes one event per approach and a run summary. The propagation is checked against published SGP4 verification cases and the screening against a dense brute force scan, as recorded in [docs/risk/orbital-conventions.md](docs/risk/orbital-conventions.md). A close approach here is two public element sets coming within 5 km, not an operational conjunction assessment.
 
-Every event is checked against its topic schema before it is written, and a record that fails a schema or rule check goes to a dead letter topic with the reason attached. The risk engine has no container image yet, so it is not part of the Compose stack.
+Every event is checked against its topic schema before it is written, and a record that fails a schema or rule check goes to a dead letter topic with the reason attached. The risk engine runs in the local Compose stack next to `ingest`, from a container image built on a distroless Java 21 base that runs as a non root user on a read only filesystem.
 
 ## What it is meant to do
 
@@ -54,17 +54,16 @@ The full design, including why each service scales differently and how delivery,
 
 ## Planned
 
-* A container image for the risk engine and its place in the Compose stack
 * Query API with MySQL, the MongoDB archiver, and contract tests
 * Angular dashboard with GraphQL and a live alert subscription
-* Container images, CI, and a Terraform environment on EKS that is brought up for demos and torn down afterwards
+* CI that builds, tests, and pushes the container images, and a Terraform environment on EKS that is brought up for demos and torn down afterwards
 * DONKI and Space-Track conjunction data ingest (conjunction data is used for flags only and is never republished)
 * The retrieval grounded assistant, the MCP tool server, and a committed evaluation suite that gates assistant changes in CI
 * Load tests with published, reproducible results
 
 ## Security
 
-Secrets never live in images, logs, or commits. The ingest container runs as a non root user on a read only filesystem with all Linux capabilities dropped, and its health port is bound to localhost. The planned dashboard is read only, and all feed text will be treated as untrusted input to the planned assistant. See the [threat model](docs/security/threat-model.md) and the [hardening checklist](docs/security/hardening-checklist.md).
+Secrets never live in images, logs, or commits. The ingest and risk engine containers run as a non root user on a read only filesystem with all Linux capabilities dropped; the ingest health port is bound to localhost, and the risk engine publishes no ports. The planned dashboard is read only, and all feed text will be treated as untrusted input to the planned assistant. See the [threat model](docs/security/threat-model.md) and the [hardening checklist](docs/security/hardening-checklist.md).
 
 ## Data sources
 

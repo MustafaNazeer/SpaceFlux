@@ -1,9 +1,15 @@
 *
 !ingest/
 !schemas/
+!pom.xml
+!risk-engine/pom.xml
+!risk-engine/src/main/
 ingest/testdata/
 **/.env
 **/.env.*
 **/*.pem
 **/*.key
 **/.envrc
+**/*.p12
+**/*.jks
+**/id_*

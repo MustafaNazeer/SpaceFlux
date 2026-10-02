@@ -3,9 +3,17 @@
 # Broker settings follow Apache's single node plaintext example for apache/kafka 4.3.1.
 name: spaceflux
 
+# Docker's json-file driver keeps every line by default, so a fault that logs in a loop could fill the disk.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
 services:
   kafka:
     profiles: [core]
+    logging: *logging
     image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
     hostname: kafka
     ports:
@@ -47,6 +55,7 @@ services:
   # provisional local value until consumer lag has been measured.
   topics:
     profiles: [core]
+    logging: *logging
     image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
     depends_on:
       kafka:
@@ -61,6 +70,7 @@ services:
 
   ingest:
     profiles: [core]
+    logging: *logging
     build:
       context: ..
       dockerfile: ingest/Dockerfile
@@ -77,6 +87,32 @@ services:
     memswap_limit: 128m
     pids_limit: 64
     read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: "no"
+
+  risk-engine:
+    profiles: [core]
+    logging: *logging
+    build:
+      context: ..
+      dockerfile: risk-engine/Dockerfile
+    depends_on:
+      topics:
+        condition: service_completed_successfully
+    environment:
+      KAFKA_BROKERS: kafka:19092
+      # snappy (ingest's producer default) and zstd unpack a native library
+      # before loading it, so they get an exec tmpfs of their own and /tmp
+      # stays noexec. The risk engine checks every codec at startup.
+      JAVA_TOOL_OPTIONS: -Dorg.xerial.snappy.tempdir=/native -DZstdTempFolder=/native
+    mem_limit: 512m
+    memswap_limit: 512m
+    pids_limit: 128
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+      - /native:exec,nosuid,nodev,size=8m,uid=65532,gid=65532,mode=0700
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     restart: "no"
