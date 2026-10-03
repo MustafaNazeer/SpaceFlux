@@ -1,0 +1,21 @@
+CREATE TABLE close_approach (
+    alert_seq BIGINT UNSIGNED NOT NULL,
+    rules_version INT UNSIGNED NOT NULL,
+    run_id VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin NOT NULL,
+    window_start DATETIME(6) NOT NULL,
+    window_end DATETIME(6) NOT NULL,
+    watchlist_number INT UNSIGNED NOT NULL,
+    watchlist_name VARCHAR(64) NULL,
+    watchlist_element_age_days DOUBLE NOT NULL,
+    other_number INT UNSIGNED NOT NULL,
+    other_name VARCHAR(64) NULL,
+    other_element_age_days DOUBLE NOT NULL,
+    time_of_closest_approach DATETIME(6) NOT NULL,
+    miss_distance_m DOUBLE NOT NULL,
+    relative_speed_m_per_s DOUBLE NOT NULL,
+    PRIMARY KEY (alert_seq),
+    KEY ix_close_approach_run (run_id),
+    KEY ix_close_approach_watchlist (watchlist_number, time_of_closest_approach),
+    KEY ix_close_approach_other (other_number, time_of_closest_approach),
+    CONSTRAINT fk_close_approach_alert FOREIGN KEY (alert_seq) REFERENCES alert_event (alert_seq)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;

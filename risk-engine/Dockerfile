@@ -5,6 +5,7 @@ FROM maven:3.9-eclipse-temurin-21@sha256:99e61abcff91a9b1333463bd8451fb18495d6eb
 WORKDIR /src
 COPY pom.xml ./
 COPY risk-engine/pom.xml risk-engine/
+COPY db-migrate/pom.xml db-migrate/
 RUN mvn -B -q -pl risk-engine -am dependency:go-offline
 COPY schemas/ schemas/
 COPY risk-engine/src/main/ risk-engine/src/main/

@@ -1,0 +1,14 @@
+[mysqld]
+# Every TCP connection must use TLS; the server generates its own certificates on first start.
+require_secure_transport = ON
+# DEFAULT CURRENT_TIMESTAMP(6) columns follow the session zone, and clients also set +00:00.
+default_time_zone = '+00:00'
+# Sized for the local memory budget; measured with deploy/measure-ram.sh.
+innodb_buffer_pool_size = 128M
+innodb_log_buffer_size = 16M
+temptable_max_ram = 64M
+max_connections = 32
+# Nothing replicates from this server.
+skip_log_bin
+# Nothing uses the X Protocol, so port 33060 stays closed.
+mysqlx = OFF

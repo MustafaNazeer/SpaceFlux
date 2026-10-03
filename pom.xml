@@ -18,6 +18,7 @@
 
   <modules>
     <module>risk-engine</module>
+    <module>db-migrate</module>
   </modules>
 
   <properties>

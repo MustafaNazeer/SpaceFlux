@@ -1,6 +1,6 @@
 # MySQL indexes
 
-* **Status:** decided on 2026-10-02. No migration exists yet, so nothing on this page has been checked with `EXPLAIN`. Each index below names the query it is for, and the [proof section](#how-each-index-is-proven) describes how each one will be checked once the migrations exist. No plan output is quoted here because none has been produced.
+* **Status:** decided on 2026-10-02. The migrations create these indexes, but nothing on this page has been checked with `EXPLAIN` yet. Each index below names the query it is for, and the [proof section](#how-each-index-is-proven) describes how each one will be checked with `EXPLAIN` against the migrated schema. No plan output is quoted here because none has been produced.
 * **Applies to:** the schema in [mysql-schema.md](mysql-schema.md), on MySQL 8.4 LTS with InnoDB. The query numbers (Q1 to Q9) are the rows of its [Queries the API needs](mysql-schema.md#queries-the-api-needs) table.
 
 ## Rules I follow
