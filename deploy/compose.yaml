@@ -117,5 +117,86 @@ services:
     security_opt: ["no-new-privileges:true"]
     restart: "no"
 
+  # Passwords are files in deploy/secrets/, written once by deploy/mysql/make-secrets.sh.
+  # The account script in mysql/initdb runs only when the data volume is empty.
+  mysql:
+    profiles: [core]
+    logging: *logging
+    image: mysql:8.4.11@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+      # Without this the image also creates root@'%', reachable from every container on the network.
+      MYSQL_ROOT_HOST: localhost
+      # Sessions use the numeric offset +00:00, so the named time zone tables are never read.
+      MYSQL_INITDB_SKIP_TZINFO: "1"
+      MYSQL_DATABASE: spaceflux
+      MYSQL_MIGRATE_USER: spaceflux_migrate
+      MYSQL_CONSUMER_USER: spaceflux_consumer
+      MYSQL_API_USER: spaceflux_api
+    secrets: [mysql_root_password, mysql_migrate_password, mysql_consumer_password, mysql_api_password]
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/conf.d/spaceflux.cnf:/etc/mysql/conf.d/spaceflux.cnf:ro
+      - ./mysql/initdb:/docker-entrypoint-initdb.d:ro
+    # No published port, and only services on the database network reach it.
+    networks: [database]
+    mem_limit: 512m
+    memswap_limit: 512m
+    pids_limit: 256
+    # The image's own mysql user, which owns the data directories, so the entrypoint needs no capability.
+    user: "999:999"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # The temporary server that runs the account script listens on no TCP port, so this
+    # passes only once the real server is up. mysqladmin ping exits 0 even when access is denied.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  migrate:
+    profiles: [core]
+    logging: *logging
+    build:
+      context: ..
+      dockerfile: db-migrate/Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MIGRATE_HOST: mysql
+      MIGRATE_USER: spaceflux_migrate
+      CONSUMER_USER: spaceflux_consumer
+      API_USER: spaceflux_api
+    secrets: [mysql_migrate_password]
+    networks: [database]
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 64
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: "no"
+
+networks:
+  default:
+  # No route out: mysql and migrate never need the internet.
+  database:
+    internal: true
+
+secrets:
+  mysql_root_password:
+    file: ./secrets/mysql_root_password
+  mysql_migrate_password:
+    file: ./secrets/mysql_migrate_password
+  mysql_consumer_password:
+    file: ./secrets/mysql_consumer_password
+  mysql_api_password:
+    file: ./secrets/mysql_api_password
+
 volumes:
   kafka-data:
+  mysql-data:

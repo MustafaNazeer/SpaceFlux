@@ -49,3 +49,6 @@ Thumbs.db
 # Python fixture scripts
 risk-engine/tools/**/.venv/
 risk-engine/tools/**/__pycache__/
+
+# Local MySQL passwords written by deploy/mysql/make-secrets.sh
+deploy/secrets/

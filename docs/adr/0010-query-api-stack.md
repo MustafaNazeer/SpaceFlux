@@ -53,7 +53,7 @@ Both commit an offset only after the database transaction for the record has com
 
 ### 7. MySQL in Compose
 
-The `mysql:8.4.11` image pinned by digest (`SEC-DAT-11`), its port published on `127.0.0.1` only, `require_secure_transport=ON`, `default-time-zone=+00:00`, a memory limit of 512 MiB to start with, then measured with `deploy/measure-ram.sh`. Its initialization creates the three users with `REQUIRE SSL`, reading passwords only from `/run/secrets/` (`SEC-DAT-09`). The migrate container runs once after MySQL is healthy, and `query-api` starts only after the migrate container has exited successfully.
+The `mysql:8.4.11` image pinned by digest (`SEC-DAT-11`), with no published port and on its own internal `database` network, so only the migrate container and `query-api` reach it, `require_secure_transport=ON`, `default-time-zone=+00:00`, a memory limit of 512 MiB to start with, then measured with `deploy/measure-ram.sh`. Its initialization creates the three users with `REQUIRE SSL`, reading passwords only from `/run/secrets/` (`SEC-DAT-09`). The migrate container runs once after MySQL is healthy, and `query-api` starts only after the migrate container has exited successfully.
 
 ### 8. Tests
 
