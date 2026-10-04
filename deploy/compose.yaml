@@ -181,9 +181,36 @@ services:
     security_opt: ["no-new-privileges:true"]
     restart: "no"
 
+  query-api:
+    profiles: [core]
+    logging: *logging
+    build:
+      context: ..
+      dockerfile: query-api/Dockerfile
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      MYSQL_HOST: mysql
+      CONSUMER_USER: spaceflux_consumer
+      API_USER: spaceflux_api
+    # Never the migration password: only the migrate container holds it.
+    secrets: [mysql_consumer_password, mysql_api_password]
+    # The database network reaches MySQL; the default network will reach Kafka and serve the dashboard.
+    networks: [database, default]
+    mem_limit: 512m
+    memswap_limit: 512m
+    pids_limit: 128
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: "no"
+
 networks:
   default:
-  # No route out: mysql and migrate never need the internet.
+  # No route out: nothing on it needs the internet. query-api also joins default for Kafka.
   database:
     internal: true
 

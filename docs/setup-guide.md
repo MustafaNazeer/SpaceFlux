@@ -47,7 +47,7 @@ This compiles the service and runs every test, including the SGP4 verification c
 
 ## Running the stack
 
-The Compose file defines a `core` profile with six services: `kafka` (a single node broker), `topics` (a one shot container that creates `raw.gp`, `raw.gp.dlq`, `raw.swpc`, `raw.swpc.dlq`, `alerts`, and `alerts.dlq`, then exits), `ingest`, `risk-engine`, `mysql` (MySQL 8.4), and `migrate` (a one shot container that applies the database migrations, then exits).
+The Compose file defines a `core` profile with seven services: `kafka` (a single node broker), `topics` (a one shot container that creates `raw.gp`, `raw.gp.dlq`, `raw.swpc`, `raw.swpc.dlq`, `alerts`, and `alerts.dlq`, then exits), `ingest`, `risk-engine`, `mysql` (MySQL 8.4), `migrate` (a one shot container that applies the database migrations, then exits), and `query-api`.
 
 MySQL needs four passwords before its first start. Write them once:
 
@@ -100,7 +100,7 @@ The provider base URLs can be overridden only with their correct values (`https:
 
 ### MySQL and the migrate container
 
-On its first start with an empty data volume, `mysql` runs `deploy/mysql/initdb/10-users.sh`, which creates three accounts from the files in `deploy/secrets/`: `spaceflux_migrate`, which can change the schema, and `spaceflux_consumer` and `spaceflux_api`, which `query-api` will use and which get their table privileges from the last migration. Every account must connect over TLS, and the server refuses unencrypted connections; it generates its own certificate on first start. Server settings are in `deploy/mysql/conf.d/spaceflux.cnf`. `root` exists only as `root@localhost`, X Protocol is off, and the database publishes no port: only services on the Compose `database` network (`mysql` and `migrate`) reach it. For a look by hand, this reads the root password from its secret file without putting it on a command line:
+On its first start with an empty data volume, `mysql` runs `deploy/mysql/initdb/10-users.sh`, which creates three accounts from the files in `deploy/secrets/`: `spaceflux_migrate`, which can change the schema, and `spaceflux_consumer` and `spaceflux_api`, which `query-api` uses and which get their table privileges from the last migration. Every account must connect over TLS, and the server refuses unencrypted connections; it generates its own certificate on first start. Server settings are in `deploy/mysql/conf.d/spaceflux.cnf`. `root` exists only as `root@localhost`, X Protocol is off, and the database publishes no port: only services on the Compose `database` network (`mysql`, `migrate` and `query-api`) reach it. For a look by hand, this reads the root password from its secret file without putting it on a command line:
 
 ```sh
 docker compose -f deploy/compose.yaml exec mysql bash -c 'mysql --defaults-extra-file=<(printf "[client]\npassword=%s\n" "$(< /run/secrets/mysql_root_password)") -uroot spaceflux'
@@ -109,6 +109,8 @@ docker compose -f deploy/compose.yaml exec mysql bash -c 'mysql --defaults-extra
 The account script runs only on the first start, while the data volume is empty. If that first start fails, the volume is already initialized and later starts come up without the accounts, so remove the volume and start again.
 
 `migrate` waits for MySQL to be healthy, applies the migrations in `db-migrate/src/main/resources/db/migration` as `spaceflux_migrate`, and exits; a later start finds the schema current and applies nothing. It refuses to run if a user name does not match `^[a-z][a-z0-9_]{0,31}$`. To start over with an empty database, stop the stack and remove the `spaceflux_mysql-data` volume yourself; that deletes every stored row.
+
+`query-api` starts once `migrate` has exited successfully. It opens two connection pools, one as `spaceflux_consumer` and one as `spaceflux_api`, reading their passwords only from the Compose secret files in `/run/secrets/` and never holding the migration password; it refuses to start if an environment variable or a flag also sets either password, or if `hikaricp.configurationFile` is set. Before either pool is used, it runs `SHOW GRANTS` as that user and refuses to start if the result differs in any line from the reviewed list in `query-api/src/main/resources/grants/`, so a privilege added by hand stops the service rather than widening it. Its settings come from `MYSQL_HOST` (default `mysql`), `MYSQL_PORT` (default `3306`), `MYSQL_SSL_MODE` (`REQUIRED` by default; `VERIFY_CA` and `VERIFY_IDENTITY` are the only other values accepted), `CONSUMER_USER` and `API_USER`. It publishes no port yet.
 
 `risk-engine` reads the broker address from `KAFKA_BROKERS` (default `localhost:9092`; Compose sets `kafka:19092`). Its other settings, including the screening watchlist in `risk-engine/src/main/resources/screening/watchlist.json`, are built into the image. The Compose file also sets `JAVA_TOOL_OPTIONS` to point the snappy and zstd compression libraries at `/native`: `ingest`'s producer compresses with snappy, both Java libraries extract a native library before loading it, and the container's `/tmp` does not allow execution, so `/native` is a small tmpfs of its own that does. At startup the risk engine decodes a test record in every codec Kafka supports and exits with a message naming the setting if one cannot be loaded. Every Compose service keeps at most three 10 MB log files.
 
