@@ -202,8 +202,11 @@ services:
       JAVA_TOOL_OPTIONS: -Dorg.xerial.snappy.tempdir=/native -DZstdTempFolder=/native
     # Never the migration password: only the migrate container holds it.
     secrets: [mysql_consumer_password, mysql_api_password]
-    # The database network reaches MySQL; the default network will reach Kafka and serve the dashboard.
+    # The database network reaches MySQL; the default network reaches Kafka.
     networks: [database, default]
+    # Loopback only, so the API can be called from this machine and nowhere else.
+    ports:
+      - "127.0.0.1:8081:8080"
     mem_limit: 512m
     memswap_limit: 512m
     pids_limit: 128

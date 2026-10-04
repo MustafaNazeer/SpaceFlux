@@ -9,7 +9,7 @@ This page covers the first six read endpoints. Login, logout, and acknowledgemen
 
 * **Times** are RFC 3339 UTC strings ending in `Z`, written with the microseconds the database holds; a time copied from a contract field that is kept as text (`time_tag`, `epoch_text`, `run_id`, `event_id`) is returned exactly as received.
 * **Absent, not null.** A field with no value is left out of the response, as the contracts leave it out of an event.
-* **Errors** are `application/problem+json` bodies with `type`, `title`, `status`, `detail`, and `correlation_id`. `detail` never holds SQL, a stack trace, or a value from the database. An unknown path or a malformed parameter is `400` or `404`; anything unexpected is `500` with the same generic body.
+* **Errors** are `application/problem+json` bodies with `title`, `status`, `detail`, `instance` (the request path), and `correlation_id`; `type` is left out, which RFC 9457 reads as `about:blank`. `detail` never holds SQL, a stack trace, or a value from the database. An unknown path or a malformed parameter is `400` or `404`; anything unexpected is `500` with the same generic body.
 * **Paging.** A list that can grow takes `limit` (default 50, at most 200) and `after`, an opaque cursor the previous page returned as `next`. A `limit` out of range, or a cursor the server cannot read, is `400`. A page with no `next` is the last one.
 * **Acknowledgement**, wherever an alert appears, is the newest acknowledgement row for its `event_id` as `{"action": ..., "acted_at": ...}`, or absent when there is none. Anonymous responses never carry the note or the principal.
 
@@ -42,7 +42,7 @@ One entry per scale, `G`, `R`, and `S`, always all three. The current series of 
 }
 ```
 
-A scale with no series stored yet reads `{"scale": "G", "state": "no_data", "no_data_reason": "no_series"}`. `no_series` is a reason only this API returns; it is never on a topic.
+A series that has no `freshness_reference` has no age to measure, so its stored state is returned as the risk engine set it, without `freshness_reference`. When two series of a scale have the same `freshness_reference`, the one with the higher satellite number is current. A scale with no series stored yet reads `{"scale": "G", "state": "no_data", "no_data_reason": "no_series"}`. `no_series` is a reason only this API returns; it is never on a topic.
 
 ## 2. Space weather history
 

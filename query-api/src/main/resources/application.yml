@@ -7,6 +7,14 @@ spring:
     import: optional:configtree:${QUERY_API_SECRETS:/run/secrets/}
   flyway:
     enabled: false
+  # Responses use the contracts' field names and leave out a field with no value (ADR 0010, amendment).
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_absent
+  web:
+    resources:
+      # No static content is served, so an unknown path reaches the API's 404 problem body.
+      add-mappings: false
   kafka:
     bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
     consumer:
@@ -43,3 +51,14 @@ spaceflux:
       username: ${CONSUMER_USER:spaceflux_consumer}
     api:
       username: ${API_USER:spaceflux_api}
+
+# The API's own error controller answers on /error; these pin Boot's defaults as a backstop, so a later change
+# cannot start returning a trace or a message from the error path (SEC-API-08).
+server:
+  error:
+    include-stacktrace: never
+    include-message: never
+    include-exception: false
+    include-binding-errors: never
+    whitelabel:
+      enabled: false
