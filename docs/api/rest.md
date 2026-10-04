@@ -8,6 +8,7 @@ This page covers the first six read endpoints. Login, logout, and acknowledgemen
 ## Common rules
 
 * **Times** are RFC 3339 UTC strings ending in `Z`, written with the microseconds the database holds; a time copied from a contract field that is kept as text (`time_tag`, `epoch_text`, `run_id`, `event_id`) is returned exactly as received.
+* **Numbers.** An event or summary returned whole (`event` in section 4, `summary` and `close_approach` in section 3) is the stored text, so its numbers keep the spelling they were received with. Every other number is written by the API from the stored value, so a value received as `8.483063140829472e-09` is returned as the equal `8.483063140829472E-9`.
 * **Absent, not null.** A field with no value is left out of the response, as the contracts leave it out of an event.
 * **Errors** are `application/problem+json` bodies with `title`, `status`, `detail`, `instance` (the request path), and `correlation_id`; `type` is left out, which RFC 9457 reads as `about:blank`. `detail` never holds SQL, a stack trace, or a value from the database. An unknown path or a malformed parameter is `400` or `404`; anything unexpected is `500` with the same generic body.
 * **Paging.** A list that can grow takes `limit` (default 50, at most 200) and `after`, an opaque cursor the previous page returned as `next`. A `limit` out of range, or a cursor the server cannot read, is `400`. A page with no `next` is the last one.
@@ -29,7 +30,7 @@ One entry per scale, `G`, `R`, and `S`, always all three. The current series of 
       "state": "level",
       "derived_level": 1,
       "derived_label": "R1",
-      "value": 1.0624149581417441e-05,
+      "value": 1.0624149581417441E-5,
       "unit": "W m-2",
       "xray_class": "M1.0",
       "time_tag": "2026-10-04T17:52:00Z",
@@ -48,7 +49,9 @@ A series that has no `freshness_reference` has no age to measure, so its stored 
 
 `GET /api/space-weather/history?scale=R&satellite=18&from=...&to=...`
 
-The state of each Kp interval (G) or GOES sample (R and S) in the time range, oldest first: for each key, the event with the highest `alert_seq` among the events that carry it (the schema's rule for "latest"). `scale` is required; `satellite` is required for R and S and refused for G. `from` and `to` are required, with `to` after `from` and at most 7 days apart; the range covers `interval_start` for G and `sample_time` for R and S, `from` inclusive and `to` exclusive. Paged.
+The state of each Kp interval (G) or GOES sample (R and S) in the time range, oldest first: for each key, the event with the highest `alert_seq` among the events that carry it (the schema's rule for "latest"). `scale` is required; `satellite` is required for R and S and refused for G. `from` and `to` are required RFC 3339 times with a year from 1000 to 9999, with `to` after `from` and at most 7 days apart; the range covers `interval_start` for G and `sample_time` for R and S, `from` inclusive and `to` exclusive. Paged.
+
+The response echoes `scale`, and `satellite` for R and S. An item carries `interval_start` and `interval_end` for G or `sample_time` for R and S, then `time_tag`, `state`, `derived_level`, `derived_label`, `value`, `unit`, `xray_class` (R), `no_data_reason` and `no_data_since` (a restated sample or a rejected Kp revision is `no_data`), `trigger`, and `event_id`, each left out when the event has no value for it.
 
 ```json
 {
@@ -71,6 +74,27 @@ The state of each Kp interval (G) or GOES sample (R and S) in the time range, ol
 }
 ```
 
+```json
+{
+  "scale": "R",
+  "satellite": 18,
+  "items": [
+    {
+      "sample_time": "2026-09-24T08:26:00.000000Z",
+      "time_tag": "2026-09-24T08:26:00Z",
+      "state": "no_data",
+      "derived_label": "no data",
+      "value": 8.483063140829472E-9,
+      "unit": "W m-2",
+      "no_data_reason": "zero_run_edge",
+      "no_data_since": "2026-09-24T08:26:00.000000Z",
+      "trigger": "restatement",
+      "event_id": "space_weather_level/1/R/18/2026-09-24T08:26:00Z/2026-09-30T19:18:36Z/restated"
+    }
+  ]
+}
+```
+
 ## 3. Current screening run
 
 `GET /api/screening/current`
@@ -90,6 +114,10 @@ The current run is the complete run with the newest `window_start`, ties broken 
   ]
 }
 ```
+
+Approaches come in publication order, the order of `approach_event_ids`, when the summary lists every id. When ids were cut, the run is every stored approach with its `run_id`, in the order this API received them.
+
+This list is not paged, an exception to the paging rule above: it is one run, written whole by the risk engine, and bounded by the run's `approach_count` beside a summary the producer keeps within 900,000 bytes ([topics.md](../data/topics.md#screening_run), "Size budget"). The API is not exposed beyond loopback until a per client rate limit is in place. To find the current run, the API checks at most the 32 newest runs; when none of them is complete, the answer is `404`.
 
 `summary` and each `close_approach` are the contract objects as received ([topics.md](../data/topics.md#screening_run)), including the lists the database keeps only in the stored event.
 

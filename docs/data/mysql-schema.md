@@ -117,7 +117,7 @@ One row per `space_weather_level` event, the full history, never updated. Each c
 | `band` | `VARCHAR(32)` | yes | R only |
 | `channel` | `VARCHAR(32)` | yes | S only |
 | `unit` | `VARCHAR(16)` | no | `Kp index`, `W m-2`, or `pfu` |
-| `value` | `DOUBLE` | yes | As received; absent on `no_data`, `ended`, and rejected Kp revisions |
+| `value` | `DOUBLE` | yes | As received; absent on `no_data` (except restatements, which keep SWPC's value), `ended`, and rejected Kp revisions |
 | `xray_class` | `VARCHAR(16)`, `utf8mb4_0900_bin` | yes | R at a level, GOES-16 or later |
 | `time_tag` | `VARCHAR(64)`, `utf8mb4_0900_bin` | yes | SWPC's own `time_tag`, as sent |
 | `interval_start`, `interval_end` | `DATETIME(6)` | yes | G only |

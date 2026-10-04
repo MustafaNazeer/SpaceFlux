@@ -407,4 +407,342 @@ class ReadApiIntegrationTest {
                 .isEqualTo(r.headers().firstValue("X-Correlation-Id").orElseThrow());
         assertThat(r.body()).doesNotContain("Exception").doesNotContain("at io.").doesNotContain("trace");
     }
+
+    static final java.util.concurrent.atomic.AtomicInteger SEQ = new java.util.concurrent.atomic.AtomicInteger();
+
+    static void emptyScreening() throws Exception {
+        TestMysql.rootSql("DELETE FROM spaceflux.screening_run_approach; DELETE FROM spaceflux.screening_run_suppressed; "
+                + "DELETE FROM spaceflux.screening_run_rejected; DELETE FROM spaceflux.screening_run_not_screened; "
+                + "DELETE FROM spaceflux.screening_run; DELETE FROM spaceflux.close_approach");
+    }
+
+    static String escaped(String text) {
+        return text.replace("\\", "\\\\").replace("'", "''");
+    }
+
+    /** Stores a close approach of the run, its distance spelled as no re-encoding writes it; returns its event_id. */
+    static String approach(String runId) throws Exception {
+        String text = java.nio.file.Files.readString(EXAMPLES.resolve("valid-close-approach.json"));
+        String id = "close_approach/1/" + runId + "/57036/27958/" + SEQ.incrementAndGet();
+        String payload = text.replace("close_approach/1/2026-09-29T05:20:09Z/1/57036/27958/2026-09-30T03:34:37.588Z",
+                id).replace("2026-09-29T05:20:09Z/1", runId).replace("1973.3", "1.9733e3");
+        TestMysql.rootSql("INSERT INTO spaceflux.alert_event (event_id, kind, schema_version, rules_version, "
+                + "produced_at, source_partition, source_offset, payload) VALUES ('" + id + "', 'close_approach', 1, "
+                + "1, '2026-10-04 00:00:00', 0, 0, '" + escaped(payload) + "'); "
+                + "INSERT INTO spaceflux.close_approach VALUES (LAST_INSERT_ID(), 1, '" + runId + "', "
+                + "'2026-09-29 05:20:09', '2026-10-06 05:20:09', 57036, 'OBJECT AJ', 1.5585, 27958, 'SL-12 DEB', "
+                + "4.1985, '2026-09-30 03:34:37.588', 1973.3, 15727)");
+        return id;
+    }
+
+    /**
+     * Stores a run summary with the given approach ids listed. {@code omittedIds} null leaves out the omitted object;
+     * the report distance is spelled as no re-encoding writes it. Returns the run_id.
+     */
+    static String run(Instant windowStart, int rulesVersion, Instant windowEnd, Integer omittedIds, int approachCount,
+            java.util.List<String> listed) throws Exception {
+        // The run_id keeps the instant's full precision, so runs of different tests never share one.
+        String ws = windowStart.toString();
+        String runId = runIdFor(windowStart, rulesVersion);
+        tools.jackson.databind.node.ObjectNode event = (tools.jackson.databind.node.ObjectNode) JSON.readTree(
+                java.nio.file.Files.readString(EXAMPLES.resolve("valid-screening-run.json")));
+        event.put("event_id", "screening_run/" + rulesVersion + "/" + runId);
+        event.put("rules_version", rulesVersion);
+        tools.jackson.databind.node.ObjectNode summary = (tools.jackson.databind.node.ObjectNode) event
+                .get("screening_run");
+        summary.put("run_id", runId);
+        summary.put("window_start", ws);
+        summary.put("window_end", windowEnd.truncatedTo(ChronoUnit.SECONDS).toString());
+        summary.put("approach_count", approachCount);
+        tools.jackson.databind.node.ArrayNode ids = summary.putArray("approach_event_ids");
+        listed.forEach(ids::add);
+        if (omittedIds == null) {
+            summary.remove("omitted");
+        } else {
+            ((tools.jackson.databind.node.ObjectNode) summary.get("omitted")).put("approach_event_ids", omittedIds);
+        }
+        String payload = JSON.writeValueAsString(event).replace("\"report_distance_m\":5000", "\"report_distance_m\":5.0e3");
+        StringBuilder sql = new StringBuilder("INSERT INTO spaceflux.alert_event (event_id, kind, schema_version, "
+                + "rules_version, produced_at, source_partition, source_offset, payload) VALUES ('screening_run/"
+                + rulesVersion + "/" + runId + "', 'screening_run', 1, " + rulesVersion + ", '2026-10-04 00:00:00', 0, "
+                + "0, '" + escaped(payload) + "'); INSERT INTO spaceflux.screening_run VALUES (LAST_INSERT_ID(), "
+                + rulesVersion + ", '" + runId + "', " + sql(windowStart) + ", " + sql(windowEnd) + ", "
+                + sql(windowStart) + ", 5000, 1, 2, 1, 0, 0, 1, " + approachCount + ", " + omittedIds
+                + (omittedIds == null ? ", NULL, NULL, NULL, NULL, NULL, NULL" : ", 0, 0, 0, 0, 0, 0")
+                + "); SET @run = LAST_INSERT_ID();");
+        for (int i = 0; i < listed.size(); i++) {
+            sql.append(" INSERT INTO spaceflux.screening_run_approach VALUES (@run, ").append(i).append(", '")
+                    .append(listed.get(i)).append("');");
+        }
+        TestMysql.rootSql(sql.toString());
+        return runId;
+    }
+
+    static String runIdFor(Instant windowStart, int rulesVersion) {
+        return windowStart + "/" + rulesVersion;
+    }
+
+    @Test
+    void withNoCompleteRunTheCurrentRunIsNotFound() throws Exception {
+        emptyScreening();
+        assertProblem(get("/api/screening/current"), 404, "/api/screening/current");
+
+        Instant ws = Instant.now().minus(1, ChronoUnit.HOURS);
+        run(ws, 1, ws.plus(7, ChronoUnit.DAYS), 0, 1, java.util.List.of("close_approach/1/never/stored"));
+
+        assertProblem(get("/api/screening/current"), 404, "/api/screening/current");
+    }
+
+    @Test
+    void theCurrentRunIsTheNewestCompleteOneWithItsSummaryAndApproachesAsReceived() throws Exception {
+        emptyScreening();
+        Instant older = Instant.now().minus(3, ChronoUnit.HOURS);
+        Instant newer = Instant.now().minus(1, ChronoUnit.HOURS);
+        String first = approach(runIdFor(older, 1));
+        String second = approach(runIdFor(older, 1));
+        String runId = run(older, 1, older.plus(7, ChronoUnit.DAYS), 0, 2, java.util.List.of(second, first));
+        TestMysql.rootSql("INSERT INTO spaceflux.alert_acknowledgement (event_id, action, principal, note) VALUES ('"
+                + first + "', 'acknowledge', 'operator', 'seen it')");
+        // A newer run whose approach has not arrived is not complete, so it is not current.
+        run(newer, 1, newer.plus(7, ChronoUnit.DAYS), 0, 1, java.util.List.of("close_approach/1/late/" + SEQ.get()));
+
+        HttpResponse<String> r = get("/api/screening/current");
+
+        assertThat(r.statusCode()).isEqualTo(200);
+        JsonNode body = JSON.readTree(r.body());
+        assertThat(fields(body)).containsExactlyInAnyOrder("stale", "summary", "approaches");
+        assertThat(body.get("stale").asBoolean()).isFalse();
+        assertThat(body.get("summary").get("run_id").asString()).isEqualTo(runId);
+        assertThat(r.body()).contains("\"report_distance_m\":5.0e3").contains("\"miss_distance_m\": 1.9733e3");
+        JsonNode approaches = body.get("approaches");
+        assertThat(approaches).hasSize(2);
+        assertThat(approaches.get(0).get("event_id").asString()).isEqualTo(second);
+        assertThat(fields(approaches.get(0))).containsExactlyInAnyOrder("event_id", "close_approach");
+        assertThat(approaches.get(1).get("event_id").asString()).isEqualTo(first);
+        assertThat(approaches.get(1).get("close_approach").get("run_id").asString()).isEqualTo(runId);
+        assertThat(fields(approaches.get(1).get("acknowledgement"))).containsExactlyInAnyOrder("action", "acted_at");
+        assertThat(r.body()).doesNotContain("operator").doesNotContain("seen it");
+    }
+
+    @Test
+    void anApproachOfARebuiltRunThatTheSummaryDoesNotListIsNotShown() throws Exception {
+        emptyScreening();
+        Instant ws = Instant.now().minus(2, ChronoUnit.HOURS);
+        String listed = approach(runIdFor(ws, 1));
+        approach(runIdFor(ws, 1));
+        run(ws, 1, ws.plus(7, ChronoUnit.DAYS), null, 1, java.util.List.of(listed));
+
+        JsonNode approaches = JSON.readTree(get("/api/screening/current").body()).get("approaches");
+
+        assertThat(approaches).singleElement()
+                .satisfies(a -> assertThat(a.get("event_id").asString()).isEqualTo(listed));
+    }
+
+    @Test
+    void aRunWhoseIdsWereCutIsCompleteOnceItHoldsApproachCountApproaches() throws Exception {
+        emptyScreening();
+        Instant ws = Instant.now().minus(2, ChronoUnit.HOURS);
+        String runId = runIdFor(ws, 1);
+        String a = approach(runId);
+        run(ws, 1, ws.plus(7, ChronoUnit.DAYS), 1, 2, java.util.List.of(a));
+        assertProblem(get("/api/screening/current"), 404, "/api/screening/current");
+
+        String b = approach(runId);
+        JsonNode approaches = JSON.readTree(get("/api/screening/current").body()).get("approaches");
+
+        assertThat(approaches).hasSize(2);
+        assertThat(approaches.get(0).get("event_id").asString()).isEqualTo(a);
+        assertThat(approaches.get(1).get("event_id").asString()).isEqualTo(b);
+    }
+
+    /** Stores {@code count} runs newer than {@code after}, each listing an approach that never arrives. */
+    static void incompleteRuns(Instant after, int count) throws Exception {
+        for (int i = 1; i <= count; i++) {
+            Instant ws = after.plus(i, ChronoUnit.MINUTES);
+            run(ws, 1, ws.plus(7, ChronoUnit.DAYS), 0, 1, java.util.List.of("close_approach/1/never/" + SEQ
+                    .incrementAndGet()));
+        }
+    }
+
+    @Test
+    void theSearchForTheCurrentRunReadsPastMoreIncompleteRunsThanOneBatch() throws Exception {
+        emptyScreening();
+        Instant ws = Instant.now().minus(3, ChronoUnit.HOURS);
+        String runId = run(ws, 1, ws.plus(7, ChronoUnit.DAYS), 0, 0, java.util.List.of());
+        incompleteRuns(ws, ScreeningController.SCAN_BATCH + 1);
+
+        assertThat(JSON.readTree(get("/api/screening/current").body()).get("summary").get("run_id").asString())
+                .isEqualTo(runId);
+    }
+
+    @Test
+    void theSearchForTheCurrentRunStopsAfterItsLimit() throws Exception {
+        emptyScreening();
+        Instant ws = Instant.now().minus(3, ChronoUnit.HOURS);
+        run(ws, 1, ws.plus(7, ChronoUnit.DAYS), 0, 0, java.util.List.of());
+        incompleteRuns(ws, ScreeningController.SCAN_LIMIT - 1);
+        assertThat(get("/api/screening/current").statusCode()).isEqualTo(200);
+
+        incompleteRuns(ws.plus(1, ChronoUnit.HOURS), 1);
+
+        assertProblem(get("/api/screening/current"), 404, "/api/screening/current");
+    }
+
+    @Test
+    void runsWithTheSameWindowStartPickTheHigherRulesVersion() throws Exception {
+        emptyScreening();
+        Instant ws = Instant.now().minus(2, ChronoUnit.HOURS);
+        run(ws, 2, ws.plus(7, ChronoUnit.DAYS), 0, 0, java.util.List.of());
+        run(ws, 1, ws.plus(7, ChronoUnit.DAYS), 0, 0, java.util.List.of());
+
+        JsonNode body = JSON.readTree(get("/api/screening/current").body());
+
+        assertThat(body.get("summary").get("run_id").asString()).isEqualTo(runIdFor(ws, 2));
+        assertThat(body.get("approaches")).isEmpty();
+    }
+
+    @Test
+    void aRunIsStaleMoreThanADayAfterItsWindowStartOrPastItsWindowEnd() throws Exception {
+        emptyScreening();
+        Instant old = Instant.now().minus(25, ChronoUnit.HOURS);
+        run(old, 1, old.plus(7, ChronoUnit.DAYS), 0, 0, java.util.List.of());
+        assertThat(JSON.readTree(get("/api/screening/current").body()).get("stale").asBoolean()).isTrue();
+
+        Instant recent = Instant.now().minus(23, ChronoUnit.HOURS);
+        run(recent, 1, recent.plus(7, ChronoUnit.DAYS), 0, 0, java.util.List.of());
+        assertThat(JSON.readTree(get("/api/screening/current").body()).get("stale").asBoolean()).isFalse();
+
+        Instant ended = Instant.now().minus(2, ChronoUnit.HOURS);
+        run(ended, 1, Instant.now().minus(1, ChronoUnit.MINUTES), 0, 0, java.util.List.of());
+        assertThat(JSON.readTree(get("/api/screening/current").body()).get("stale").asBoolean()).isTrue();
+    }
+
+    /** Stores one space weather event and its alert_event row; {@code key} is interval_start for G, else sample_time. */
+    static String swEvent(String scale, Integer satellite, String state, String label, Integer level, Double value,
+            String trigger, String key, String extraColumns, String extraValues) throws Exception {
+        String id = "space_weather_level/1/" + scale + "/" + SEQ.incrementAndGet();
+        boolean g = "G".equals(scale);
+        String keyColumns = g ? "interval_start, interval_end" : "sample_time";
+        String keyValues = g ? "'" + key + "', DATE_ADD('" + key + "', INTERVAL 3 HOUR)" : "'" + key + "'";
+        TestMysql.rootSql("INSERT INTO spaceflux.alert_event (event_id, kind, schema_version, rules_version, "
+                + "produced_at, source_partition, source_offset, payload) VALUES ('" + id + "', 'space_weather_level', "
+                + "1, 1, '2026-10-04 00:00:00', 0, 0, '{}'); INSERT INTO spaceflux.space_weather_event (alert_seq, "
+                + "rules_version, scale, satellite, product, state, derived_level, derived_label, trigger_kind, "
+                + "derived_from, estimated, unit, value, time_tag, " + keyColumns + extraColumns + ") VALUES "
+                + "(LAST_INSERT_ID(), 1, '" + scale + "', " + satellite + ", '"
+                + (g ? "swpc.kp" : "R".equals(scale) ? "swpc.goes.xrays" : "swpc.goes.protons") + "', '" + state
+                + "', " + level + ", '" + label + "', '" + trigger + "', 'measurement', " + g + ", '"
+                + (g ? "Kp index" : "R".equals(scale) ? "W m-2" : "pfu") + "', " + value + ", '"
+                + key.replace(" ", "T") + (g ? "" : "Z") + "', " + keyValues + extraValues + ")");
+        return id;
+    }
+
+    static final String DAY = "&from=2031-01-01T00:00:00Z&to=2031-01-02T00:00:00Z";
+
+    @Test
+    void historyGivesTheLatestEventOfEachIntervalInTheRangeOldestFirst() throws Exception {
+        TestMysql.rootSql("DELETE FROM spaceflux.space_weather_event");
+        swEvent("G", null, "level", "G1", 1, 5.0, "level_change", "2030-12-31 21:00:00", "", "");
+        swEvent("G", null, "none", "none", null, 3.33, "level_change", "2031-01-01 03:00:00", "", "");
+        swEvent("G", null, "level", "G4", 4, 7.67, "level_change", "2031-01-01 00:00:00", "", "");
+        String revised = swEvent("G", null, "level", "G3", 3, 7.0, "revision", "2031-01-01 00:00:00", "", "");
+        swEvent("G", null, "level", "G2", 2, 6.0, "level_change", "2031-01-02 00:00:00", "", "");
+
+        HttpResponse<String> r = get("/api/space-weather/history?scale=G" + DAY);
+
+        assertThat(r.statusCode()).isEqualTo(200);
+        JsonNode body = JSON.readTree(r.body());
+        assertThat(fields(body)).containsExactlyInAnyOrder("scale", "items");
+        JsonNode items = body.get("items");
+        assertThat(items).hasSize(2);
+        JsonNode first = items.get(0);
+        assertThat(fields(first)).containsExactlyInAnyOrder("interval_start", "interval_end", "time_tag", "state",
+                "derived_level", "derived_label", "value", "unit", "trigger", "event_id");
+        assertThat(first.get("event_id").asString()).isEqualTo(revised);
+        assertThat(first.get("derived_label").asString()).isEqualTo("G3");
+        assertThat(first.get("trigger").asString()).isEqualTo("revision");
+        assertThat(first.get("interval_start").asString()).isEqualTo("2031-01-01T00:00:00.000000Z");
+        assertThat(first.get("interval_end").asString()).isEqualTo("2031-01-01T03:00:00.000000Z");
+        assertThat(first.get("time_tag").asString()).isEqualTo("2031-01-01T00:00:00");
+        assertThat(items.get(1).get("state").asString()).isEqualTo("none");
+    }
+
+    @Test
+    void historyOfAGoesSeriesKeepsToItsSatelliteAndShowsWhyASampleHasNoData() throws Exception {
+        TestMysql.rootSql("DELETE FROM spaceflux.space_weather_event");
+        swEvent("R", 18, "level", "R1", 1, 1.1e-05, "level_change", "2031-01-01 08:25:00", ", xray_class",
+                ", 'M1.1'");
+        swEvent("R", 18, "none", "none", null, 8.48e-09, "level_change", "2031-01-01 08:26:00", "", "");
+        String restated = swEvent("R", 18, "no_data", "no data", null, 8.48e-09, "restatement",
+                "2031-01-01 08:26:00", ", no_data_reason, no_data_since", ", 'zero_run_edge', '2031-01-01 08:26:00'");
+        swEvent("R", 19, "level", "R2", 2, 6.0e-05, "level_change", "2031-01-01 08:27:00", "", "");
+        // Another satellite's newer event at the same sample time does not replace this satellite's state.
+        swEvent("R", 19, "level", "R2", 2, 6.0e-05, "level_change", "2031-01-01 08:26:00", "", "");
+
+        JsonNode body = JSON.readTree(get("/api/space-weather/history?scale=R&satellite=18" + DAY).body());
+
+        assertThat(fields(body)).containsExactlyInAnyOrder("scale", "satellite", "items");
+        assertThat(body.get("satellite").asInt()).isEqualTo(18);
+        JsonNode items = body.get("items");
+        assertThat(items).hasSize(2);
+        assertThat(items.get(0).get("xray_class").asString()).isEqualTo("M1.1");
+        JsonNode sample = items.get(1);
+        assertThat(fields(sample)).containsExactlyInAnyOrder("sample_time", "time_tag", "state", "derived_label",
+                "value", "unit", "trigger", "event_id", "no_data_reason", "no_data_since");
+        assertThat(sample.get("event_id").asString()).isEqualTo(restated);
+        assertThat(sample.get("no_data_reason").asString()).isEqualTo("zero_run_edge");
+        assertThat(sample.get("no_data_since").asString()).isEqualTo("2031-01-01T08:26:00.000000Z");
+        assertThat(sample.get("sample_time").asString()).isEqualTo("2031-01-01T08:26:00.000000Z");
+    }
+
+    @Test
+    void historyIsPagedByAnOpaqueCursor() throws Exception {
+        TestMysql.rootSql("DELETE FROM spaceflux.space_weather_event");
+        for (int minute = 0; minute < 5; minute++) {
+            swEvent("S", 18, "none", "none", null, 0.5, "level_change", "2031-01-01 10:0" + minute + ":00", "", "");
+        }
+
+        JsonNode page1 = JSON.readTree(get("/api/space-weather/history?scale=S&satellite=18&limit=2" + DAY).body());
+        assertThat(page1.get("items")).hasSize(2);
+        String next = page1.get("next").asString();
+        JsonNode page2 = JSON.readTree(get("/api/space-weather/history?scale=S&satellite=18&limit=2" + DAY + "&after="
+                + query(next)).body());
+        JsonNode page3 = JSON.readTree(get("/api/space-weather/history?scale=S&satellite=18&limit=2" + DAY + "&after="
+                + query(page2.get("next").asString())).body());
+
+        assertThat(page2.get("items").get(0).get("sample_time").asString()).isEqualTo("2031-01-01T10:02:00.000000Z");
+        assertThat(page3.get("items")).singleElement()
+                .satisfies(i -> assertThat(i.get("sample_time").asString()).isEqualTo("2031-01-01T10:04:00.000000Z"));
+        assertThat(page3.has("next")).isFalse();
+        JsonNode whole = JSON.readTree(get("/api/space-weather/history?scale=S&satellite=18" + DAY).body());
+        assertThat(whole.get("items")).hasSize(5);
+        assertThat(whole.has("next")).isFalse();
+        JsonNode full = JSON.readTree(get("/api/space-weather/history?scale=S&satellite=18&limit=5" + DAY).body());
+        assertThat(full.get("items")).hasSize(5);
+        assertThat(full.has("next")).isFalse();
+    }
+
+    @Test
+    void aHistoryRequestOutsideTheRulesIsABadRequest() throws Exception {
+        String path = "/api/space-weather/history";
+        for (String q : new String[] {"?" + DAY.substring(1), "?scale=X" + DAY, "?scale=G&satellite=18" + DAY,
+                "?scale=R" + DAY, "?scale=R&satellite=0" + DAY, "?scale=G&to=2031-01-02T00:00:00Z",
+                "?scale=G&from=2031-01-01T00:00:00Z", "?scale=G&from=2031-01-02T00:00:00Z&to=2031-01-01T00:00:00Z",
+                "?scale=G&from=2031-01-01T00:00:00Z&to=2031-01-01T00:00:00Z",
+                "?scale=G&from=2031-01-01T00:00:00Z&to=2031-01-08T00:00:01Z", "?scale=G&from=yesterday&to=today",
+                "?scale=G&limit=0" + DAY, "?scale=G&limit=201" + DAY, "?scale=G&after=not-a-cursor" + DAY,
+                "?scale=G&after=" + query(java.util.Base64.getUrlEncoder().encodeToString("x".getBytes())) + DAY,
+                "?scale=G&from=" + query("+1000000000-12-31T23:59:59Z") + "&to=" + query("+1000000000-12-31T23:59:59Z"),
+                "?scale=G&from=0999-12-31T00:00:00Z&to=1000-01-01T00:00:00Z",
+                "?scale=G&from=9999-12-31T00:00:00Z&to=" + query("+10000-01-01T00:00:00Z"),
+                "?scale=G&after=" + query(java.util.Base64.getUrlEncoder().encodeToString(
+                        "+10000-01-01T00:00:00".getBytes())) + DAY}) {
+            assertProblem(get(path + q), 400, path);
+        }
+        assertThat(get(path + "?scale=G&from=2031-01-01T00:00:00Z&to=2031-01-08T00:00:00Z").statusCode())
+                .isEqualTo(200);
+        assertThat(get(path + "?scale=G&limit=200" + DAY).statusCode()).isEqualTo(200);
+        assertThat(get(path + "?scale=G&from=1000-01-01T00:00:00Z&to=1000-01-02T00:00:00Z").statusCode())
+                .isEqualTo(200);
+    }
 }

@@ -91,7 +91,7 @@ Items marked **(to be verified)** depend on a tool, library, or provider behavio
 - [ ] `SEC-API-01` All SQL uses parameter binding; no query text is built by concatenating request values. [T4.1]
 - [ ] `SEC-API-02` Mongo filters are built from typed values; request values that are objects or start with an operator character are rejected. [T4.2]
 - [ ] `SEC-API-03` GraphQL enforces a maximum query depth and a maximum complexity, each with a test that sends a query over the limit. How these limits are configured in Spring for GraphQL **(to be verified)**. [T5.1]
-- [ ] `SEC-API-04` Every list field and endpoint has a maximum page size enforced server side. [T5.1]
+- [ ] `SEC-API-04` Every list field and endpoint has a maximum page size enforced server side. [T5.1] One documented exception: the approaches of `GET /api/screening/current` are returned whole with their run, bounded by the run's `approach_count` and the 900,000 byte summary budget, and the current run search checks at most 32 runs ([REST API](../api/rest.md), section 3). Because of it, the API stays on loopback until `SEC-API-09` is met.
 - [ ] `SEC-API-05` The GraphQL introspection setting for the cloud environment matches the recorded ADR decision. [T5.2]
 - [ ] `SEC-API-06` Subscriptions have a per client connection cap, an idle timeout, and an origin check on the handshake. [T5.3]
 - [ ] `SEC-API-07` CORS allows only the dashboard origin, and never combines a wildcard origin with credentials. While the dashboard is served from the same origin as the API ([ADR 0009](../adr/0009-alert-acknowledgement-auth.md)), no CORS configuration exists at all. Met today: `query-api` configures no CORS, and a cross origin preflight gets no `Access-Control-Allow-Origin`. [T5.4]
