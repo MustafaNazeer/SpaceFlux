@@ -6,6 +6,8 @@
 !risk-engine/src/main/
 !db-migrate/pom.xml
 !db-migrate/src/main/
+!query-api/pom.xml
+!query-api/src/main/
 ingest/testdata/
 **/.env
 **/.env.*

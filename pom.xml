@@ -19,6 +19,7 @@
   <modules>
     <module>risk-engine</module>
     <module>db-migrate</module>
+    <module>query-api</module>
   </modules>
 
   <properties>

@@ -6,6 +6,7 @@ WORKDIR /src
 COPY pom.xml ./
 COPY risk-engine/pom.xml risk-engine/
 COPY db-migrate/pom.xml db-migrate/
+COPY query-api/pom.xml query-api/
 RUN mvn -B -q -pl risk-engine -am dependency:go-offline
 COPY schemas/ schemas/
 COPY risk-engine/src/main/ risk-engine/src/main/

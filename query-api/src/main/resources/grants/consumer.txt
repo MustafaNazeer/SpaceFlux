@@ -1,0 +1,11 @@
+GRANT USAGE ON *.* TO `${user}`@`%`
+GRANT SELECT, INSERT (`event_id`, `kind`, `payload`, `produced_at`, `rules_version`, `schema_version`, `source_offset`, `source_partition`) ON `${database}`.`alert_event` TO `${user}`@`%`
+GRANT SELECT, INSERT ON `${database}`.`space_weather_event` TO `${user}`@`%`
+GRANT SELECT, INSERT, UPDATE ON `${database}`.`space_weather_series` TO `${user}`@`%`
+GRANT SELECT, INSERT ON `${database}`.`close_approach` TO `${user}`@`%`
+GRANT SELECT, INSERT ON `${database}`.`screening_run` TO `${user}`@`%`
+GRANT SELECT, INSERT ON `${database}`.`screening_run_approach` TO `${user}`@`%`
+GRANT SELECT, INSERT ON `${database}`.`screening_run_suppressed` TO `${user}`@`%`
+GRANT SELECT, INSERT ON `${database}`.`screening_run_rejected` TO `${user}`@`%`
+GRANT SELECT, INSERT ON `${database}`.`screening_run_not_screened` TO `${user}`@`%`
+GRANT SELECT, INSERT, UPDATE ON `${database}`.`catalog_object` TO `${user}`@`%`

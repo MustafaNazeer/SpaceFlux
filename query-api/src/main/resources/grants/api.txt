@@ -1,0 +1,13 @@
+GRANT USAGE ON *.* TO `${user}`@`%`
+GRANT SELECT ON `${database}`.`alert_event` TO `${user}`@`%`
+GRANT SELECT ON `${database}`.`space_weather_event` TO `${user}`@`%`
+GRANT SELECT ON `${database}`.`space_weather_series` TO `${user}`@`%`
+GRANT SELECT ON `${database}`.`close_approach` TO `${user}`@`%`
+GRANT SELECT ON `${database}`.`screening_run` TO `${user}`@`%`
+GRANT SELECT ON `${database}`.`screening_run_approach` TO `${user}`@`%`
+GRANT SELECT ON `${database}`.`screening_run_suppressed` TO `${user}`@`%`
+GRANT SELECT ON `${database}`.`screening_run_rejected` TO `${user}`@`%`
+GRANT SELECT ON `${database}`.`screening_run_not_screened` TO `${user}`@`%`
+GRANT SELECT ON `${database}`.`catalog_object` TO `${user}`@`%`
+GRANT SELECT ON `${database}`.`watchlist_object` TO `${user}`@`%`
+GRANT SELECT, INSERT (`action`, `event_id`, `note`, `principal`) ON `${database}`.`alert_acknowledgement` TO `${user}`@`%`
