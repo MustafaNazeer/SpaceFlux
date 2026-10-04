@@ -22,7 +22,8 @@ class MysqlPropertiesTest {
 
         assertThat(url).isEqualTo("jdbc:mysql://mysql:3306/spaceflux?sslMode=REQUIRED"
                 + "&allowPublicKeyRetrieval=false&allowLoadLocalInfile=false&allowUrlInLocalInfile=false"
-                + "&connectionTimeZone=%2B00:00&forceConnectionTimeZoneToSession=true");
+                + "&connectionTimeZone=%2B00:00&forceConnectionTimeZoneToSession=true"
+                + "&socketTimeout=30000");
     }
 
     @ParameterizedTest

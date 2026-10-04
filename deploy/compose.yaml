@@ -190,10 +190,19 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      topics:
+        condition: service_completed_successfully
     environment:
       MYSQL_HOST: mysql
       CONSUMER_USER: spaceflux_consumer
       API_USER: spaceflux_api
+      KAFKA_BROKERS: kafka:19092
+      # Off until the consumer stores every kind of event: a run before then would mark events as seen
+      # without filling their tables.
+      SPACEFLUX_ALERTS_ENABLED: "false"
+      # As for risk-engine: snappy and zstd unpack a native library, so they get an exec tmpfs of their own
+      # and /tmp stays noexec. query-api checks every codec at startup.
+      JAVA_TOOL_OPTIONS: -Dorg.xerial.snappy.tempdir=/native -DZstdTempFolder=/native
     # Never the migration password: only the migrate container holds it.
     secrets: [mysql_consumer_password, mysql_api_password]
     # The database network reaches MySQL; the default network will reach Kafka and serve the dashboard.
@@ -204,6 +213,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=16m
+      - /native:exec,nosuid,nodev,size=8m,uid=65532,gid=65532,mode=0700
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     restart: "no"

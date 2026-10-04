@@ -6,20 +6,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.SecureRandom;
 import java.sql.Connection;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
 import javax.sql.DataSource;
 
-import com.github.dockerjava.api.model.Capability;
 import com.mysql.cj.conf.PropertyKey;
 import com.mysql.cj.conf.PropertySet;
 import com.mysql.cj.jdbc.JdbcConnection;
-import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,104 +26,40 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.images.builder.Transferable;
-import org.testcontainers.utility.DockerImageName;
-import org.testcontainers.utility.MountableFile;
 
 import io.github.mustafanazeer.spaceflux.query.QueryApiApplication;
+import io.github.mustafanazeer.spaceflux.query.TestMysql;
 
 /** Starts the service against the pinned MySQL image after the real migrations have run. */
 class MysqlPoolsIntegrationTest {
 
-    static final String IMAGE =
-            "mysql:8.4.11@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242";
-    static final Path REPO = Path.of("..").toAbsolutePath().normalize();
-    static final String MIGRATE = "spaceflux_migrate";
-    static final String CONSUMER = "spaceflux_consumer";
-    static final String API = "spaceflux_api";
+    static final String CONSUMER = TestMysql.CONSUMER;
+    static final String API = TestMysql.API;
+    static final String CONSUMER_PASSWORD = TestMysql.CONSUMER_PASSWORD;
+    static final String API_PASSWORD = TestMysql.API_PASSWORD;
+    static final GenericContainer<?> MYSQL = TestMysql.MYSQL;
 
-    static final String MIGRATE_PASSWORD = password();
-    static final String CONSUMER_PASSWORD = password();
-    static final String API_PASSWORD = password();
-
-    // Started as Compose starts it, with the same server settings and account script.
-    static final GenericContainer<?> MYSQL = new GenericContainer<>(DockerImageName.parse(IMAGE))
-            .withExposedPorts(3306)
-            .withCreateContainerCmdModifier(cmd -> {
-                cmd.withUser("999:999");
-                cmd.getHostConfig().withCapDrop(Capability.ALL);
-            })
-            .withEnv("MYSQL_ROOT_PASSWORD_FILE", "/run/secrets/mysql_root_password")
-            .withEnv("MYSQL_ROOT_HOST", "localhost")
-            .withEnv("MYSQL_INITDB_SKIP_TZINFO", "1")
-            .withEnv("MYSQL_DATABASE", "spaceflux")
-            .withEnv("MYSQL_MIGRATE_USER", MIGRATE)
-            .withEnv("MYSQL_CONSUMER_USER", CONSUMER)
-            .withEnv("MYSQL_API_USER", API)
-            .withCopyFileToContainer(MountableFile.forHostPath(REPO.resolve("deploy/mysql/conf.d/spaceflux.cnf"), 0644),
-                    "/etc/mysql/conf.d/spaceflux.cnf")
-            .withCopyFileToContainer(MountableFile.forHostPath(REPO.resolve("deploy/mysql/initdb/10-users.sh"), 0644),
-                    "/docker-entrypoint-initdb.d/10-users.sh")
-            .withCopyToContainer(Transferable.of(password(), 0444), "/run/secrets/mysql_root_password")
-            .withCopyToContainer(Transferable.of(MIGRATE_PASSWORD, 0444), "/run/secrets/mysql_migrate_password")
-            .withCopyToContainer(Transferable.of(CONSUMER_PASSWORD, 0444), "/run/secrets/mysql_consumer_password")
-            .withCopyToContainer(Transferable.of(API_PASSWORD, 0444), "/run/secrets/mysql_api_password")
-            .waitingFor(Wait.forLogMessage(".*ready for connections.*port: 3306.*", 1)
-                    .withStartupTimeout(Duration.ofMinutes(3)));
-
-    @TempDir
     static Path secrets;
 
     @BeforeAll
-    static void startAndMigrate() throws Exception {
-        MYSQL.start();
-        String url = "jdbc:mysql://" + MYSQL.getHost() + ":" + MYSQL.getMappedPort(3306) + "/spaceflux"
-                + "?sslMode=REQUIRED&connectionTimeZone=%2B00:00&forceConnectionTimeZoneToSession=true";
-        Flyway.configure()
-                .dataSource(url, MIGRATE, MIGRATE_PASSWORD)
-                .locations("filesystem:" + REPO.resolve("db-migrate/src/main/resources/db/migration"))
-                .placeholders(Map.of("consumer_user", CONSUMER, "api_user", API))
-                .cleanDisabled(true)
-                .load()
-                .migrate();
-        // Compose mounts each secret as a file named after it; the service reads them as a config tree.
-        Files.writeString(secrets.resolve("mysql_consumer_password"), CONSUMER_PASSWORD, StandardCharsets.US_ASCII);
-        Files.writeString(secrets.resolve("mysql_api_password"), API_PASSWORD, StandardCharsets.US_ASCII);
-    }
-
-    @AfterAll
-    static void stop() {
-        MYSQL.stop();
+    static void startAndMigrate() {
+        TestMysql.start();
+        secrets = TestMysql.secrets();
     }
 
     static String password() {
-        String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        SecureRandom random = new SecureRandom();
-        StringBuilder out = new StringBuilder();
-        for (int i = 0; i < 40; i++) {
-            out.append(alphabet.charAt(random.nextInt(alphabet.length())));
-        }
-        return out.toString();
+        return TestMysql.password();
     }
 
-    /** Runs SQL as root over the socket inside the container; the password never reaches a command line. */
     static void rootSql(String sql) throws Exception {
-        String quoted = "'" + sql.replace("'", "'\\''") + "'";
-        ExecResult result = MYSQL.execInContainer("bash", "-c",
-                "mysql --defaults-extra-file=<(printf '[client]\\npassword=%s\\n' \"$(< /run/secrets/mysql_root_password)\")"
-                        + " -uroot -N -B -e " + quoted);
-        assertThat(result.getExitCode()).as(result.getStderr()).isZero();
+        TestMysql.rootSql(sql);
     }
 
     static ConfigurableApplicationContext start() {
         return new SpringApplicationBuilder(QueryApiApplication.class)
                 .web(WebApplicationType.NONE)
-                .run("--QUERY_API_SECRETS=" + secrets + "/",
-                        "--MYSQL_HOST=" + MYSQL.getHost(),
-                        "--MYSQL_PORT=" + MYSQL.getMappedPort(3306));
+                .run(TestMysql.args("--spaceflux.alerts.enabled=false"));
     }
 
     static Throwable rootCause(Throwable t) {
@@ -150,6 +81,14 @@ class MysqlPoolsIntegrationTest {
                         .single()).isNotBlank();
                 assertThat(jdbc.sql("SELECT @@session.time_zone").query(String.class).single()).isEqualTo("+00:00");
             }
+        }
+    }
+
+    @Test
+    void theAlertsConsumerIsOffUnlessTurnedOn() {
+        try (ConfigurableApplicationContext context = new SpringApplicationBuilder(QueryApiApplication.class)
+                .web(WebApplicationType.NONE).run(TestMysql.args())) {
+            assertThat(context.containsBean("alertsListener")).isFalse();
         }
     }
 
@@ -210,7 +149,7 @@ class MysqlPoolsIntegrationTest {
         assertThatThrownBy(() -> new SpringApplicationBuilder(QueryApiApplication.class)
                 .web(WebApplicationType.NONE)
                 .run("--QUERY_API_SECRETS=" + partial + "/", "--MYSQL_HOST=" + MYSQL.getHost(),
-                        "--MYSQL_PORT=" + MYSQL.getMappedPort(3306)))
+                        "--MYSQL_PORT=" + MYSQL.getMappedPort(3306), "--spaceflux.alerts.enabled=false"))
                 .satisfies(e -> assertThat(rootCause(e))
                         .hasMessage("no secret file mysql_consumer_password holds the password for spaceflux_consumer"));
         assertThat(output.getAll()).doesNotContain(API_PASSWORD);
@@ -224,7 +163,8 @@ class MysqlPoolsIntegrationTest {
         assertThatThrownBy(() -> new SpringApplicationBuilder(QueryApiApplication.class)
                 .web(WebApplicationType.NONE)
                 .run("--QUERY_API_SECRETS=" + secrets + "/", "--MYSQL_HOST=" + MYSQL.getHost(),
-                        "--MYSQL_PORT=" + MYSQL.getMappedPort(3306), "--mysql_api_password=" + flagged))
+                        "--MYSQL_PORT=" + MYSQL.getMappedPort(3306), "--mysql_api_password=" + flagged,
+                        "--spaceflux.alerts.enabled=false"))
                 .satisfies(e -> assertThat(rootCause(e))
                         .hasMessageContaining("mysql_api_password is set by commandLineArgs"));
         assertThat(output.getAll()).doesNotContain(flagged).doesNotContain(API_PASSWORD)
@@ -237,7 +177,8 @@ class MysqlPoolsIntegrationTest {
         assertThatThrownBy(() -> new SpringApplicationBuilder(QueryApiApplication.class)
                 .web(WebApplicationType.NONE)
                 .run("--QUERY_API_SECRETS=" + secrets + "/", "--MYSQL_HOST=" + MYSQL.getHost(),
-                        "--MYSQL_PORT=" + MYSQL.getMappedPort(3306), "--CONSUMER_USER=spaceflux'consumer"))
+                        "--MYSQL_PORT=" + MYSQL.getMappedPort(3306), "--CONSUMER_USER=spaceflux'consumer",
+                        "--spaceflux.alerts.enabled=false"))
                 .satisfies(e -> assertThat(rootCause(e)).hasMessageContaining("username"));
         assertThat(output.getAll()).doesNotContain(API_PASSWORD).doesNotContain(CONSUMER_PASSWORD);
     }
@@ -281,6 +222,7 @@ class MysqlPoolsIntegrationTest {
                     assertThat(settings.getBooleanProperty(PropertyKey.allowLoadLocalInfile).getValue()).isFalse();
                     assertThat(settings.getBooleanProperty(PropertyKey.allowUrlInLocalInfile).getValue()).isFalse();
                     assertThat(settings.getBooleanProperty(PropertyKey.allowPublicKeyRetrieval).getValue()).isFalse();
+                    assertThat(settings.getIntegerProperty(PropertyKey.socketTimeout).getValue()).isEqualTo(30_000);
                 }
             }
         }

@@ -1,4 +1,5 @@
-# Database settings follow ADR 0010 and the dat items of docs/security/hardening-checklist.md.
+# Database settings follow ADR 0010 and the dat items of docs/security/hardening-checklist.md; Kafka settings follow
+# ADR 0008 and ADR 0010. The broker address comes from KAFKA_BROKERS; plaintext is for the local stack only.
 # Passwords are read only from the Compose secret files, as a config tree: the file mysql_api_password
 # becomes the property mysql_api_password. The service refuses to start if any other source sets either one.
 spring:
@@ -6,8 +7,32 @@ spring:
     import: optional:configtree:${QUERY_API_SECRETS:/run/secrets/}
   flyway:
     enabled: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+      properties:
+        allow.auto.create.topics: false
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+      properties:
+        enable.idempotence: true
+        max.block.ms: 10000
+        delivery.timeout.ms: 30000
+        request.timeout.ms: 10000
+    listener:
+      # The offset of each record is committed once the listener returns for it.
+      ack-mode: record
 
 spaceflux:
+  alerts:
+    # Off until the consumer stores every kind of event; see deploy/compose.yaml.
+    enabled: ${SPACEFLUX_ALERTS_ENABLED:false}
   mysql:
     host: ${MYSQL_HOST:mysql}
     port: ${MYSQL_PORT:3306}

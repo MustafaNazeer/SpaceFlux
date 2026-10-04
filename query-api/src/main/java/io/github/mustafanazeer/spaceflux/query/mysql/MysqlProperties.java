@@ -37,7 +37,10 @@ public record MysqlProperties(String host, int port, String database, String ssl
                 + "?sslMode=" + sslMode
                 + "&allowPublicKeyRetrieval=false&allowLoadLocalInfile=false&allowUrlInLocalInfile=false"
                 // A literal + in a URL query decodes as a space, so the +00:00 offset is percent encoded.
-                + "&connectionTimeZone=%2B00:00&forceConnectionTimeZoneToSession=true";
+                + "&connectionTimeZone=%2B00:00&forceConnectionTimeZoneToSession=true"
+                // A database that accepts a connection and then stops answering fails a statement after 30 s, a
+                // logged and retried error, instead of blocking a consumer past Kafka's max.poll.interval.ms.
+                + "&socketTimeout=30000";
     }
 
     public record Account(String username) {
