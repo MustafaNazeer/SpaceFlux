@@ -308,6 +308,92 @@ class ReadApiIntegrationTest {
         assertThat(s.has("freshness_reference")).isFalse();
     }
 
+    static final java.nio.file.Path EXAMPLES = java.nio.file.Path.of("..", "schemas", "alerts", "examples");
+
+    /** Stores an example event as received, under a fresh event_id; returns that event_id. */
+    static String storeAlert(String file) throws Exception {
+        String text = java.nio.file.Files.readString(EXAMPLES.resolve(file));
+        String original = JSON.readTree(text).get("event_id").asString();
+        String id = original + "/" + UUID.randomUUID();
+        String payload = text.replace("\"" + original + "\"", "\"" + id + "\"");
+        TestMysql.rootSql("INSERT INTO spaceflux.alert_event (event_id, kind, schema_version, rules_version, "
+                + "produced_at, source_partition, source_offset, payload) VALUES ('" + id + "', '"
+                + JSON.readTree(text).get("kind").asString() + "', 1, 1, '2026-10-04 00:00:00', 0, 0, '"
+                + payload.replace("\\", "\\\\").replace("'", "''") + "')");
+        return id;
+    }
+
+    static String query(String value) {
+        return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void anAlertIsReturnedExactlyAsReceivedWithItsLatestAcknowledgement() throws Exception {
+        String id = storeAlert("valid-r-level.json");
+        TestMysql.rootSql("INSERT INTO spaceflux.alert_acknowledgement (event_id, action, principal, note) VALUES ('"
+                + id + "', 'acknowledge', 'operator', 'looked at it')");
+        TestMysql.rootSql("INSERT INTO spaceflux.alert_acknowledgement (event_id, action, principal, note) VALUES ('"
+                + id + "', 'unacknowledge', 'operator', 'not yet')");
+
+        HttpResponse<String> r = get("/api/alerts/by-id?event_id=" + query(id));
+
+        assertThat(r.statusCode()).isEqualTo(200);
+        JsonNode body = JSON.readTree(r.body());
+        assertThat(fields(body)).containsExactlyInAnyOrder("event", "received_at", "acknowledgement");
+        assertThat(body.get("event").get("event_id").asString()).isEqualTo(id);
+        // The number keeps the spelling it was received with, so the event is the text stored, not a re-encoding.
+        assertThat(r.body()).contains("1.0624149581417441e-05");
+        assertThat(fields(body.get("acknowledgement"))).containsExactlyInAnyOrder("action", "acted_at");
+        assertThat(body.get("acknowledgement").get("action").asString()).isEqualTo("unacknowledge");
+        assertThat(r.body()).doesNotContain("operator").doesNotContain("not yet").doesNotContain("looked at it");
+    }
+
+    @Test
+    void anAlertWithNoAcknowledgementLeavesItOut() throws Exception {
+        String id = storeAlert("valid-g-level.json");
+
+        JsonNode body = JSON.readTree(get("/api/alerts/by-id?event_id=" + query(id)).body());
+
+        assertThat(fields(body)).containsExactlyInAnyOrder("event", "received_at");
+    }
+
+    @Test
+    void anUnknownMissingOrOverlongEventIdIsAProblem() throws Exception {
+        assertProblem(get("/api/alerts/by-id?event_id=" + query("close_approach/1/none")), 404, "/api/alerts/by-id");
+        assertProblem(get("/api/alerts/by-id"), 400, "/api/alerts/by-id");
+        assertProblem(get("/api/alerts/by-id?event_id=" + "x".repeat(513)), 400, "/api/alerts/by-id");
+        assertProblem(get("/api/alerts/by-id?event_id=" + "x".repeat(512)), 404, "/api/alerts/by-id");
+        // 512 code points that are 1,024 UTF-16 units: the limit counts code points.
+        assertProblem(get("/api/alerts/by-id?event_id=" + query("\uD83D\uDE80".repeat(512))), 404,
+                "/api/alerts/by-id");
+    }
+
+    @Test
+    void aCatalogObjectIsReturnedByItsNumber() throws Exception {
+        TestMysql.rootSql("DELETE FROM spaceflux.catalog_object WHERE norad_cat_id = 25544");
+        TestMysql.rootSql("INSERT INTO spaceflux.catalog_object VALUES (25544, 'ISS (ZARYA)', false, '1998-067A', "
+                + "'2026-09-27 04:10:50.460096', '2026-09-27T04:10:50.460096', 15.48664528, 0.0007168, 51.6315, "
+                + "155.3455, 193.0559, 167.0244, 0.00018291, 9.528e-05, 0, 0, 'U', 999, 58756, "
+                + "'2026-09-27 08:57:39', 'https://celestrak.org/', '2026-09-27 08:57:39', '2026-09-27 08:57:39')");
+
+        HttpResponse<String> r = get("/api/catalog/25544");
+
+        assertThat(r.statusCode()).isEqualTo(200);
+        JsonNode body = JSON.readTree(r.body());
+        assertThat(body.get("norad_cat_id").asLong()).isEqualTo(25544);
+        assertThat(body.get("epoch_text").asString()).isEqualTo("2026-09-27T04:10:50.460096");
+        assertThat(fields(body)).hasSize(23);
+    }
+
+    @Test
+    void aCatalogNumberThatIsUnknownOrNotACatalogNumberIsAProblem() throws Exception {
+        TestMysql.rootSql("DELETE FROM spaceflux.catalog_object WHERE norad_cat_id = 999999999");
+        assertProblem(get("/api/catalog/999999999"), 404, "/api/catalog/999999999");
+        assertProblem(get("/api/catalog/1000000000"), 400, "/api/catalog/1000000000");
+        assertProblem(get("/api/catalog/-1"), 400, "/api/catalog/-1");
+        assertProblem(get("/api/catalog/abc"), 400, "/api/catalog/abc");
+    }
+
     @Test
     void anUnknownPathIsAProblemDetailWithTheCorrelationIdAndNothingInternal() throws Exception {
         HttpResponse<String> r = get("/api/nothing-here");
