@@ -108,6 +108,18 @@ class AlertsProcessorTest {
     }
 
     @Test
+    void aRecordWithAnythingAfterItsEventIsDeadLetteredNotStored() throws Exception {
+        // The API returns a stored event as its text, so a stored value must be exactly one JSON object.
+        String event = new String(example("valid-close-approach.json"), StandardCharsets.UTF_8).strip();
+        String forged = event.substring(0, event.length() - 1) + "},\"acknowledgement\":{\"action\":\"acknowledge\"}}";
+        for (String value : List.of(event + " {}", forged)) {
+            deadLetter(processor.process(in("k", value.getBytes(StandardCharsets.UTF_8)), NOW));
+        }
+
+        assertThat(store.rows).isEmpty();
+    }
+
+    @Test
     void theDeadLetterKeepsTheRecordKey() throws Exception {
         var outcome = processor.process(in("space_weather.R", "{".getBytes(StandardCharsets.UTF_8)), NOW);
 
