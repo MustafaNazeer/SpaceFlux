@@ -46,7 +46,8 @@ class DeadLettersTest {
     void aRuleRejectionIsAValidateDeadLetterOnTheSourceTopic() {
         byte[] payload = "{\"record\":{\"Kp\":12.0}}".getBytes(StandardCharsets.UTF_8);
 
-        DeadLetters.Message m = dlq.build("raw.swpc", URL, "swpc.kp", "rule", "\"Kp\" 12.0 is above 9.00", payload, NOW);
+        DeadLetters.Message m =
+                dlq.build("raw.swpc", URL, "swpc.kp", "rule", "\"Kp\" 12.0 is above 9.00", payload, NOW);
 
         assertThat(m.topic()).isEqualTo("raw.swpc.dlq");
         assertThat(m.key()).isEqualTo("swpc.kp");
@@ -73,7 +74,7 @@ class DeadLettersTest {
 
     @Test
     void aLargePayloadKeepsItsFirst256KibibytesOnACharacterBoundary() {
-        byte[] big = ("{\"a\":\"" + "é".repeat(200_000) + "\"}").getBytes(StandardCharsets.UTF_8);
+        byte[] big = ("{\"a\":\"" + "\u00e9".repeat(200_000) + "\"}").getBytes(StandardCharsets.UTF_8);
 
         JsonNode v = value(dlq.build("raw.swpc", URL, "swpc.kp", "schema", "too big", big, NOW));
 
@@ -102,6 +103,67 @@ class DeadLettersTest {
 
         assertThat(value(m).get("payload_encoding").asString()).isEqualTo("base64");
         assertThat(m.value().length).isLessThan(900_000);
+    }
+
+    @Test
+    void aSourceUrlThatWouldPushTheDeadLetterOverBudgetIsLeftOutAndNamed() {
+        String url = "https://celestrak.org/" + "u".repeat(950_000);
+        byte[] payload = "{\"gp\":{}}".getBytes(StandardCharsets.UTF_8);
+
+        DeadLetters.Message m = dlq.build("raw.gp", url, "25544", null, "source_url is too long", payload, NOW);
+
+        assertThat(m.value().length).isLessThanOrEqualTo(900_000);
+        JsonNode v = value(m);
+        assertThat(v.has("source_url")).isFalse();
+        assertThat(v.get("reason").asString())
+                .isEqualTo("source_url is too long; source_url left out: " + url.length() + " bytes");
+        assertThat(v.get("payload").asString()).isEqualTo("{\"gp\":{}}");
+    }
+
+    @Test
+    void aSourceUrlWithinBudgetIsKeptEvenWhenLong() {
+        String url = "https://celestrak.org/" + "u".repeat(100_000);
+
+        DeadLetters.Message m = dlq.build("raw.gp", url, "25544", null, "r", "{}".getBytes(StandardCharsets.UTF_8),
+                NOW);
+
+        assertThat(value(m).get("source_url").asString()).isEqualTo(url);
+    }
+
+    @Test
+    void theLargestPayloadAndALongUrlStillFitTheBudget() {
+        byte[] payload = new byte[400_000];
+        java.util.Arrays.fill(payload, (byte) 0xFF);
+        String url = "https://celestrak.org/" + "u".repeat(700_000);
+
+        DeadLetters.Message m = dlq.build("raw.gp", url, "25544", "schema", "x", payload, NOW);
+
+        assertThat(m.value().length).isLessThanOrEqualTo(900_000);
+        assertThat(value(m).has("source_url")).isFalse();
+        assertThat(value(m).get("payload_encoding").asString()).isEqualTo("base64");
+    }
+
+    @Test
+    void aKeyThatWouldPushKeyAndValuePastTheBudgetIsLeftOutAndNamed() {
+        String key = "k".repeat(900_000);
+        // Control characters escape to six bytes each, so the value grows without needing the base64 fallback.
+        byte[] payload = "\u0001".repeat(30_000).getBytes(StandardCharsets.UTF_8);
+
+        DeadLetters.Message m = dlq.build("raw.gp", null, key, "schema", "not JSON", payload, NOW);
+
+        assertThat(m.key()).isNull();
+        assertThat(m.value().length).isLessThanOrEqualTo(900_000);
+        assertThat(value(m).get("reason").asString()).isEqualTo("not JSON; key left out: 900000 bytes");
+    }
+
+    @Test
+    void aLongKeyWithinBudgetIsKept() {
+        String key = "k".repeat(100_000);
+
+        DeadLetters.Message m = dlq.build("raw.gp", null, key, "schema", "r", "{}".getBytes(StandardCharsets.UTF_8),
+                NOW);
+
+        assertThat(m.key()).isEqualTo(key);
     }
 
     @Test

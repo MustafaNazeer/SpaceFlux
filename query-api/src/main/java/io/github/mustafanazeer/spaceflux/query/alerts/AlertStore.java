@@ -1,5 +1,7 @@
 package io.github.mustafanazeer.spaceflux.query.alerts;
 
+import io.github.mustafanazeer.spaceflux.query.consume.NotStorable;
+
 /** Where a schema valid alerts event is kept. */
 interface AlertStore {
 

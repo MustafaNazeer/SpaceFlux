@@ -47,6 +47,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import io.github.mustafanazeer.spaceflux.query.QueryApiApplication;
 import io.github.mustafanazeer.spaceflux.query.TestMysql;
+import io.github.mustafanazeer.spaceflux.query.consume.NotStorable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -76,7 +77,7 @@ class AlertsConsumerIntegrationTest {
         app = new SpringApplicationBuilder(QueryApiApplication.class)
                 .web(WebApplicationType.NONE)
                 .run(TestMysql.args("--spring.kafka.bootstrap-servers=" + KAFKA.getBootstrapServers(),
-                        "--spaceflux.alerts.enabled=true"));
+                        "--spaceflux.alerts.enabled=true", "--spaceflux.catalog.enabled=false"));
         db = app.getBean("apiJdbcClient", JdbcClient.class);
     }
 

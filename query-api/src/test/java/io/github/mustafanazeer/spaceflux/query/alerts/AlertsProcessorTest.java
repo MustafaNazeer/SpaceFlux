@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 
 import io.github.mustafanazeer.spaceflux.contracts.TopicSchemas;
+import io.github.mustafanazeer.spaceflux.query.consume.NotStorable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;

@@ -15,8 +15,11 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Builds dlq v1 dead letters for records a service read and could not use, with the limits ingest applies: the
  * first 256 KiB of the payload, cut on a character boundary; base64 when the bytes are not UTF-8 or when JSON escaping
- * would push the record past 900,000 bytes; and a reason of at most 4 KiB (docs/data/topics.md, raw.gp.dlq). Every
- * dead letter is checked against the dlq schema before it is returned.
+ * would push the record past 900,000 bytes; a reason of at most 4 KiB; a source_url left out, with its length named
+ * in the reason, whenever the dead letter with it would be over 900,000 bytes, before the payload falls back to
+ * base64; and the record key left out the same way when key and value together would be over that budget, since the
+ * producer's request limit counts both (docs/data/topics.md, raw.gp.dlq). No dead letter over 900,000 bytes, key
+ * included, is ever returned, and every one is checked against the dlq schema first.
  */
 public final class DeadLetters {
 
@@ -67,16 +70,39 @@ public final class DeadLetters {
             d.put("payload_truncated", true);
         }
         byte[] value = MAPPER.writeValueAsBytes(d);
+        // The payload and reason are capped, but a source_url copied from a record is not: one long enough would make
+        // a dead letter the producer refuses, and the record would be retried forever. So whenever the dead letter
+        // with it is over budget, it is left out, before the payload falls back to base64.
+        if (sourceUrl != null && value.length > MAX_RECORD) {
+            d.remove("source_url");
+            d.put("reason", TopicSchemas.cap(reason + "; source_url left out: "
+                    + sourceUrl.getBytes(StandardCharsets.UTF_8).length + " bytes"));
+            value = MAPPER.writeValueAsBytes(d);
+        }
         if (text != null && value.length > MAX_RECORD) {
             d.put("payload", Base64.getEncoder().encodeToString(kept));
             d.put("payload_encoding", "base64");
             value = MAPPER.writeValueAsBytes(d);
         }
+        // The producer's request limit counts the key with the value, and a key copied from a record is not bounded
+        // either, so it is left out the same way, when the two together would be over budget.
+        String sentKey = key;
+        int keyBytes = key == null ? 0 : key.getBytes(StandardCharsets.UTF_8).length;
+        if (keyBytes > 0 && keyBytes + value.length > MAX_RECORD) {
+            sentKey = null;
+            d.put("reason", TopicSchemas.cap(d.get("reason").asString() + "; key left out: " + keyBytes + " bytes"));
+            value = MAPPER.writeValueAsBytes(d);
+        }
+        int sentKeyBytes = sentKey == null ? 0 : keyBytes;
+        if (sentKeyBytes + value.length > MAX_RECORD) {
+            throw new IllegalStateException("dead letter is " + (sentKeyBytes + value.length)
+                    + " bytes with its key, over the 900,000 byte budget");
+        }
         TopicSchemas.Result r = schemas.check("dlq", d);
         if (r.failure() != null) {
             throw new IllegalStateException("dead letter fails the dlq schema: " + r.failure());
         }
-        return new Message(sourceTopic + ".dlq", key, value);
+        return new Message(sourceTopic + ".dlq", sentKey, value);
     }
 
     private static byte[] cutOnCharacter(byte[] payload) {

@@ -2,6 +2,8 @@ package io.github.mustafanazeer.spaceflux.query.alerts;
 
 import java.time.LocalDateTime;
 
+import io.github.mustafanazeer.spaceflux.query.consume.NotStorable;
+import io.github.mustafanazeer.spaceflux.query.consume.RuleRejected;
 import tools.jackson.databind.JsonNode;
 
 /**

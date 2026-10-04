@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.mustafanazeer.spaceflux.query.consume.NotStorable;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 

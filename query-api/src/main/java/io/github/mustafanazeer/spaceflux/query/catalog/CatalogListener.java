@@ -1,4 +1,4 @@
-package io.github.mustafanazeer.spaceflux.query.alerts;
+package io.github.mustafanazeer.spaceflux.query.catalog;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -17,39 +17,38 @@ import io.github.mustafanazeer.spaceflux.contracts.TopicSchemas;
 import io.github.mustafanazeer.spaceflux.query.consume.Failures;
 
 /**
- * Reads alerts one record at a time in the consumer group query-api-alerts (ADR 0010). A record's offset is committed
- * only after its transaction committed or its dead letter was acknowledged; anything thrown makes the container
- * deliver the record again.
+ * Reads raw.gp one record at a time in the consumer group query-api-catalog, independently of the risk engine's
+ * screening consumer (docs/data/topics.md). A record's offset is committed only after its transaction committed or
+ * its dead letter was acknowledged; anything thrown makes the container deliver the record again.
  */
 @Component
-@ConditionalOnProperty(name = "spaceflux.alerts.enabled", havingValue = "true")
-class AlertsListener {
+@ConditionalOnProperty(name = "spaceflux.catalog.enabled", havingValue = "true")
+class CatalogListener {
 
-    static final String GROUP = "query-api-alerts";
-    private static final Logger LOG = LoggerFactory.getLogger(AlertsListener.class);
+    static final String GROUP = "query-api-catalog";
+    private static final Logger LOG = LoggerFactory.getLogger(CatalogListener.class);
     private static final Duration SEND_TIMEOUT = Duration.ofSeconds(40);
 
-    private final AlertsProcessor processor;
+    private final CatalogProcessor processor;
     private final KafkaTemplate<String, byte[]> kafka;
     private final Clock clock = Clock.systemUTC();
 
-    AlertsListener(AlertStore store, KafkaTemplate<String, byte[]> kafka) {
-        this.processor = new AlertsProcessor(TopicSchemas.fromClasspath(), store);
+    CatalogListener(CatalogStore store, KafkaTemplate<String, byte[]> kafka) {
+        this.processor = new CatalogProcessor(TopicSchemas.fromClasspath(), store);
         this.kafka = kafka;
     }
 
-    @KafkaListener(topics = AlertsProcessor.TOPIC, groupId = GROUP)
+    @KafkaListener(topics = CatalogProcessor.TOPIC, groupId = GROUP)
     void onRecord(ConsumerRecord<String, byte[]> record) {
         try {
-            AlertsProcessor.Outcome outcome = processor.process(
-                    new AlertsProcessor.In(record.key(), record.value(), record.partition(), record.offset()),
-                    clock.instant());
-            if (outcome instanceof AlertsProcessor.Outcome.DeadLetter(DeadLetters.Message m)) {
+            CatalogProcessor.Outcome outcome = processor.process(
+                    new CatalogProcessor.In(record.key(), record.value()), clock.instant());
+            if (outcome instanceof CatalogProcessor.Outcome.DeadLetter(DeadLetters.Message m)) {
                 send(m);
             }
         } catch (RuntimeException e) {
             // The error handler retries without logging each attempt, so an outage would otherwise be silent.
-            LOG.warn("alerts record {}@{} not stored, delivered again: {}", record.partition(), record.offset(),
+            LOG.warn("raw.gp record {}@{} not applied, delivered again: {}", record.partition(), record.offset(),
                     Failures.describe(e));
             throw e;
         }

@@ -40,7 +40,7 @@ class ScreeningStoreIntegrationTest {
     static void start() {
         TestMysql.start();
         app = new SpringApplicationBuilder(QueryApiApplication.class).web(WebApplicationType.NONE)
-                .run(TestMysql.args("--spaceflux.alerts.enabled=false"));
+                .run(TestMysql.args("--spaceflux.alerts.enabled=false", "--spaceflux.catalog.enabled=false"));
         processor = new AlertsProcessor(TopicSchemas.fromClasspath(), app.getBean(AlertStore.class));
         db = app.getBean("apiJdbcClient", JdbcClient.class);
     }

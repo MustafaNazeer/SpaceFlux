@@ -32,6 +32,8 @@ spring:
 spaceflux:
   alerts:
     enabled: ${SPACEFLUX_ALERTS_ENABLED:true}
+  catalog:
+    enabled: ${SPACEFLUX_CATALOG_ENABLED:true}
   mysql:
     host: ${MYSQL_HOST:mysql}
     port: ${MYSQL_PORT:3306}

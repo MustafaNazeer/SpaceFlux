@@ -3,6 +3,8 @@ package io.github.mustafanazeer.spaceflux.query.alerts;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
+import io.github.mustafanazeer.spaceflux.query.consume.NotStorable;
+import io.github.mustafanazeer.spaceflux.query.consume.UtcColumns;
 import tools.jackson.databind.JsonNode;
 
 /**

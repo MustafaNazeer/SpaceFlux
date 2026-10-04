@@ -1,17 +1,18 @@
 package io.github.mustafanazeer.spaceflux.query.alerts;
 
-import java.sql.SQLException;
 import java.time.LocalDateTime;
-import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.jdbc.support.JdbcTransactionManager;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
+
+import io.github.mustafanazeer.spaceflux.query.consume.NotStorable;
+import io.github.mustafanazeer.spaceflux.query.consume.SqlErrors;
 
 /**
  * Stores alerts events through the consumer pool, one transaction per event: the {@code alert_event} row, the row
@@ -22,14 +23,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Component
 class MysqlAlertStore implements AlertStore {
 
-    static final int DUPLICATE_KEY = 1062;
     static final String EVENT_ID_KEY = "uk_alert_event_event_id";
     static final String RUN_ID_KEY = "uk_screening_run_run_id";
-    // Errors a stored value causes, as opposed to the database being unreachable or failing: data too long, out of
-    // range, an incorrect date or time, an incorrect string, a failed check constraint, a null in a NOT NULL column.
-    // After the checks in AlertRow, 1048 and 1292 can only come from a fault in this code; they are dead lettered by
-    // design too, so the record is kept in alerts.dlq and the partition does not stop.
-    static final Set<Integer> VALUE_REFUSED = Set.of(1406, 1264, 1292, 1366, 3819, 1048);
 
     private final JdbcClient jdbc;
     private final TransactionTemplate tx;
@@ -65,16 +60,14 @@ class MysqlAlertStore implements AlertStore {
                 return true;
             }));
         } catch (DataAccessException e) {
-            SQLException sql = sqlCause(e);
-            if (sql != null && sql.getErrorCode() == DUPLICATE_KEY && String.valueOf(sql.getMessage())
-                    .contains(RUN_ID_KEY)) {
+            if (SqlErrors.isDuplicateOn(e, RUN_ID_KEY)) {
                 // A screening_run event_id is built from its run_id, so this is a second event_id claiming a run
                 // already stored: retrying would never succeed.
                 throw new NotStorable("a screening run with this run_id is already stored under another event_id");
             }
-            if (sql != null && VALUE_REFUSED.contains(sql.getErrorCode())) {
-                throw new NotStorable("the database refused a value: error " + sql.getErrorCode() + ", "
-                        + sql.getMessage());
+            NotStorable refused = SqlErrors.refusedValue(e);
+            if (refused != null) {
+                throw refused;
             }
             throw e;
         }
@@ -205,17 +198,6 @@ class MysqlAlertStore implements AlertStore {
     }
 
     static boolean isRepeat(DataAccessException e) {
-        SQLException sql = sqlCause(e);
-        return sql != null && sql.getErrorCode() == DUPLICATE_KEY && String.valueOf(sql.getMessage())
-                .contains(EVENT_ID_KEY);
-    }
-
-    private static SQLException sqlCause(Throwable t) {
-        for (Throwable c = t; c != null; c = c.getCause()) {
-            if (c instanceof SQLException sql) {
-                return sql;
-            }
-        }
-        return null;
+        return SqlErrors.isDuplicateOn(e, EVENT_ID_KEY);
     }
 }

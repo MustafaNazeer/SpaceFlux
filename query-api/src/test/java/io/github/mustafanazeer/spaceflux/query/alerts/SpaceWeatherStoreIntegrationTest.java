@@ -22,6 +22,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import io.github.mustafanazeer.spaceflux.contracts.TopicSchemas;
 import io.github.mustafanazeer.spaceflux.query.QueryApiApplication;
 import io.github.mustafanazeer.spaceflux.query.TestMysql;
+import io.github.mustafanazeer.spaceflux.query.consume.NotStorable;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -41,7 +42,7 @@ class SpaceWeatherStoreIntegrationTest {
     static void start() {
         TestMysql.start();
         app = new SpringApplicationBuilder(QueryApiApplication.class).web(WebApplicationType.NONE)
-                .run(TestMysql.args("--spaceflux.alerts.enabled=false"));
+                .run(TestMysql.args("--spaceflux.alerts.enabled=false", "--spaceflux.catalog.enabled=false"));
         store = app.getBean(AlertStore.class);
         processor = new AlertsProcessor(TopicSchemas.fromClasspath(), store);
         db = app.getBean("apiJdbcClient", JdbcClient.class);

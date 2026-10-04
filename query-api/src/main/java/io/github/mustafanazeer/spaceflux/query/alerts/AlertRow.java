@@ -2,6 +2,8 @@ package io.github.mustafanazeer.spaceflux.query.alerts;
 
 import java.time.LocalDateTime;
 
+import io.github.mustafanazeer.spaceflux.query.consume.NotStorable;
+import io.github.mustafanazeer.spaceflux.query.consume.UtcColumns;
 import tools.jackson.databind.JsonNode;
 
 /** The envelope columns of one {@code alert_event} row, read from a schema valid alerts event. */

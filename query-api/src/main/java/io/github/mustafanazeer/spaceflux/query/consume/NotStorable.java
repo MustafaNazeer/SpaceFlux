@@ -1,4 +1,4 @@
-package io.github.mustafanazeer.spaceflux.query.alerts;
+package io.github.mustafanazeer.spaceflux.query.consume;
 
 /**
  * A schema valid event holds a value its column cannot store as received. The event is dead lettered with this
