@@ -1,4 +1,4 @@
-package io.github.mustafanazeer.spaceflux.risk.kafka;
+package io.github.mustafanazeer.spaceflux.contracts;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

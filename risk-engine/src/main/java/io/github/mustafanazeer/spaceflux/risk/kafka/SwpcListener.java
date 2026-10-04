@@ -17,6 +17,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import io.github.mustafanazeer.spaceflux.contracts.TopicSchemas;
+
 /**
  * Reads raw.swpc in batches and writes the alerts events and dead letters each batch produces. The batch's offsets are
  * committed only after every write was acknowledged (ADR 0008). When a write fails, the series state is restored to

@@ -22,6 +22,8 @@ import org.springframework.util.backoff.ExponentialBackOff;
 @Configuration
 class KafkaConfig {
 
+    /** Written into every dead letter this service builds. */
+    static final String SERVICE = "risk-engine";
     static final String NEVER_COMMIT_FACTORY = "neverCommitFactory";
 
     @Bean

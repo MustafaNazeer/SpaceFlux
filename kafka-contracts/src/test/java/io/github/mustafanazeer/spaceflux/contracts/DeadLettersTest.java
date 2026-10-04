@@ -1,6 +1,7 @@
-package io.github.mustafanazeer.spaceflux.risk.kafka;
+package io.github.mustafanazeer.spaceflux.contracts;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -12,16 +13,33 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Dead letters the risk engine writes: dlq v1 events built the same way ingest builds them (docs/data/topics.md). */
+/** Dead letters a service writes: dlq v1 events built the same way ingest builds them (docs/data/topics.md). */
 class DeadLettersTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Instant NOW = Instant.parse("2026-09-30T21:00:00Z");
     private static final String URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
-    private final DeadLetters dlq = new DeadLetters(TopicSchemas.fromClasspath());
+    private final DeadLetters dlq = new DeadLetters(TopicSchemas.fromClasspath(), "risk-engine");
 
     private static JsonNode value(DeadLetters.Message m) {
         return JSON.readTree(m.value());
+    }
+
+    @Test
+    void theDeadLetterNamesTheServiceThatBuiltIt() {
+        DeadLetters queryApi = new DeadLetters(TopicSchemas.fromClasspath(), "query-api");
+
+        DeadLetters.Message m = queryApi.build("alerts", null, "space_weather.G", "schema", "kind: not allowed",
+                "{}".getBytes(StandardCharsets.UTF_8), NOW);
+
+        assertThat(value(m).get("service").asString()).isEqualTo("query-api");
+        assertThat(value(m).has("source_url")).isFalse();
+    }
+
+    @Test
+    void anEmptyServiceNameIsRefused() {
+        assertThatThrownBy(() -> new DeadLetters(TopicSchemas.fromClasspath(), ""))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

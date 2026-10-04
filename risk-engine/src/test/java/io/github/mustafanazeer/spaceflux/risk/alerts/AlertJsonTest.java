@@ -13,8 +13,7 @@ import java.util.TreeMap;
 
 import org.junit.jupiter.api.Test;
 
-import io.github.mustafanazeer.spaceflux.risk.kafka.TopicSchemas;
-
+import io.github.mustafanazeer.spaceflux.contracts.TopicSchemas;
 import io.github.mustafanazeer.spaceflux.risk.weather.Scale;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;

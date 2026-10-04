@@ -21,6 +21,7 @@ import org.springframework.kafka.listener.ConsumerSeekAware;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import io.github.mustafanazeer.spaceflux.contracts.TopicSchemas;
 import io.github.mustafanazeer.spaceflux.risk.screening.Watchlist;
 
 /**

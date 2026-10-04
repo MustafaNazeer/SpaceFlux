@@ -80,8 +80,8 @@ The risk engine shares the `raw.*` schemas and the Compose file with `ingest`, s
 | An X-ray flux of exactly 0 is counted, not dead lettered | `aZeroFluxIsCountedNotDeadLettered` (`SwpcProcessorTest`) |
 | A space weather event that fails the `alerts` schema goes to `alerts.dlq` | `anAlertThatFailsItsSchemaGoesToTheAlertsDeadLetterTopic` (`SwpcProcessorTest`) |
 | Screening events that fail the `alerts` schema go to `alerts.dlq` with `check` `schema`, keyed by the run's `run_id` | `runEventsThatFailTheAlertsSchemaGoToAlertsDlqUnderTheRunId` (`GpProcessorTest`) |
-| The dead letter envelope: reason cap, payload cap on a character boundary, base64 for bytes that are not UTF-8 or would inflate | every case in `DeadLettersTest` |
-| Schema guards: duplicate keys, documents over 1 MiB, no remote references, no runaway patterns | `TopicSchemasTest` |
+| The dead letter envelope: reason cap, payload cap on a character boundary, base64 for bytes that are not UTF-8 or would inflate | every case in `DeadLettersTest`, in `kafka-contracts` |
+| Schema guards: duplicate keys, documents over 1 MiB, no remote references, no runaway patterns | `TopicSchemasTest`, in `kafka-contracts` |
 | Records with dead letters and alerts against a real broker, offset committed only after both were written | `recordsInBecomeAlertsAndDeadLettersOutAndTheOffsetIsCommitted` (`RiskEngineKafkaIntegrationTest`) |
 | A `raw.gp` record that fails its schema reaches `raw.gp.dlq` on a real broker with `check` `schema` | `anElementSetThatFailsItsSchemaReachesRawGpDlq` (`RiskEngineKafkaIntegrationTest`) |
 | A test that sets no broker of its own points at an address that reaches nothing, never at a local Compose broker | `aContextWithoutItsOwnBrokerPointsAtAnAddressThatReachesNothing` (`RiskEngineApplicationTest`) |

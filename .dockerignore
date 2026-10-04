@@ -2,6 +2,8 @@
 !ingest/
 !schemas/
 !pom.xml
+!kafka-contracts/pom.xml
+!kafka-contracts/src/main/
 !risk-engine/pom.xml
 !risk-engine/src/main/
 !db-migrate/pom.xml

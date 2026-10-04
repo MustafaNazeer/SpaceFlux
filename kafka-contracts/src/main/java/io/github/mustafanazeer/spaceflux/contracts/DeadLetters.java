@@ -1,4 +1,4 @@
-package io.github.mustafanazeer.spaceflux.risk.kafka;
+package io.github.mustafanazeer.spaceflux.contracts;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -13,25 +13,30 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Builds dlq v1 dead letters for records the risk engine read and could not use, with the limits ingest applies: the
+ * Builds dlq v1 dead letters for records a service read and could not use, with the limits ingest applies: the
  * first 256 KiB of the payload, cut on a character boundary; base64 when the bytes are not UTF-8 or when JSON escaping
  * would push the record past 900,000 bytes; and a reason of at most 4 KiB (docs/data/topics.md, raw.gp.dlq). Every
  * dead letter is checked against the dlq schema before it is returned.
  */
 public final class DeadLetters {
 
-    static final String SERVICE = "risk-engine";
     static final int MAX_PAYLOAD = 256 << 10;
     private static final int MAX_RECORD = 900_000;
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
     private final TopicSchemas schemas;
+    private final String service;
 
     public record Message(String topic, String key, byte[] value) {
     }
 
-    public DeadLetters(TopicSchemas schemas) {
+    /** {@code service} is written into every dead letter as the service that rejected the payload. */
+    public DeadLetters(TopicSchemas schemas, String service) {
+        if (service == null || service.isBlank()) {
+            throw new IllegalArgumentException("a dead letter needs the name of the service that wrote it");
+        }
         this.schemas = schemas;
+        this.service = service;
     }
 
     /**
@@ -45,7 +50,7 @@ public final class DeadLetters {
         ObjectNode d = JsonNodeFactory.instance.objectNode();
         d.put("schema_version", 1);
         d.put("source_topic", sourceTopic);
-        d.put("service", SERVICE);
+        d.put("service", service);
         d.put("stage", "validate");
         if (check != null) {
             d.put("check", check);

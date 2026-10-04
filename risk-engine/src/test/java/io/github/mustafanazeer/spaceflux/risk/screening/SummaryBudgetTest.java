@@ -10,8 +10,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.orekit.time.AbsoluteDate;
 
+import io.github.mustafanazeer.spaceflux.contracts.TopicSchemas;
 import io.github.mustafanazeer.spaceflux.risk.alerts.ScreeningJson;
-import io.github.mustafanazeer.spaceflux.risk.kafka.TopicSchemas;
 import io.github.mustafanazeer.spaceflux.risk.orbit.OrekitData;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;

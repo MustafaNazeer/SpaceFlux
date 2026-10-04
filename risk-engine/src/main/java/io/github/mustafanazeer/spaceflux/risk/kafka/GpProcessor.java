@@ -17,6 +17,8 @@ import org.orekit.time.TimeScale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.github.mustafanazeer.spaceflux.contracts.DeadLetters;
+import io.github.mustafanazeer.spaceflux.contracts.TopicSchemas;
 import io.github.mustafanazeer.spaceflux.risk.alerts.ScreeningJson;
 import io.github.mustafanazeer.spaceflux.risk.alerts.UtcTimes;
 import io.github.mustafanazeer.spaceflux.risk.orbit.GpElementSets;
@@ -85,7 +87,7 @@ public final class GpProcessor {
 
     public GpProcessor(TopicSchemas schemas, Set<Integer> watchlist, TimeScale utc) {
         this.schemas = schemas;
-        this.deadLetters = new DeadLetters(schemas);
+        this.deadLetters = new DeadLetters(schemas, KafkaConfig.SERVICE);
         this.watchlist = Set.copyOf(watchlist);
         this.utc = utc;
     }

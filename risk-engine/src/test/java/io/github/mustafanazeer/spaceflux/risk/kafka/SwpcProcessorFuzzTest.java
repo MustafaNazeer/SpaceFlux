@@ -12,6 +12,7 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.mustafanazeer.spaceflux.contracts.TopicSchemas;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;

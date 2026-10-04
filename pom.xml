@@ -17,6 +17,7 @@
   <packaging>pom</packaging>
 
   <modules>
+    <module>kafka-contracts</module>
     <module>risk-engine</module>
     <module>db-migrate</module>
     <module>query-api</module>
@@ -36,6 +37,11 @@
         <groupId>org.orekit</groupId>
         <artifactId>orekit</artifactId>
         <version>${orekit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.mustafanazeer.spaceflux</groupId>
+        <artifactId>kafka-contracts</artifactId>
+        <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.networknt</groupId>

@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import io.github.mustafanazeer.spaceflux.contracts.DeadLetters;
+import io.github.mustafanazeer.spaceflux.contracts.TopicSchemas;
 import io.github.mustafanazeer.spaceflux.risk.alerts.AlertJson;
 import io.github.mustafanazeer.spaceflux.risk.alerts.LevelEvent;
 import io.github.mustafanazeer.spaceflux.risk.alerts.Reading;
@@ -54,7 +56,7 @@ public final class SwpcProcessor {
 
     public SwpcProcessor(TopicSchemas schemas) {
         this.schemas = schemas;
-        this.deadLetters = new DeadLetters(schemas);
+        this.deadLetters = new DeadLetters(schemas, KafkaConfig.SERVICE);
         for (Scale s : Scale.values()) {
             trackers.put(s, new ScaleTracker(s, RULES_VERSION));
         }

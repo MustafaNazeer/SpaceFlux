@@ -1,4 +1,4 @@
-package io.github.mustafanazeer.spaceflux.risk.kafka;
+package io.github.mustafanazeer.spaceflux.contracts;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,7 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 public final class TopicSchemas {
 
-    static final String ID_PREFIX = "https://github.com/MustafaNazeer/SpaceFlux/schemas/";
+    public static final String ID_PREFIX = "https://github.com/MustafaNazeer/SpaceFlux/schemas/";
     static final List<String> TOPICS = List.of("raw.gp", "raw.swpc", "alerts", "dlq");
     static final int MAX_REASON_BYTES = 4 << 10;
     private static final long MAX_DOCUMENT_BYTES = 1 << 20;
@@ -67,7 +67,8 @@ public final class TopicSchemas {
         return of(files);
     }
 
-    static TopicSchemas of(Map<String, String> schemaByTopic) {
+    /** Schemas from the given texts, keyed by topic; each text's $id must start with {@link #ID_PREFIX}. */
+    public static TopicSchemas of(Map<String, String> schemaByTopic) {
         Map<String, String> byIri = new HashMap<>();
         schemaByTopic.forEach((topic, text) -> byIri.put(iri(topic), text));
         SchemaRegistryConfig config = SchemaRegistryConfig.builder().formatAssertionsEnabled(true).build();
