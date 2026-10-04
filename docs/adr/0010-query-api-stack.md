@@ -59,6 +59,16 @@ The `mysql:8.4.11` image pinned by digest (`SEC-DAT-11`), with no published port
 
 JUnit 5 with Testcontainers 2.0.5: `testcontainers-mysql` on the same pinned `mysql:8.4.11` image, and `testcontainers-kafka` on `apache/kafka:4.3.1` as in ADR 0008. The schema's test obligations (`DOUBLE` round trips, the column limited acknowledgement insert, the UTC session, and the exact privileges Flyway needs) are proven against that container before code relies on them.
 
+### Amendment, 2026-10-04: response conventions
+
+Three conventions added to decision 6 before the first read endpoints:
+
+* **Field names are `snake_case`**, the names the Kafka contracts and the MySQL columns already use (`event_id`, `derived_label`, `freshness_reference`), so one field reads the same in an event, a row, and a response. A name that a column changed for MySQL's sake (`trigger_kind`) is returned under its contract name (`trigger`).
+* **Every response carries an `X-Correlation-Id` header**, a random UUID generated for the request; a problem body repeats it, and the log line for an error carries it with the stack trace. An incoming header of that name is ignored, so a client cannot choose the value written into the log.
+* **Locally, Compose publishes the API on `127.0.0.1:8081` only**, so it can be called from this machine and from nowhere else; `ingest` keeps `127.0.0.1:8080`.
+
+Considered: `camelCase`, the usual style for a browser client, at the cost of a second name for every field; and accepting a client's correlation ID when it is a valid UUID, which would help trace a request across the dashboard and the API but lets a client pick a value that appears in the log.
+
 ## Alternatives considered
 
 * **Spring WebFlux with R2DBC.** Non blocking end to end, but the service's load is a handful of dashboard viewers, R2DBC would replace the JDBC driver and pool the schema's facts were checked against, and ADR 0009's configuration is written for the servlet filter chain.
