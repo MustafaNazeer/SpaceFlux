@@ -2,7 +2,6 @@ package io.github.mustafanazeer.spaceflux.query.alerts;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 
 import tools.jackson.databind.JsonNode;
 
@@ -63,15 +62,10 @@ record SpaceWeatherRow(long rulesVersion, String scale, Integer satellite, Strin
 
     /** Refuses the times that order a series when one is later than {@code limit}. */
     void requireNotLaterThan(LocalDateTime limit, LocalDateTime readAt) {
-        String[] names = {"freshness_reference", "sample_time", "interval_start", "no_data_since"};
-        LocalDateTime[] times = {freshnessReference, sampleTime, intervalStart, noDataSince};
-        for (int i = 0; i < names.length; i++) {
-            if (times[i] != null && times[i].isAfter(limit)) {
-                throw new RuleRejected(names[i] + " " + times[i].atOffset(ZoneOffset.UTC).toInstant()
-                        + " is more than 1 hour after " + readAt.atOffset(ZoneOffset.UTC).toInstant()
-                        + ", when it was read");
-            }
-        }
+        UtcColumns.requireNotLaterThan("freshness_reference", freshnessReference, limit, readAt);
+        UtcColumns.requireNotLaterThan("sample_time", sampleTime, limit, readAt);
+        UtcColumns.requireNotLaterThan("interval_start", intervalStart, limit, readAt);
+        UtcColumns.requireNotLaterThan("no_data_since", noDataSince, limit, readAt);
     }
 
     /** The series key's second part: the GOES satellite, or 0 for G, which has no satellite. */

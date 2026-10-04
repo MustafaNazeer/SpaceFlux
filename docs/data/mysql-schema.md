@@ -202,7 +202,7 @@ One row per `screening_run` event, never updated ([topics.md](topics.md#screenin
 | --- | --- | --- | --- |
 | `alert_seq` | `BIGINT UNSIGNED` | no | Primary key, and foreign key to `alert_event` |
 | `rules_version` | `INT UNSIGNED` | no | From the envelope |
-| `run_id` | `VARCHAR(64)`, `utf8mb4_0900_bin` | no | Unique. A `screening_run` `event_id` is `screening_run/<v>/<run_id>` and `run_id` itself ends in `<v>`, so `run_id` is unique exactly when `event_id` is |
+| `run_id` | `VARCHAR(64)`, `utf8mb4_0900_bin` | no | Unique. A `screening_run` `event_id` is `screening_run/<v>/<run_id>` and `run_id` itself ends in `<v>`, so `run_id` is unique exactly when `event_id` is. A second event that claims a stored `run_id` under another `event_id` breaks that rule, can never be stored, and is dead lettered with no `check` |
 | `window_start`, `window_end`, `input_fetched_at` | `DATETIME(6)` | no | |
 | `report_distance_m` | `DOUBLE` | no | 5000 today |
 | `watchlist_accepted`, `catalog_admitted`, `pairs`, `pairs_not_screenable`, `pairs_removed_by_prefilter`, `pairs_searched` | `INT UNSIGNED` | no | The `coverage` counts |

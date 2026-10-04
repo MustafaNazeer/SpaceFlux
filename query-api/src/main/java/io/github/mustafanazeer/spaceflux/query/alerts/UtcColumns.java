@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.DateTimeException;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -102,7 +103,17 @@ final class UtcColumns {
      * would all be stored changed. The event must be parsed with decimals kept, or the digits are already lost.
      */
     static Double optionalDouble(String field, JsonNode parent) {
-        JsonNode node = parent.get(field);
+        return optionalDouble(field, parent, field);
+    }
+
+    /** As {@link #optionalDouble(String, JsonNode)}, for a field the schema requires. */
+    static double requiredDouble(String field, JsonNode parent, String key) {
+        return optionalDouble(field, parent, key);
+    }
+
+    /** {@code field} names the value in a refusal, {@code key} is its name in {@code parent}. */
+    static Double optionalDouble(String field, JsonNode parent, String key) {
+        JsonNode node = parent.get(key);
         if (node == null || node.isNull()) {
             return null;
         }
@@ -116,8 +127,13 @@ final class UtcColumns {
 
     /** A nullable {@code VARCHAR(max)} value. */
     static String optionalVarchar(String field, JsonNode parent, int max) {
-        JsonNode node = parent.get(field);
-        return node == null || node.isNull() ? null : varchar(field, node.asString(), max);
+        return optionalVarchar(field, parent, field, max);
+    }
+
+    /** {@code label} names the field in a refusal, {@code key} is its name in {@code parent}. */
+    static String optionalVarchar(String label, JsonNode parent, String key, int max) {
+        JsonNode node = parent.get(key);
+        return node == null || node.isNull() ? null : varchar(label, node.asString(), max);
     }
 
     /** A {@code TEXT} value, whose limit is 65,535 bytes of UTF-8, not characters. */
@@ -134,6 +150,18 @@ final class UtcColumns {
     static String optionalText(String field, JsonNode parent) {
         JsonNode node = parent.get(field);
         return node == null || node.isNull() ? null : text(field, node.asString());
+    }
+
+    /**
+     * Refuses a time that orders a series or picks the current run when it is later than {@code limit}: a far future
+     * time would keep its series or run the newest forever, so a stale or false result would read as current.
+     */
+    static void requireNotLaterThan(String field, LocalDateTime time, LocalDateTime limit, LocalDateTime readAt) {
+        if (time != null && time.isAfter(limit)) {
+            throw new RuleRejected(field + " " + time.atOffset(ZoneOffset.UTC).toInstant()
+                    + " is more than 1 hour after " + readAt.atOffset(ZoneOffset.UTC).toInstant()
+                    + ", when it was read");
+        }
     }
 
     static void requireWellFormed(String field, String text) {

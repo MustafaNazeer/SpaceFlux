@@ -192,6 +192,26 @@ class AlertsProcessorTest {
     }
 
     @Test
+    void aRunWindowOrInputTimeMoreThanAnHourAfterTheClockIsDeadLetteredByRule() throws Exception {
+        String late = "\"2026-10-04T13:00:00.000001Z\"";
+        for (String[] c : List.of(new String[] {"valid-screening-run.json", "window_start"},
+                new String[] {"valid-screening-run.json", "input_fetched_at"},
+                new String[] {"valid-close-approach.json", "window_start"})) {
+            JsonNode d = deadLetter(processor.process(in("k", withRaw(c[0], c[1], late)), NOW));
+
+            assertThat(d.get("check").asString()).as(c[0] + " " + c[1]).isEqualTo("rule");
+            assertThat(d.get("reason").asString()).as(c[1]).startsWith(c[1] + " 2026-10-04T13:00:00.000001Z is more");
+        }
+        assertThat(store.rows).isEmpty();
+    }
+
+    @Test
+    void aCloseApproachTimeDaysAheadIsStored() throws Exception {
+        assertThat(processor.process(in("k", withRaw("valid-close-approach.json", "time_of_closest_approach",
+                "\"2026-10-10T00:00:00Z\"")), NOW)).isEqualTo(AlertsProcessor.Outcome.STORED);
+    }
+
+    @Test
     void aSeriesTimeExactlyAnHourAfterTheClockIsStored() throws Exception {
         assertThat(processor.process(in("k", withRaw("valid-r-level.json", "freshness_reference",
                 "\"2026-10-04T13:00:00Z\"")), NOW)).isEqualTo(AlertsProcessor.Outcome.STORED);

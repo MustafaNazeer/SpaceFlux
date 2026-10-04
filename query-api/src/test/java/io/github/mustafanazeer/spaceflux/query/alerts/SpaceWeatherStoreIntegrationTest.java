@@ -41,7 +41,7 @@ class SpaceWeatherStoreIntegrationTest {
     static void start() {
         TestMysql.start();
         app = new SpringApplicationBuilder(QueryApiApplication.class).web(WebApplicationType.NONE)
-                .run(TestMysql.args());
+                .run(TestMysql.args("--spaceflux.alerts.enabled=false"));
         store = app.getBean(AlertStore.class);
         processor = new AlertsProcessor(TopicSchemas.fromClasspath(), store);
         db = app.getBean("apiJdbcClient", JdbcClient.class);

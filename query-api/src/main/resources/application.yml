@@ -31,8 +31,7 @@ spring:
 
 spaceflux:
   alerts:
-    # Off until the consumer stores every kind of event; see deploy/compose.yaml.
-    enabled: ${SPACEFLUX_ALERTS_ENABLED:false}
+    enabled: ${SPACEFLUX_ALERTS_ENABLED:true}
   mysql:
     host: ${MYSQL_HOST:mysql}
     port: ${MYSQL_PORT:3306}

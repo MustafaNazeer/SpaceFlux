@@ -45,7 +45,7 @@ class AlertsMutationIntegrationTest {
     static void start() {
         TestMysql.start();
         app = new SpringApplicationBuilder(QueryApiApplication.class).web(WebApplicationType.NONE)
-                .run(TestMysql.args());
+                .run(TestMysql.args("--spaceflux.alerts.enabled=false"));
         processor = new AlertsProcessor(TopicSchemas.fromClasspath(), app.getBean(AlertStore.class));
     }
 
@@ -171,10 +171,108 @@ class AlertsMutationIntegrationTest {
         assertThat(applied).isGreaterThan(60);
     }
 
+    /** A change to a close_approach or screening_run event, by the file it applies to. */
+    record EventMutation(String file, String name, Consumer<ObjectNode> change, Class<?> expected) {
+    }
+
+    static ObjectNode at(ObjectNode e, String... path) {
+        tools.jackson.databind.JsonNode node = e;
+        for (String step : path) {
+            node = step.matches("[0-9]+") ? node.get(Integer.parseInt(step)) : node.get(step);
+        }
+        return (ObjectNode) node;
+    }
+
+    static List<EventMutation> screeningMutations() {
+        Class<?> stored = AlertsProcessor.Outcome.Stored.class;
+        Class<?> dead = AlertsProcessor.Outcome.DeadLetter.class;
+        String ca = "valid-close-approach.json";
+        String cut = "valid-screening-run-cut.json";
+        List<EventMutation> m = new ArrayList<>();
+        m.add(new EventMutation(ca, "name 64", e -> at(e, "close_approach", "other_object").put("name",
+                "n".repeat(64)), stored));
+        m.add(new EventMutation(ca, "name lone surrogate", e -> at(e, "close_approach", "other_object").put("name",
+                "SL \uDC00"), dead));
+        m.add(new EventMutation(ca, "element age with more digits than a double", e -> at(e, "close_approach",
+                "watchlist_object").put("element_age_days", new java.math.BigDecimal("1.55850000000000000000001")),
+                dead));
+        m.add(new EventMutation(ca, "negative element age", e -> at(e, "close_approach", "watchlist_object")
+                .put("element_age_days", -0.25), stored));
+        m.add(new EventMutation(ca, "largest catalog number", e -> at(e, "close_approach", "other_object")
+                .put("catalog_number", 999_999_999), stored));
+        m.add(new EventMutation(ca, "miss distance below the smallest double", e -> at(e, "close_approach")
+                .put("miss_distance_m", new java.math.BigDecimal("1e-400")), dead));
+        m.add(new EventMutation(ca, "window start a year ahead", e -> at(e, "close_approach").put("window_start",
+                "2027-10-04T00:00:00Z"), dead));
+        m.add(new EventMutation(ca, "closest approach a week ahead", e -> at(e, "close_approach")
+                .put("time_of_closest_approach", "2026-10-11T00:00:00Z"), stored));
+        m.add(new EventMutation(cut, "mechanism 65", e -> at(e, "screening_run", "suppressed", "0").put("mechanism",
+                "m".repeat(65)), dead));
+        m.add(new EventMutation(cut, "detail lone surrogate", e -> at(e, "screening_run", "suppressed", "0")
+                .put("detail", "x \uD800"), dead));
+        m.add(new EventMutation(cut, "detail 65536 bytes", e -> at(e, "screening_run", "suppressed", "0")
+                .put("detail", "d".repeat(65_536)), dead));
+        m.add(new EventMutation(cut, "reason NUL and CR LF", e -> at(e, "screening_run", "rejected", "1")
+                .put("reason", "a\u0000b\r\nc"), stored));
+        m.add(new EventMutation(cut, "code 64", e -> at(e, "screening_run", "rejected", "0").put("code",
+                "c".repeat(64)), stored));
+        m.add(new EventMutation(cut, "separation time a week ahead", e -> at(e, "screening_run", "suppressed", "0")
+                .put("min_separation_at", "2026-10-11T00:00:00Z"), stored));
+        m.add(new EventMutation(cut, "coverage count above INT UNSIGNED", e -> at(e, "screening_run", "coverage")
+                .put("pairs", 4_294_967_296L), dead));
+        m.add(new EventMutation(cut, "approach id 513", e -> ((tools.jackson.databind.node.ArrayNode) at(e,
+                "screening_run").get("approach_event_ids")).add("close_approach/" + "a".repeat(498)), dead));
+        m.add(new EventMutation(cut, "approach id 512", e -> ((tools.jackson.databind.node.ArrayNode) at(e,
+                "screening_run").get("approach_event_ids")).add("close_approach/" + "a".repeat(497)), stored));
+        m.add(new EventMutation(cut, "input fetched a year ahead", e -> at(e, "screening_run").put("input_fetched_at",
+                "2027-10-04T00:00:00Z"), dead));
+        return m;
+    }
+
+    @Test
+    void noSchemaValidMutationOfAScreeningFieldMakesTheProcessorThrow() throws Exception {
+        int run = 0;
+        for (EventMutation mutation : screeningMutations()) {
+            ObjectNode e = (ObjectNode) JSON.readTree(Files.readString(EXAMPLES.resolve(mutation.file())));
+            // A run identity of its own, so a summary is never refused as a second claim on a stored run_id.
+            String start = String.format("2026-09-29T07:30:00.%06dZ", 1 + run++);
+            ObjectNode p = (ObjectNode) e.get(e.has("screening_run") ? "screening_run" : "close_approach");
+            p.put("run_id", start + "/1");
+            p.put("window_start", start);
+            if (p.has("input_fetched_at")) {
+                p.put("input_fetched_at", start);
+            }
+            e.put("event_id", e.get("kind").asString() + "/1/" + start + "/1/m" + run);
+            mutation.change().accept(e);
+
+            AlertsProcessor.Outcome outcome = processor.process(
+                    new AlertsProcessor.In("k", JSON.writeValueAsBytes(e), 0, run), NOW);
+
+            String reason = outcome instanceof AlertsProcessor.Outcome.DeadLetter(var d)
+                    ? JSON.readTree(d.value()).get("reason").asString() : "";
+            assertThat(outcome).as("%s, %s: %s", mutation.file(), mutation.name(), reason)
+                    .isInstanceOf(mutation.expected());
+        }
+    }
+
     static void r5(ObjectNode p, String xrayClass) {
         p.put("derived_level", 5);
         p.put("derived_label", "R5");
         p.put("xray_class", xrayClass);
+    }
+
+    static void freshRun(ObjectNode e, int run) {
+        String kind = e.get("kind").asString();
+        if (!kind.equals("screening_run") && !kind.equals("close_approach")) {
+            return;
+        }
+        String start = String.format("2026-09-28T07:30:00.%06dZ", run);
+        ObjectNode p = (ObjectNode) e.get(kind);
+        p.put("run_id", start + "/1");
+        p.put("window_start", start);
+        if (p.has("input_fetched_at")) {
+            p.put("input_fetched_at", start);
+        }
     }
 
     static void suffix(ObjectNode e, String tail) {
@@ -199,7 +297,9 @@ class AlertsMutationIntegrationTest {
             for (Mutation mutation : mutations()) {
                 ObjectNode e = (ObjectNode) JSON.readTree(Files.readString(example));
                 // A fresh identity per case, so each lands as a first arrival unless the mutation is the identity.
+                // A run's identity is its run_id too, so screening examples get a window start of their own.
                 e.put("event_id", e.get("event_id").asString() + "/m" + run++);
+                freshRun(e, run);
                 mutation.change().accept(e);
 
                 AlertsProcessor.Outcome outcome = processor.process(

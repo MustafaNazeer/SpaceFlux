@@ -24,6 +24,7 @@ class MysqlAlertStore implements AlertStore {
 
     static final int DUPLICATE_KEY = 1062;
     static final String EVENT_ID_KEY = "uk_alert_event_event_id";
+    static final String RUN_ID_KEY = "uk_screening_run_run_id";
     // Errors a stored value causes, as opposed to the database being unreachable or failing: data too long, out of
     // range, an incorrect date or time, an incorrect string, a failed check constraint, a null in a NOT NULL column.
     // After the checks in AlertRow, 1048 and 1292 can only come from a fault in this code; they are dead lettered by
@@ -56,11 +57,21 @@ class MysqlAlertStore implements AlertStore {
                 if (rows.spaceWeather() != null) {
                     insertSpaceWeather(alertSeq, rows.spaceWeather());
                     applyToSeries(alertSeq, rows.spaceWeather());
+                } else if (rows.closeApproach() != null) {
+                    insertCloseApproach(alertSeq, rows.closeApproach());
+                } else if (rows.screeningRun() != null) {
+                    insertScreeningRun(alertSeq, rows.screeningRun());
                 }
                 return true;
             }));
         } catch (DataAccessException e) {
             SQLException sql = sqlCause(e);
+            if (sql != null && sql.getErrorCode() == DUPLICATE_KEY && String.valueOf(sql.getMessage())
+                    .contains(RUN_ID_KEY)) {
+                // A screening_run event_id is built from its run_id, so this is a second event_id claiming a run
+                // already stored: retrying would never succeed.
+                throw new NotStorable("a screening run with this run_id is already stored under another event_id");
+            }
             if (sql != null && VALUE_REFUSED.contains(sql.getErrorCode())) {
                 throw new NotStorable("the database refused a value: error " + sql.getErrorCode() + ", "
                         + sql.getMessage());
@@ -95,6 +106,64 @@ class MysqlAlertStore implements AlertStore {
                         r.timerRefreshAt(), r.noDataReason(), r.noDataSince(), r.restatedByTimeTag(),
                         r.endedBySatellite())
                 .update();
+    }
+
+    private void insertCloseApproach(long alertSeq, CloseApproachRow r) {
+        jdbc.sql("INSERT INTO close_approach (alert_seq, rules_version, run_id, window_start, window_end, "
+                + "watchlist_number, watchlist_name, watchlist_element_age_days, other_number, other_name, "
+                + "other_element_age_days, time_of_closest_approach, miss_distance_m, relative_speed_m_per_s) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                .params(alertSeq, r.rulesVersion(), r.runId(), r.windowStart(), r.windowEnd(), r.watchlistNumber(),
+                        r.watchlistName(), r.watchlistElementAgeDays(), r.otherNumber(), r.otherName(),
+                        r.otherElementAgeDays(), r.timeOfClosestApproach(), r.missDistanceM(),
+                        r.relativeSpeedMPerS())
+                .update();
+    }
+
+    /** The run row, then each list's rows with their 0 based position, since list order carries meaning. */
+    private void insertScreeningRun(long alertSeq, ScreeningRunRow r) {
+        jdbc.sql("INSERT INTO screening_run (alert_seq, rules_version, run_id, window_start, window_end, "
+                + "input_fetched_at, report_distance_m, watchlist_accepted, catalog_admitted, pairs, "
+                + "pairs_not_screenable, pairs_removed_by_prefilter, pairs_searched, approach_count, "
+                + "omitted_approach_event_ids, omitted_suppressed, omitted_rejected, omitted_not_screened, "
+                + "omitted_epoch_after_start, omitted_differing_copies, omitted_differing_copies_over_cap) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                .params(alertSeq, r.rulesVersion(), r.runId(), r.windowStart(), r.windowEnd(), r.inputFetchedAt(),
+                        r.reportDistanceM(), r.watchlistAccepted(), r.catalogAdmitted(), r.pairs(),
+                        r.pairsNotScreenable(), r.pairsRemovedByPrefilter(), r.pairsSearched(), r.approachCount(),
+                        r.omittedApproachEventIds(), r.omittedSuppressed(), r.omittedRejected(),
+                        r.omittedNotScreened(), r.omittedEpochAfterStart(), r.omittedDifferingCopies(),
+                        r.omittedDifferingCopiesOverCap())
+                .update();
+        for (int i = 0; i < r.approachEventIds().size(); i++) {
+            jdbc.sql("INSERT INTO screening_run_approach (run_alert_seq, position, approach_event_id) "
+                    + "VALUES (?, ?, ?)").params(alertSeq, i, r.approachEventIds().get(i)).update();
+        }
+        for (int i = 0; i < r.suppressed().size(); i++) {
+            ScreeningRunRow.Suppressed s = r.suppressed().get(i);
+            jdbc.sql("INSERT INTO screening_run_suppressed (run_alert_seq, position, watchlist_number, "
+                    + "other_number, watchlist_name, other_name, mechanism, detail, min_separation_m, "
+                    + "max_separation_m, min_separation_at, stack_entry_may_be_stale) "
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                    .params(alertSeq, i, s.watchlistNumber(), s.otherNumber(), s.watchlistName(), s.otherName(),
+                            s.mechanism(), s.detail(), s.minSeparationM(), s.maxSeparationM(), s.minSeparationAt(),
+                            s.stackEntryMayBeStale())
+                    .update();
+        }
+        for (int i = 0; i < r.rejected().size(); i++) {
+            ScreeningRunRow.Rejected x = r.rejected().get(i);
+            jdbc.sql("INSERT INTO screening_run_rejected (run_alert_seq, position, catalog_number, name, role, "
+                    + "code, reason) VALUES (?, ?, ?, ?, ?, ?, ?)")
+                    .params(alertSeq, i, x.catalogNumber(), x.name(), x.role(), x.code(), x.reason()).update();
+        }
+        for (int i = 0; i < r.notScreened().size(); i++) {
+            ScreeningRunRow.NotScreened n = r.notScreened().get(i);
+            jdbc.sql("INSERT INTO screening_run_not_screened (run_alert_seq, position, catalog_number, name, role, "
+                    + "kind, reason, screened_until) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+                    .params(alertSeq, i, n.catalogNumber(), n.name(), n.role(), n.kind(), n.reason(),
+                            n.screenedUntil())
+                    .update();
+        }
     }
 
     /** Reads the series row under a lock, applies the event, and writes the row back if it changed. */

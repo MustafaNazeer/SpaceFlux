@@ -223,11 +223,11 @@ class AlertsConsumerIntegrationTest {
         java.time.LocalDateTime at = java.time.LocalDateTime.of(2026, 10, 4, 0, 0);
 
         // Neither can come from a schema valid event; they stand in for any value MySQL refuses.
-        assertThatThrownBy(() -> store.store(new EventRows(new AlertRow("x/1/check", "solar_flare", 1, 1, at), null),
-                "{}", 0, 0))
+        assertThatThrownBy(() -> store.store(
+                new EventRows(new AlertRow("x/1/check", "solar_flare", 1, 1, at), null, null, null), "{}", 0, 0))
                 .isInstanceOf(NotStorable.class).hasMessageContaining("error 3819");
         assertThatThrownBy(() -> store.store(new EventRows(new AlertRow("x/1/" + "y".repeat(600), "screening_run", 1, 1,
-                at), null), "{}", 0, 0)).isInstanceOf(NotStorable.class).hasMessageContaining("error 1406");
+                at), null, null, null), "{}", 0, 0)).isInstanceOf(NotStorable.class).hasMessageContaining("error 1406");
         assertThat(rows("x/1/check")).isZero();
     }
 

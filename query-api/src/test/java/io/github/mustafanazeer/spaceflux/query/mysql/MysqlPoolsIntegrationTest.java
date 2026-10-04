@@ -85,9 +85,13 @@ class MysqlPoolsIntegrationTest {
     }
 
     @Test
-    void theAlertsConsumerIsOffUnlessTurnedOn() {
+    void theAlertsConsumerIsOnByDefaultAndOffWhenTurnedOff() {
         try (ConfigurableApplicationContext context = new SpringApplicationBuilder(QueryApiApplication.class)
                 .web(WebApplicationType.NONE).run(TestMysql.args())) {
+            assertThat(context.containsBean("alertsListener")).isTrue();
+        }
+        try (ConfigurableApplicationContext context = new SpringApplicationBuilder(QueryApiApplication.class)
+                .web(WebApplicationType.NONE).run(TestMysql.args("--SPACEFLUX_ALERTS_ENABLED=false"))) {
             assertThat(context.containsBean("alertsListener")).isFalse();
         }
     }
@@ -151,7 +155,8 @@ class MysqlPoolsIntegrationTest {
                 .run("--QUERY_API_SECRETS=" + partial + "/", "--MYSQL_HOST=" + MYSQL.getHost(),
                         "--MYSQL_PORT=" + MYSQL.getMappedPort(3306), "--spaceflux.alerts.enabled=false"))
                 .satisfies(e -> assertThat(rootCause(e))
-                        .hasMessage("no secret file mysql_consumer_password holds the password for spaceflux_consumer"));
+                        .hasMessage("no secret file mysql_consumer_password holds the password for "
+                                + "spaceflux_consumer"));
         assertThat(output.getAll()).doesNotContain(API_PASSWORD);
     }
 

@@ -6,9 +6,10 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Every row one alerts event writes, read before any database work so a value that cannot be stored is found before a
- * transaction starts. {@code spaceWeather} is null unless the event is a {@code space_weather_level}.
+ * transaction starts. Exactly one of the kind rows is set, the one named by the envelope's {@code kind}.
  */
-record EventRows(AlertRow envelope, SpaceWeatherRow spaceWeather) {
+record EventRows(AlertRow envelope, SpaceWeatherRow spaceWeather, CloseApproachRow closeApproach,
+        ScreeningRunRow screeningRun) {
 
     /**
      * Reads {@code event}, parsed with decimals kept, as read at {@code now}. Throws {@link NotStorable} when a value
@@ -16,11 +17,24 @@ record EventRows(AlertRow envelope, SpaceWeatherRow spaceWeather) {
      */
     static EventRows of(JsonNode event, LocalDateTime now) {
         AlertRow envelope = AlertRow.of(event);
-        SpaceWeatherRow spaceWeather = null;
-        if ("space_weather_level".equals(envelope.kind())) {
-            spaceWeather = SpaceWeatherRow.of(event);
-            spaceWeather.requireNotLaterThan(now.plus(SpaceWeatherRow.FUTURE_TOLERANCE), now);
-        }
-        return new EventRows(envelope, spaceWeather);
+        LocalDateTime limit = now.plus(SpaceWeatherRow.FUTURE_TOLERANCE);
+        return switch (envelope.kind()) {
+            case "space_weather_level" -> {
+                SpaceWeatherRow row = SpaceWeatherRow.of(event);
+                row.requireNotLaterThan(limit, now);
+                yield new EventRows(envelope, row, null, null);
+            }
+            case "close_approach" -> {
+                CloseApproachRow row = CloseApproachRow.of(event);
+                row.requireNotLaterThan(limit, now);
+                yield new EventRows(envelope, null, row, null);
+            }
+            case "screening_run" -> {
+                ScreeningRunRow row = ScreeningRunRow.of(event);
+                row.requireNotLaterThan(limit, now);
+                yield new EventRows(envelope, null, null, row);
+            }
+            default -> throw new NotStorable("kind " + envelope.kind() + " has no table");
+        };
     }
 }
