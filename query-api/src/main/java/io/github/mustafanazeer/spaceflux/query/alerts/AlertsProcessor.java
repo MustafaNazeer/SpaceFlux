@@ -5,9 +5,13 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 import io.github.mustafanazeer.spaceflux.contracts.DeadLetters;
 import io.github.mustafanazeer.spaceflux.contracts.TopicSchemas;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Applies one alerts record: checks it against the schema, stores its first arrival, and drops a repeat. Nothing in a
@@ -18,6 +22,10 @@ final class AlertsProcessor {
 
     static final String TOPIC = "alerts";
     static final String SERVICE = "query-api";
+    // The schema check parses numbers as doubles, which loses digits a column check needs, so the rows are read from
+    // a second parse of the same text that keeps every decimal.
+    private static final JsonMapper DECIMALS =
+            JsonMapper.builder().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).build();
 
     private final TopicSchemas schemas;
     private final DeadLetters deadLetters;
@@ -62,16 +70,18 @@ final class AlertsProcessor {
         if (checked.failure() != null) {
             return deadLetter(in, value, "schema", checked.failure(), now);
         }
-        AlertRow row;
+        EventRows rows;
         try {
-            row = AlertRow.of(checked.node());
+            rows = EventRows.of(DECIMALS.readTree(text), LocalDateTime.ofInstant(now, ZoneOffset.UTC));
+        } catch (RuleRejected e) {
+            return deadLetter(in, value, "rule", e.getMessage(), now);
         } catch (NotStorable e) {
             return deadLetter(in, value, null, e.getMessage(), now);
         } catch (RuntimeException e) {
             return deadLetter(in, value, null, "the event could not be read: " + e.getClass().getSimpleName(), now);
         }
         try {
-            return store.store(row, text, in.partition(), in.offset())
+            return store.store(rows, text, in.partition(), in.offset())
                     ? Outcome.STORED : Outcome.REPEAT;
         } catch (NotStorable e) {
             return deadLetter(in, value, null, e.getMessage(), now);

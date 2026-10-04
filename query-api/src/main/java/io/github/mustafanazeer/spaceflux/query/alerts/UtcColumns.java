@@ -1,6 +1,7 @@
 package io.github.mustafanazeer.spaceflux.query.alerts;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.DateTimeException;
 import java.time.LocalDateTime;
 import java.util.regex.Matcher;
@@ -14,6 +15,9 @@ final class UtcColumns {
     private static final Pattern UTC =
             Pattern.compile("^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\\.([0-9]+))?Z$");
     static final BigDecimal UNSIGNED_INT_MAX = new BigDecimal("4294967295");
+    static final BigDecimal INT_MIN = BigDecimal.valueOf(Integer.MIN_VALUE);
+    static final BigDecimal INT_MAX = BigDecimal.valueOf(Integer.MAX_VALUE);
+    static final int TEXT_MAX_BYTES = 65_535;
     private static final int MIN_DATETIME_YEAR = 1000;
 
     private UtcColumns() {
@@ -68,6 +72,68 @@ final class UtcColumns {
                     + " its column holds");
         }
         return text;
+    }
+
+    /** A nullable {@code DATETIME(6)} value: null when the field is absent. */
+    static LocalDateTime optionalDatetime(String field, JsonNode parent) {
+        JsonNode node = parent.get(field);
+        return node == null || node.isNull() ? null : datetime(field, node.asString());
+    }
+
+    /** A nullable signed {@code INT} value, refused when it is not a whole number or is outside the column's range. */
+    static Integer optionalInt(String field, JsonNode parent) {
+        JsonNode node = parent.get(field);
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        BigDecimal value = node.decimalValue();
+        if (value.stripTrailingZeros().scale() > 0) {
+            throw new NotStorable(field + " " + node + " is not a whole number");
+        }
+        if (value.compareTo(INT_MIN) < 0 || value.compareTo(INT_MAX) > 0) {
+            throw new NotStorable(field + " " + node + " is outside the range its INT column holds");
+        }
+        return value.intValueExact();
+    }
+
+    /**
+     * A nullable {@code DOUBLE} value, refused unless the double reads back as exactly the number written: one beyond
+     * a double's range, one below its smallest that would read as 0, and one with more digits than a double keeps
+     * would all be stored changed. The event must be parsed with decimals kept, or the digits are already lost.
+     */
+    static Double optionalDouble(String field, JsonNode parent) {
+        JsonNode node = parent.get(field);
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        BigDecimal written = node.decimalValue();
+        double value = written.doubleValue();
+        if (!Double.isFinite(value) || new BigDecimal(Double.toString(value)).compareTo(written) != 0) {
+            throw new NotStorable(field + " " + node + " cannot be stored exactly as a DOUBLE");
+        }
+        return value;
+    }
+
+    /** A nullable {@code VARCHAR(max)} value. */
+    static String optionalVarchar(String field, JsonNode parent, int max) {
+        JsonNode node = parent.get(field);
+        return node == null || node.isNull() ? null : varchar(field, node.asString(), max);
+    }
+
+    /** A {@code TEXT} value, whose limit is 65,535 bytes of UTF-8, not characters. */
+    static String text(String field, String text) {
+        requireWellFormed(field, text);
+        int bytes = text.getBytes(StandardCharsets.UTF_8).length;
+        if (bytes > TEXT_MAX_BYTES) {
+            throw new NotStorable(field + " is " + bytes + " bytes, longer than the 65535 its TEXT column holds");
+        }
+        return text;
+    }
+
+    /** A nullable {@code TEXT} value. */
+    static String optionalText(String field, JsonNode parent) {
+        JsonNode node = parent.get(field);
+        return node == null || node.isNull() ? null : text(field, node.asString());
     }
 
     static void requireWellFormed(String field, String text) {

@@ -8,5 +8,5 @@ interface AlertStore {
      * {@link NotStorable} when the database refuses a value of the event, and any other exception when the database
      * could not be reached or failed, in which case nothing was stored.
      */
-    boolean store(AlertRow row, String payload, int partition, long offset);
+    boolean store(EventRows rows, String payload, int partition, long offset);
 }

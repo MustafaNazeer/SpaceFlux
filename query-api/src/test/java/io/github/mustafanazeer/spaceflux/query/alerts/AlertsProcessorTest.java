@@ -32,18 +32,18 @@ class AlertsProcessorTest {
         final Set<String> ids = new HashSet<>();
         RuntimeException failWith;
 
-        record Stored(AlertRow row, String payload, int partition, long offset) {
+        record Stored(EventRows rows, String payload, int partition, long offset) {
         }
 
         @Override
-        public boolean store(AlertRow row, String payload, int partition, long offset) {
+        public boolean store(EventRows stored, String payload, int partition, long offset) {
             if (failWith != null) {
                 throw failWith;
             }
-            if (!ids.add(row.eventId())) {
+            if (!ids.add(stored.envelope().eventId())) {
                 return false;
             }
-            rows.add(new Stored(row, payload, partition, offset));
+            rows.add(new Stored(stored, payload, partition, offset));
             return true;
         }
     }
@@ -135,6 +135,66 @@ class AlertsProcessorTest {
             assertThat(java.util.Base64.getDecoder().decode(d.get("payload").asString())).isEqualTo(value);
         }
         assertThat(store.rows).isEmpty();
+    }
+
+    /** The example's text with one field's raw JSON value replaced, so a number keeps exactly the digits written. */
+    static byte[] withRaw(String file, String field, String raw) throws Exception {
+        String text = new String(example(file), StandardCharsets.UTF_8);
+        String changed = text.replaceFirst("\"" + field + "\":\\s*(\"[^\"]*\"|[^,}\\s]+)",
+                java.util.regex.Matcher.quoteReplacement("\"" + field + "\": " + raw));
+        assertThat(changed).as("field %s present", field).isNotEqualTo(text);
+        return changed.getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void aNumberThatADoubleWouldRoundIsDeadLetteredNotStoredRounded() throws Exception {
+        for (String raw : List.of("1e-400", "0.1000000000000000000001", "123456789012345678901")) {
+            JsonNode d = deadLetter(processor.process(in("k", withRaw("valid-r-level.json", "value", raw)), NOW));
+
+            assertThat(d.has("check")).as(raw).isFalse();
+            assertThat(d.get("reason").asString()).as(raw).contains("cannot be stored exactly as a DOUBLE");
+        }
+        assertThat(store.rows).isEmpty();
+    }
+
+    @Test
+    void aNumberADoubleHoldsExactlyIsStored() throws Exception {
+        for (String raw : List.of("4.9E-324", "1.7976931348623157E308", "5", "7.670")) {
+            assertThat(processor.process(in("k", withRaw("valid-r-level.json", "value", raw)), NOW))
+                    .as(raw).isEqualTo(AlertsProcessor.Outcome.STORED);
+            store.ids.clear();
+        }
+    }
+
+    @Test
+    void aRulesVersionThatIsNotAWholeNumberIsDeadLettered() throws Exception {
+        JsonNode d = deadLetter(processor.process(
+                in("k", withRaw("valid-g-level.json", "rules_version", "1.0000000000000000001")), NOW));
+
+        assertThat(d.has("check")).isFalse();
+        assertThat(d.get("reason").asString()).contains("is not a whole number");
+    }
+
+    @Test
+    void aSeriesTimeMoreThanAnHourAfterTheClockIsDeadLetteredByRule() throws Exception {
+        String late = "\"2026-10-04T13:00:00.000001Z\"";
+        for (String[] c : List.of(new String[] {"valid-g-level.json", "freshness_reference"},
+                new String[] {"valid-g-level.json", "interval_start"},
+                new String[] {"valid-r-level.json", "sample_time"},
+                new String[] {"valid-r-no-data.json", "no_data_since"})) {
+            JsonNode d = deadLetter(processor.process(in("k", withRaw(c[0], c[1], late)), NOW));
+
+            assertThat(d.get("check").asString()).as(c[1]).isEqualTo("rule");
+            assertThat(d.get("reason").asString()).as(c[1]).isEqualTo(c[1]
+                    + " 2026-10-04T13:00:00.000001Z is more than 1 hour after 2026-10-04T12:00:00Z, when it was read");
+        }
+        assertThat(store.rows).isEmpty();
+    }
+
+    @Test
+    void aSeriesTimeExactlyAnHourAfterTheClockIsStored() throws Exception {
+        assertThat(processor.process(in("k", withRaw("valid-r-level.json", "freshness_reference",
+                "\"2026-10-04T13:00:00Z\"")), NOW)).isEqualTo(AlertsProcessor.Outcome.STORED);
     }
 
     @Test

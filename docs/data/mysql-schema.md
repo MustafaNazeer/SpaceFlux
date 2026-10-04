@@ -43,7 +43,7 @@ Both consumers commit a Kafka offset only after the database transaction holding
 
 SWPC's own `time_tag` is kept as sent (Kp has no zone designator), as the contract requires, next to its UTC reading (`interval_start` or `sample_time`).
 
-**Numbers.** Values as received (`value`, distances, speeds, element ages, mean elements) are `DOUBLE`, which round trips every finite JSON number the producers write. Counts are `INT UNSIGNED`. Catalog numbers are `INT UNSIGNED`, which holds the schema's maximum of 999,999,999.
+**Numbers.** Values as received (`value`, distances, speeds, element ages, mean elements) are `DOUBLE`, which round trips every finite JSON number the producers write. Counts are `INT UNSIGNED`. Catalog numbers are `INT UNSIGNED`, which holds the schema's maximum of 999,999,999. `query-api` reads each event's numbers with every digit kept and stores one in a `DOUBLE` only when the double reads back as exactly the number written; one beyond a double's range, one so small it would read as 0, or one with more digits than a double keeps is dead lettered under the rule below, and an integer column refuses a number that is not whole. Every number written in the shortest form Java or Go produce passes.
 
 **Strings without a bound.** Several strings have no maximum length in their schema (`derived_from`, `reason`, `detail`, `source_url`, `OBJECT_ID`). When such a string is display text and never an identity or an index key, its column is `TEXT` and holds it in full. When it is an identity or a key, the column is a bounded `VARCHAR` sized well above every value the contracts can produce in practice, and an event whose value does not fit is dead lettered rather than stored cut (rule below).
 
@@ -159,6 +159,8 @@ How each event is applied, following [topics.md](topics.md#space_weather_level) 
 3. `revision` (G only) sets the state only when its `interval_start` is the series' newest interval, which for G is its `freshness_reference` after step 1. A revision of an older interval is history only.
 4. `restatement` never sets the state.
 5. An event with a lower `rules_version` than the row's is not applied at all.
+
+A series has no row until the first event that sets its state. An event that does not set a state, a restatement or a revision of an older interval, for a series with no row yet (after a risk engine restart, or a replay that starts mid stream) is stored in `space_weather_event` as history only, and the row is created by the next event that sets the state, with that event's `freshness_reference`.
 
 **Current state of a scale.** The series of that scale whose `state` is not `ended` and whose `freshness_reference` is newest. It is shown as current only while the clock minus that `freshness_reference` is within the series' age limit in [the scales note](../risk/space-weather-scales.md), Section 5.3; past it, the scale is shown as "no data" from the time the limit passed, with `freshness_reference` beside it. The age limits are configuration of `query-api`, taken from Section 5.3, and are not stored in this database, so the scales note stays their single source. The risk engine's own `age_limit` event normally arrives as well, but the check at read time does not depend on it.
 
