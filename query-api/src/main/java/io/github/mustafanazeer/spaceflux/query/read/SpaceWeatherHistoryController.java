@@ -74,16 +74,7 @@ class SpaceWeatherHistoryController {
         }
         LocalDateTime cursor = after == null ? null : cursor(after);
 
-        String key = g ? "interval_start" : "sample_time";
-        String own = g ? "e.satellite IS NULL" : "e.satellite = ?";
-        // Each key's state is the event with the highest alert_seq among those that carry the key.
-        String sql = "SELECT e." + key + ", e.interval_end, e.time_tag, e.state, e.derived_level, e.derived_label, "
-                + "e.value, e.unit, e.xray_class, e.no_data_reason, e.no_data_since, e.trigger_kind, a.event_id "
-                + "FROM space_weather_event e JOIN alert_event a ON a.alert_seq = e.alert_seq WHERE e.scale = ? AND "
-                + own + " AND e." + key + " >= ? AND e." + key + " < ?" + (cursor == null ? "" : " AND e." + key
-                + " > ?") + " AND e.alert_seq = (SELECT MAX(x.alert_seq) FROM space_weather_event x WHERE "
-                + "x.scale = e.scale AND " + (g ? "x.satellite IS NULL" : "x.satellite = e.satellite") + " AND x."
-                + key + " = e." + key + ") ORDER BY e." + key + " LIMIT ?";
+        String sql = sql(g, cursor != null);
         List<Object> params = new ArrayList<>();
         params.add(scale);
         if (!g) {
@@ -101,8 +92,8 @@ class SpaceWeatherHistoryController {
             keys.add(k);
             String keyText = ApiTimes.format(k);
             return new Item(g ? keyText : null, ApiTimes.format(rs.getObject(2, LocalDateTime.class)),
-                    g ? null : keyText, rs.getString(3), rs.getString(4), rs.getObject(5, Integer.class), rs.getString(6),
-                    rs.getObject(7, Double.class), rs.getString(8), rs.getString(9), rs.getString(10),
+                    g ? null : keyText, rs.getString(3), rs.getString(4), rs.getObject(5, Integer.class),
+                    rs.getString(6), rs.getObject(7, Double.class), rs.getString(8), rs.getString(9), rs.getString(10),
                     ApiTimes.format(rs.getObject(11, LocalDateTime.class)), rs.getString(12), rs.getString(13));
         }).list();
         String next = null;
@@ -112,6 +103,22 @@ class SpaceWeatherHistoryController {
                     .encodeToString(CURSOR.format(keys.get(limit - 1)).getBytes(StandardCharsets.US_ASCII));
         }
         return new History(scale, satellite, items, next);
+    }
+
+    /**
+     * Each key's state is the event with the highest alert_seq among those that carry the key. Parameters: scale,
+     * the satellite unless G, from, to, the cursor when there is one, and the row limit.
+     */
+    static String sql(boolean g, boolean cursor) {
+        String key = g ? "interval_start" : "sample_time";
+        return "SELECT e." + key + ", e.interval_end, e.time_tag, e.state, e.derived_level, e.derived_label, "
+                + "e.value, e.unit, e.xray_class, e.no_data_reason, e.no_data_since, e.trigger_kind, a.event_id "
+                + "FROM space_weather_event e JOIN alert_event a ON a.alert_seq = e.alert_seq WHERE e.scale = ? AND "
+                + (g ? "e.satellite IS NULL" : "e.satellite = ?") + " AND e." + key + " >= ? AND e." + key + " < ?"
+                + (cursor ? " AND e." + key + " > ?" : "") + " AND e.alert_seq = (SELECT MAX(x.alert_seq) FROM "
+                + "space_weather_event x WHERE x.scale = e.scale AND "
+                + (g ? "x.satellite IS NULL" : "x.satellite = e.satellite") + " AND x." + key + " = e." + key
+                + ") ORDER BY e." + key + " LIMIT ?";
     }
 
     private static ApiErrors.Refused refused(String detail) {

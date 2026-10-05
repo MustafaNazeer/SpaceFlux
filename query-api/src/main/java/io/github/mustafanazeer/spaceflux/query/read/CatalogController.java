@@ -14,6 +14,7 @@ import io.github.mustafanazeer.spaceflux.query.web.ApiErrors;
 class CatalogController {
 
     static final long NORAD_MAX = 999_999_999L;
+    static final String BY_NUMBER = "SELECT " + CatalogView.COLUMNS + " FROM catalog_object c WHERE c.norad_cat_id = ?";
 
     private final JdbcClient api;
 
@@ -27,8 +28,7 @@ class CatalogController {
             throw new ApiErrors.Refused(HttpStatus.BAD_REQUEST, "A catalog number is a whole number from 0 to "
                     + "999999999.");
         }
-        return api.sql("SELECT " + CatalogView.COLUMNS + " FROM catalog_object c WHERE c.norad_cat_id = ?")
-                .param(noradCatId)
+        return api.sql(BY_NUMBER).param(noradCatId)
                 .query((rs, n) -> CatalogView.read(rs, 1))
                 .optional()
                 .orElseThrow(() -> new ApiErrors.Refused(HttpStatus.NOT_FOUND, "No catalog object has this number."));

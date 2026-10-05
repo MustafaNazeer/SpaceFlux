@@ -25,6 +25,10 @@ class MysqlAlertStore implements AlertStore {
 
     static final String EVENT_ID_KEY = "uk_alert_event_event_id";
     static final String RUN_ID_KEY = "uk_screening_run_run_id";
+    static final String SERIES_FOR_UPDATE = "SELECT scale, series_satellite, rules_version, state, derived_level, "
+            + "derived_label, value, unit, xray_class, time_tag, interval_start, sample_time, no_data_reason, "
+            + "no_data_since, ended_by_satellite, freshness_reference, state_alert_seq, last_alert_seq "
+            + "FROM space_weather_series WHERE scale = ? AND series_satellite = ? FOR UPDATE";
 
     private final JdbcClient jdbc;
     private final TransactionTemplate tx;
@@ -161,11 +165,7 @@ class MysqlAlertStore implements AlertStore {
 
     /** Reads the series row under a lock, applies the event, and writes the row back if it changed. */
     private void applyToSeries(long alertSeq, SpaceWeatherRow event) {
-        SeriesState current = jdbc.sql("SELECT scale, series_satellite, rules_version, state, derived_level, "
-                + "derived_label, value, unit, xray_class, time_tag, interval_start, sample_time, no_data_reason, "
-                + "no_data_since, ended_by_satellite, freshness_reference, state_alert_seq, last_alert_seq "
-                + "FROM space_weather_series WHERE scale = ? AND series_satellite = ? FOR UPDATE")
-                .params(event.scale(), event.seriesSatellite())
+        SeriesState current = jdbc.sql(SERIES_FOR_UPDATE).params(event.scale(), event.seriesSatellite())
                 .query((rs, n) -> new SeriesState(rs.getString(1), rs.getInt(2), rs.getLong(3), rs.getString(4),
                         rs.getObject(5, Integer.class), rs.getString(6), rs.getObject(7, Double.class),
                         rs.getString(8), rs.getString(9), rs.getString(10),

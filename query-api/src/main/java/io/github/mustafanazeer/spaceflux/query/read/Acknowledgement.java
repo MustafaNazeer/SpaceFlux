@@ -11,9 +11,11 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  */
 record Acknowledgement(String action, String actedAt) {
 
+    static final String LATEST = "SELECT action, acted_at FROM alert_acknowledgement WHERE event_id = ? "
+            + "ORDER BY ack_id DESC LIMIT 1";
+
     static Optional<Acknowledgement> latest(JdbcClient api, String eventId) {
-        return api.sql("SELECT action, acted_at FROM alert_acknowledgement WHERE event_id = ? "
-                + "ORDER BY ack_id DESC LIMIT 1").param(eventId)
+        return api.sql(LATEST).param(eventId)
                 .query((rs, n) -> new Acknowledgement(rs.getString(1),
                         ApiTimes.format(rs.getObject(2, LocalDateTime.class))))
                 .optional();

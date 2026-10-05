@@ -17,6 +17,7 @@ import io.github.mustafanazeer.spaceflux.query.web.ApiErrors;
 class AlertController {
 
     static final int EVENT_ID_MAX = 512;
+    static final String BY_ID = "SELECT payload, received_at FROM alert_event WHERE event_id = ?";
 
     private final JdbcClient api;
 
@@ -35,7 +36,7 @@ class AlertController {
         }
         record Row(String payload, LocalDateTime receivedAt) {
         }
-        Row row = api.sql("SELECT payload, received_at FROM alert_event WHERE event_id = ?").param(eventId)
+        Row row = api.sql(BY_ID).param(eventId)
                 .query((rs, n) -> new Row(rs.getString(1), rs.getObject(2, LocalDateTime.class)))
                 .optional()
                 .orElseThrow(() -> new ApiErrors.Refused(HttpStatus.NOT_FOUND, "No alert has this event_id."));

@@ -31,6 +31,26 @@ class ScreeningController {
     private static final String APPROACH_COLUMNS = "e.event_id, e.payload, k.action, k.acted_at";
     private static final String LATEST_ACK = " LEFT JOIN alert_acknowledgement k ON k.ack_id = (SELECT MAX(x.ack_id) "
             + "FROM alert_acknowledgement x WHERE x.event_id = e.event_id)";
+    private static final String CANDIDATE_COLUMNS = "SELECT r.alert_seq, r.run_id, r.window_start, r.window_end, "
+            + "r.rules_version, r.approach_count, r.omitted_approach_event_ids FROM screening_run r";
+    private static final String NEWEST_FIRST = " ORDER BY r.window_start DESC, r.rules_version DESC, r.alert_seq DESC "
+            + "LIMIT " + SCAN_BATCH;
+
+    /** The first batch of runs, newest window first, the higher rules_version first on a tie. */
+    static final String CANDIDATES = CANDIDATE_COLUMNS + NEWEST_FIRST;
+    /** The next batch after a run: window_start, window_start, rules_version, rules_version, alert_seq. */
+    static final String CANDIDATES_AFTER = CANDIDATE_COLUMNS + " WHERE r.window_start < ? OR (r.window_start = ? "
+            + "AND (r.rules_version < ? OR (r.rules_version = ? AND r.alert_seq < ?)))" + NEWEST_FIRST;
+    /** How many approaches a run lists that are not stored yet. */
+    static final String LISTED_MISSING = "SELECT COUNT(*) FROM screening_run_approach a LEFT JOIN alert_event e "
+            + "ON e.event_id = a.approach_event_id WHERE a.run_alert_seq = ? AND e.alert_seq IS NULL";
+    static final String CUT_COUNT = "SELECT COUNT(*) FROM close_approach WHERE run_id = ?";
+    static final String SUMMARY = "SELECT payload FROM alert_event WHERE alert_seq = ?";
+    static final String LISTED_APPROACHES = "SELECT " + APPROACH_COLUMNS + " FROM screening_run_approach a "
+            + "JOIN alert_event e ON e.event_id = a.approach_event_id" + LATEST_ACK + " WHERE a.run_alert_seq = ? "
+            + "ORDER BY a.position";
+    static final String CUT_APPROACHES = "SELECT " + APPROACH_COLUMNS + " FROM close_approach c JOIN alert_event e "
+            + "ON e.alert_seq = c.alert_seq" + LATEST_ACK + " WHERE c.run_id = ? ORDER BY c.alert_seq";
 
     private final JdbcClient api;
     private final Clock clock;
@@ -61,7 +81,7 @@ class ScreeningController {
         LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
         Run run = newestComplete().orElseThrow(() -> new ApiErrors.Refused(HttpStatus.NOT_FOUND,
                 "No complete screening run is stored."));
-        String payload = api.sql("SELECT payload FROM alert_event WHERE alert_seq = ?").param(run.alertSeq())
+        String payload = api.sql(SUMMARY).param(run.alertSeq())
                 .query(String.class).single();
         boolean stale = now.isAfter(run.windowStart().plusHours(24)) || now.isAfter(run.windowEnd());
         return new Current(stale, RawJson.member(payload, "screening_run"), approaches(run));
@@ -86,17 +106,10 @@ class ScreeningController {
         return Optional.empty();
     }
 
-    /** The runs after {@code last}, newest window first, the higher rules_version first on a tie. */
     private List<Run> candidates(Run last) {
-        String after = last == null ? "" : " WHERE r.window_start < ? OR (r.window_start = ? AND (r.rules_version < ? "
-                + "OR (r.rules_version = ? AND r.alert_seq < ?)))";
-        JdbcClient.StatementSpec sql = api.sql("SELECT r.alert_seq, r.run_id, r.window_start, r.window_end, "
-                + "r.rules_version, r.approach_count, r.omitted_approach_event_ids FROM screening_run r" + after
-                + " ORDER BY r.window_start DESC, r.rules_version DESC, r.alert_seq DESC LIMIT " + SCAN_BATCH);
-        if (last != null) {
-            sql = sql.params(last.windowStart(), last.windowStart(), last.rulesVersion(), last.rulesVersion(),
-                    last.alertSeq());
-        }
+        JdbcClient.StatementSpec sql = last == null ? api.sql(CANDIDATES)
+                : api.sql(CANDIDATES_AFTER).params(last.windowStart(), last.windowStart(), last.rulesVersion(),
+                        last.rulesVersion(), last.alertSeq());
         return sql.query((rs, n) -> new Run(rs.getLong(1), rs.getString(2), rs.getObject(3, LocalDateTime.class),
                 rs.getObject(4, LocalDateTime.class), rs.getLong(5), rs.getLong(6), rs.getObject(7, Long.class)))
                 .list();
@@ -104,22 +117,16 @@ class ScreeningController {
 
     private boolean complete(Run run) {
         if (run.listsEveryApproach()) {
-            return api.sql("SELECT COUNT(*) FROM screening_run_approach a LEFT JOIN alert_event e "
-                    + "ON e.event_id = a.approach_event_id WHERE a.run_alert_seq = ? AND e.alert_seq IS NULL")
-                    .param(run.alertSeq()).query(Long.class).single() == 0;
+            return api.sql(LISTED_MISSING).param(run.alertSeq()).query(Long.class).single() == 0;
         }
-        return api.sql("SELECT COUNT(*) FROM close_approach WHERE run_id = ?").param(run.runId())
+        return api.sql(CUT_COUNT).param(run.runId())
                 .query(Long.class).single() >= run.approachCount();
     }
 
     private List<Approach> approaches(Run run) {
         JdbcClient.StatementSpec sql = run.listsEveryApproach()
-                ? api.sql("SELECT " + APPROACH_COLUMNS + " FROM screening_run_approach a JOIN alert_event e "
-                        + "ON e.event_id = a.approach_event_id" + LATEST_ACK + " WHERE a.run_alert_seq = ? "
-                        + "ORDER BY a.position").param(run.alertSeq())
-                : api.sql("SELECT " + APPROACH_COLUMNS + " FROM close_approach c JOIN alert_event e "
-                        + "ON e.alert_seq = c.alert_seq" + LATEST_ACK + " WHERE c.run_id = ? ORDER BY c.alert_seq")
-                        .param(run.runId());
+                ? api.sql(LISTED_APPROACHES).param(run.alertSeq())
+                : api.sql(CUT_APPROACHES).param(run.runId());
         return sql.query((rs, n) -> {
             String action = rs.getString(3);
             return new Approach(rs.getString(1), RawJson.member(rs.getString(2), "close_approach"),

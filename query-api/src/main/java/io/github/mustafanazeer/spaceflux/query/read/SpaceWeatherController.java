@@ -22,6 +22,12 @@ class SpaceWeatherController {
     static final Map<String, Duration> AGE_LIMITS = Map.of("G", Duration.ofMinutes(390), "R", Duration.ofMinutes(20),
             "S", Duration.ofMinutes(40));
 
+    /** Newest freshness first within each scale, a null freshness last, and the higher satellite on a tie. */
+    static final String CURRENT = "SELECT scale, series_satellite, rules_version, state, derived_level, "
+            + "derived_label, value, unit, xray_class, time_tag, interval_start, sample_time, no_data_reason, "
+            + "no_data_since, freshness_reference FROM space_weather_series WHERE state <> 'ended' "
+            + "ORDER BY scale, freshness_reference DESC, series_satellite DESC";
+
     private final JdbcClient api;
     private final Clock clock;
 
@@ -47,11 +53,7 @@ class SpaceWeatherController {
     @GetMapping("/api/space-weather/current")
     Current current() {
         LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
-        // Newest freshness first within each scale, a null freshness last, and the higher satellite on a tie.
-        List<Series> rows = api.sql("SELECT scale, series_satellite, rules_version, state, derived_level, "
-                + "derived_label, value, unit, xray_class, time_tag, interval_start, sample_time, no_data_reason, "
-                + "no_data_since, freshness_reference FROM space_weather_series WHERE state <> 'ended' "
-                + "ORDER BY scale, freshness_reference DESC, series_satellite DESC")
+        List<Series> rows = api.sql(CURRENT)
                 .query((rs, n) -> new Series(rs.getString(1), rs.getInt(2), rs.getLong(3), rs.getString(4),
                         rs.getObject(5, Integer.class), rs.getString(6), rs.getObject(7, Double.class),
                         rs.getString(8), rs.getString(9), rs.getString(10), rs.getObject(11, LocalDateTime.class),

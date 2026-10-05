@@ -24,6 +24,9 @@ class MysqlCatalogStore implements CatalogStore {
             + "mean_motion_dot, mean_motion_ddot, ephemeris_type, classification_type, element_set_no, rev_at_epoch, "
             + "fetched_at, source_url, first_fetched_at, last_fetched_at";
 
+    static final String HELD_FOR_UPDATE = "SELECT " + COLUMNS + " FROM catalog_object WHERE norad_cat_id = ? "
+            + "FOR UPDATE";
+
     private final JdbcClient jdbc;
     private final TransactionTemplate tx;
 
@@ -37,8 +40,8 @@ class MysqlCatalogStore implements CatalogStore {
     public void apply(CatalogRow received) {
         try {
             tx.executeWithoutResult(status -> {
-                CatalogState held = jdbc.sql("SELECT " + COLUMNS + " FROM catalog_object WHERE norad_cat_id = ? "
-                        + "FOR UPDATE").param(received.noradCatId()).query((rs, n) -> new CatalogState(
+                CatalogState held = jdbc.sql(HELD_FOR_UPDATE).param(received.noradCatId())
+                        .query((rs, n) -> new CatalogState(
                                 new CatalogRow(rs.getLong(1), rs.getString(2), rs.getBoolean(3), rs.getString(4),
                                         rs.getObject(5, LocalDateTime.class), rs.getString(6), rs.getDouble(7),
                                         rs.getDouble(8), rs.getDouble(9), rs.getDouble(10), rs.getDouble(11),
