@@ -1,0 +1,19 @@
+Query: screening-cut-count
+Account: spaceflux_api
+Parameters: [2025-07-07T06:01:02.093Z/1]
+Data from 2025-01-01T00:00:00Z, seed 20261004: 365 days of space weather, 365 days of screening runs; 236885 space weather events, 1460 screening runs, 2269 close approaches, 22 catalog objects, 4884 acknowledgements
+MySQL: 8.4.11, statistics from ANALYZE TABLE after seeding
+
+SQL:
+SELECT COUNT(*) FROM close_approach WHERE run_id = ?
+
+EXPLAIN FORMAT=TREE:
+-> Aggregate: count(0)  (cost=0.658 rows=1)
+    -> Covering index lookup on close_approach using ix_close_approach_run (run_id='2025-07-07T06:01:02.093Z/1')  (cost=0.458 rows=2)
+
+Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
+close_approach, ref, ix_close_approach_run, run_id
+
+EXPLAIN ANALYZE, one run on Linux amd64 with 4 processors; the times describe this run only:
+-> Aggregate: count(0)  (cost=0.658 rows=1) (actual time=0.0221..0.0222 rows=1 loops=1)
+    -> Covering index lookup on close_approach using ix_close_approach_run (run_id='2025-07-07T06:01:02.093Z/1')  (cost=0.458 rows=2) (actual time=0.0165..0.0196 rows=2 loops=1)

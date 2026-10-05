@@ -1,0 +1,14 @@
+Query: consumer-catalog-for-update
+Account: spaceflux_consumer
+Parameters: [25544]
+Data from 2025-01-01T00:00:00Z, seed 20261004: 365 days of space weather, 365 days of screening runs; 236885 space weather events, 1460 screening runs, 2269 close approaches, 22 catalog objects, 4884 acknowledgements
+MySQL: 8.4.11, statistics from ANALYZE TABLE after seeding
+
+SQL:
+SELECT norad_cat_id, object_name, object_name_cut, object_id, epoch, epoch_text, mean_motion, eccentricity, inclination, ra_of_asc_node, arg_of_pericenter, mean_anomaly, bstar, mean_motion_dot, mean_motion_ddot, ephemeris_type, classification_type, element_set_no, rev_at_epoch, fetched_at, source_url, first_fetched_at, last_fetched_at FROM catalog_object WHERE norad_cat_id = ? FOR UPDATE
+
+EXPLAIN FORMAT=TREE:
+-> Rows fetched before execution  (cost=0..0 rows=1)
+
+Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
+catalog_object, const, PRIMARY, norad_cat_id

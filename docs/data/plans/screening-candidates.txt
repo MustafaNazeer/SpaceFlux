@@ -1,0 +1,19 @@
+Query: screening-candidates
+Account: spaceflux_api
+Parameters: []
+Data from 2025-01-01T00:00:00Z, seed 20261004: 365 days of space weather, 365 days of screening runs; 236885 space weather events, 1460 screening runs, 2269 close approaches, 22 catalog objects, 4884 acknowledgements
+MySQL: 8.4.11, statistics from ANALYZE TABLE after seeding
+
+SQL:
+SELECT r.alert_seq, r.run_id, r.window_start, r.window_end, r.rules_version, r.approach_count, r.omitted_approach_event_ids FROM screening_run r ORDER BY r.window_start DESC, r.rules_version DESC, r.alert_seq DESC LIMIT 8
+
+EXPLAIN FORMAT=TREE:
+-> Limit: 8 row(s)  (cost=0.0263 rows=8)
+    -> Index scan on r using ix_screening_run_window (reverse)  (cost=0.0263 rows=8)
+
+Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
+r, index, ix_screening_run_window, window_start rules_version
+
+EXPLAIN ANALYZE, one run on Linux amd64 with 4 processors; the times describe this run only:
+-> Limit: 8 row(s)  (cost=0.0263 rows=8) (actual time=0.0916..0.0963 rows=8 loops=1)
+    -> Index scan on r using ix_screening_run_window (reverse)  (cost=0.0263 rows=8) (actual time=0.0711..0.0749 rows=8 loops=1)

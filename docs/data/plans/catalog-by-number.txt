@@ -1,0 +1,17 @@
+Query: catalog-by-number
+Account: spaceflux_api
+Parameters: [25544]
+Data from 2025-01-01T00:00:00Z, seed 20261004: 365 days of space weather, 365 days of screening runs; 236885 space weather events, 1460 screening runs, 2269 close approaches, 22 catalog objects, 4884 acknowledgements
+MySQL: 8.4.11, statistics from ANALYZE TABLE after seeding
+
+SQL:
+SELECT c.norad_cat_id, c.object_name, c.object_name_cut, c.object_id, c.epoch, c.epoch_text, c.mean_motion, c.eccentricity, c.inclination, c.ra_of_asc_node, c.arg_of_pericenter, c.mean_anomaly, c.bstar, c.mean_motion_dot, c.mean_motion_ddot, c.ephemeris_type, c.classification_type, c.element_set_no, c.rev_at_epoch, c.fetched_at, c.source_url, c.first_fetched_at, c.last_fetched_at FROM catalog_object c WHERE c.norad_cat_id = ?
+
+EXPLAIN FORMAT=TREE:
+-> Rows fetched before execution  (cost=0..0 rows=1)
+
+Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
+c, const, PRIMARY, norad_cat_id
+
+EXPLAIN ANALYZE, one run on Linux amd64 with 4 processors; the times describe this run only:
+-> Rows fetched before execution  (cost=0..0 rows=1) (actual time=387e-6..430e-6 rows=1 loops=1)

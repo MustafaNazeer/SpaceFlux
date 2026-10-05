@@ -1,0 +1,37 @@
+Query: space-weather-history-g
+Account: spaceflux_api
+Parameters: [G, 2025-01-04T00:00, 2025-01-11T00:00, 51]
+Data from 2025-01-01T00:00:00Z, seed 20261004: 365 days of space weather, 365 days of screening runs; 236885 space weather events, 1460 screening runs, 2269 close approaches, 22 catalog objects, 4884 acknowledgements
+MySQL: 8.4.11, statistics from ANALYZE TABLE after seeding
+
+SQL:
+SELECT e.interval_start, e.interval_end, e.time_tag, e.state, e.derived_level, e.derived_label, e.value, e.unit, e.xray_class, e.no_data_reason, e.no_data_since, e.trigger_kind, a.event_id FROM space_weather_event e JOIN alert_event a ON a.alert_seq = e.alert_seq WHERE e.scale = ? AND e.satellite IS NULL AND e.interval_start >= ? AND e.interval_start < ? AND e.alert_seq = (SELECT MAX(x.alert_seq) FROM space_weather_event x WHERE x.scale = e.scale AND x.satellite IS NULL AND x.interval_start = e.interval_start) ORDER BY e.interval_start LIMIT ?
+
+EXPLAIN FORMAT=TREE:
+-> Limit: 51 row(s)  (cost=1028 rows=51)
+    -> Nested loop inner join  (cost=1028 rows=504)
+        -> Filter: (e.alert_seq = (select #2))  (cost=573 rows=504)
+            -> Index range scan on e using ix_space_weather_event_interval over (scale = 'G' AND satellite = NULL AND '2025-01-04 00:00:00.000000' <= interval_start < '2025-01-11 00:00:00.000000'), with index condition: ((e.scale = 'G') and (e.satellite is null) and (e.interval_start >= TIMESTAMP'2025-01-04 00:00:00') and (e.interval_start < TIMESTAMP'2025-01-11 00:00:00'))  (cost=573 rows=504)
+            -> Select #2 (subquery in condition; dependent)
+                -> Aggregate: max(x.alert_seq)  (cost=16.8 rows=1)
+                    -> Filter: (x.satellite is null)  (cost=8.94 rows=78.7)
+                        -> Covering index lookup on x using ix_space_weather_event_interval (scale=e.scale, satellite=NULL, interval_start=e.interval_start)  (cost=8.94 rows=78.7)
+        -> Filter: (a.alert_seq = e.alert_seq)  (cost=0.804 rows=1)
+            -> Single-row index lookup on a using PRIMARY (alert_seq=(select #2))  (cost=0.804 rows=1)
+
+Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
+e, range, ix_space_weather_event_interval, scale satellite interval_start
+x, ref, ix_space_weather_event_interval, scale satellite interval_start
+a, eq_ref, PRIMARY, alert_seq
+
+EXPLAIN ANALYZE, one run on Linux amd64 with 4 processors; the times describe this run only:
+-> Limit: 51 row(s)  (cost=1028 rows=51) (actual time=154..1020 rows=51 loops=1)
+    -> Nested loop inner join  (cost=1028 rows=504) (actual time=154..1020 rows=51 loops=1)
+        -> Filter: (e.alert_seq = (select #2))  (cost=573 rows=504) (actual time=71..187 rows=51 loops=1)
+            -> Index range scan on e using ix_space_weather_event_interval over (scale = 'G' AND satellite = NULL AND '2025-01-04 00:00:00.000000' <= interval_start < '2025-01-11 00:00:00.000000'), with index condition: ((e.scale = 'G') and (e.satellite is null) and (e.interval_start >= TIMESTAMP'2025-01-04 00:00:00') and (e.interval_start < TIMESTAMP'2025-01-11 00:00:00'))  (cost=573 rows=504) (actual time=70.7..178 rows=459 loops=1)
+            -> Select #2 (subquery in condition; dependent)
+                -> Aggregate: max(x.alert_seq)  (cost=16.8 rows=1) (actual time=0.0187..0.0187 rows=1 loops=561)
+                    -> Filter: (x.satellite is null)  (cost=8.94 rows=78.7) (actual time=0.0122..0.016 rows=9 loops=561)
+                        -> Covering index lookup on x using ix_space_weather_event_interval (scale=e.scale, satellite=NULL, interval_start=e.interval_start)  (cost=8.94 rows=78.7) (actual time=0.0119..0.0147 rows=9 loops=561)
+        -> Filter: (a.alert_seq = e.alert_seq)  (cost=0.804 rows=1) (actual time=16.3..16.3 rows=1 loops=51)
+            -> Single-row index lookup on a using PRIMARY (alert_seq=(select #2))  (cost=0.804 rows=1) (actual time=16.3..16.3 rows=1 loops=51)

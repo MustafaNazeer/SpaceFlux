@@ -1,6 +1,6 @@
 # MySQL indexes
 
-* **Status:** decided on 2026-10-02. The migrations create these indexes, but nothing on this page has been checked with `EXPLAIN` yet. Each index below names the query it is for, and the [proof section](#how-each-index-is-proven) describes how each one will be checked with `EXPLAIN` against the migrated schema. No plan output is quoted here because none has been produced.
+* **Status:** decided on 2026-10-02; the queries of Q1, Q2, Q4 and Q7, the single alert and catalog lookups, and the consumers' lookups were checked with `EXPLAIN` on 2026-10-05 (see [Results](#results)). Q3, Q5, Q6, Q8 and Q9 have no query in the code yet, so their indexes are not proven; each is checked when its query is written.
 * **Applies to:** the schema in [mysql-schema.md](mysql-schema.md), on MySQL 8.4 LTS with InnoDB. The query numbers (Q1 to Q9) are the rows of its [Queries the API needs](mysql-schema.md#queries-the-api-needs) table.
 
 ## Rules I follow
@@ -18,7 +18,7 @@
 | Index | Columns | Used by | Why |
 | --- | --- | --- | --- |
 | Primary key | `alert_seq` | Q3, the kind tables' joins | Newest first by a backward scan of the clustered index; every kind table joins on it |
-| Unique | `event_id` | Idempotent insert; Q3 and Q8 joins from `alert_acknowledgement`; Q4 completeness | The duplicate key on this index is what turns a redelivered event into a no op. It is also the parent key of the acknowledgement foreign key |
+| Unique | `event_id` | Idempotent insert; Q3 and Q8 joins from `alert_acknowledgement`; Q4 completeness and approaches; one alert | The duplicate key on this index is what turns a redelivered event into a no op. It is also the parent key of the acknowledgement foreign key |
 | Secondary | (`kind`, `alert_seq`) | Q3 when filtered by kind | Newest events of one kind without reading the others |
 
 ### `space_weather_event`
@@ -36,7 +36,7 @@
 
 | Index | Columns | Used by | Why |
 | --- | --- | --- | --- |
-| Primary key | (`scale`, `series_satellite`) | Q1; every consumer update | One row per series, a handful of rows in all. Q1 reads the rows of one scale by the key prefix and picks the newest `freshness_reference` among those not `ended`; no further index is useful at this size |
+| Primary key | (`scale`, `series_satellite`) | Q1; every consumer update | One row per series, a handful of rows in all. Q1 reads every series in one pass and sorts them to pick, per scale, the newest `freshness_reference` among those not `ended`; at this size a scan is the right plan and no further index is useful |
 
 ### `close_approach`
 
@@ -55,15 +55,15 @@ Q6 asks for an object's approaches in either role. I write it as a `UNION` of tw
 | --- | --- | --- | --- |
 | Primary key | `alert_seq` | Parent of the list tables | |
 | Unique | `run_id` | Insert; joining approaches to their run | One summary per run |
-| Secondary | (`window_start`, `rules_version`) | Q4 | The newest run is the last entry of this index; a backward index scan reads it first ([descending indexes](https://dev.mysql.com/doc/refman/8.4/en/descending-indexes.html) shows the plan note "Backward index scan"). The current run is the newest complete one, so the scan continues past runs still incomplete, which are at most the last one or two |
+| Secondary | (`window_start`, `rules_version`) | Q4 | The newest run is the last entry of this index; a backward index scan reads it first ([descending indexes](https://dev.mysql.com/doc/refman/8.4/en/descending-indexes.html) shows the plan note "Backward index scan"; the tree format of `EXPLAIN` marks it "(reverse)"). The current run is the newest complete one, so the scan continues past runs still incomplete, which are at most the last one or two |
 
 ### Run list tables
 
-All four are keyed by (`run_alert_seq`, `position`), which serves Q5 (one run's list in order) and covers the foreign key to `screening_run`.
+All four are keyed by (`run_alert_seq`, `position`), which serves Q5 (one run's list in order) and Q4 (the approaches a run lists, checked and read in order), and covers the foreign key to `screening_run`.
 
 | Table | Secondary index | Used by | Why |
 | --- | --- | --- | --- |
-| `screening_run_approach` | `approach_event_id` | Q4, Q6 | Whether a stored approach is listed by the kept summary of its run |
+| `screening_run_approach` | `approach_event_id` | Q6 | Whether a stored approach is listed by the kept summary of its run, asked from the approach's side. Q4 reads a run's list by the primary key instead |
 | `screening_run_suppressed` | (`watchlist_number`, `run_alert_seq`) and (`other_number`, `run_alert_seq`) | Q6 | Whether an object was in a suppressed pair of the current run, from either side |
 | `screening_run_rejected` | (`catalog_number`, `run_alert_seq`) | Q6 | Whether an object was rejected in the current run |
 | `screening_run_not_screened` | (`catalog_number`, `run_alert_seq`) | Q6 | Whether an object was not screened in the current run |
@@ -89,7 +89,7 @@ No index on `object_name`. None of the queries searches by name. If a search is 
 | Index | Columns | Used by | Why |
 | --- | --- | --- | --- |
 | Primary key | `ack_id` | Insert order | |
-| Secondary | (`event_id`, `ack_id`) | Q3, Q8 | The latest action for an alert is the last entry for its `event_id`; its history is the whole range. Also covers the foreign key to `alert_event.event_id` |
+| Secondary | (`event_id`, `ack_id`) | Q3, Q4, Q8, one alert | The latest action for an alert is the last entry for its `event_id`; its history is the whole range. Also covers the foreign key to `alert_event.event_id` |
 
 No index on (`principal`, `acted_at`). None of the queries reads by principal, and there is one operator.
 
@@ -115,3 +115,14 @@ The bar is that every hot query has an index justified by an `EXPLAIN` plan. Onc
 3. **One plan per query, taken as the user that runs it.** For each of Q1 to Q9, and for the consumers' write path lookups, the exact SQL from the repository code is run with `EXPLAIN FORMAT=TREE` ([EXPLAIN](https://dev.mysql.com/doc/refman/8.4/en/explain.html)) as the database user that issues it in production. `EXPLAIN` needs the same privileges as the statement it explains, so this also checks the grants.
 4. **What a plan must show.** The index named on this page is the one chosen, and no table that grows with time is read by a full table scan. Where the timing matters (Q3 and the candidate index on `space_weather_event`), `EXPLAIN ANALYZE` adds actual rows read and time; those timings are reported with the machine, the data volume and the script that produced them, and are not general claims.
 5. **Committed evidence.** The plans are committed as text next to this page, and a test asserts the chosen index for each query, so a later change to a query or an index that loses its plan fails the build instead of going unnoticed.
+
+### Results
+
+The plans are in [plans/](plans/), one file per query the service runs today: the six read endpoints, split into each statement they issue, and the consumers' two lookups before a write. Q3, Q5, Q6, Q8 and Q9 have no query in the code yet; each gets its plan and assertion when its endpoint is built. The data is a year from 2025-01-01 at the rates under "Expected volume" on the schema page (12 events an hour for each R and S series, 3 an hour for G, 4 screening runs a day), built by `query-api/src/test/java/io/github/mustafanazeer/spaceflux/query/plans/PlanData.java` with a fixed seed and stored through the consumers' own processors and stores; each file's header gives the exact counts.
+
+* Every query reads each table through the index the tables above name for it, every history and run query reads its range in index order with no sort, and no table that grows with time is read whole.
+* The only table scan is of `space_weather_series` (Q1, a few rows, one per series); `watchlist_object` (Q7, a handful of configured objects) is read whole through its primary key.
+* The newest run is read backward from the end of (`window_start`, `rules_version`), as the plan note "(reverse)" shows, and the next batch is a range on the same index.
+* `QueryPlansIntegrationTest` in the normal build seeds a week of space weather and a year of screening runs, then asserts for every query each table's access type and index, the column each range is on, both bounds of each history range, and that only Q1 sorts. With too few runs the optimizer rightly sorts the whole run table instead, which would prove nothing, so the build keeps a year of them.
+
+Seeding is bound by the consumers' write path, not by these queries: each event is stored in its own transaction, which waits on the commit's log flush, so a long replay of a topic takes as long as the disk needs for one flush per event. The plan test relaxes that flush on the test server while seeding and restores it before taking any plan; the setting changes no plan.

@@ -1,0 +1,17 @@
+Query: screening-summary
+Account: spaceflux_api
+Parameters: [238797]
+Data from 2025-01-01T00:00:00Z, seed 20261004: 365 days of space weather, 365 days of screening runs; 236885 space weather events, 1460 screening runs, 2269 close approaches, 22 catalog objects, 4884 acknowledgements
+MySQL: 8.4.11, statistics from ANALYZE TABLE after seeding
+
+SQL:
+SELECT payload FROM alert_event WHERE alert_seq = ?
+
+EXPLAIN FORMAT=TREE:
+-> Rows fetched before execution  (cost=0..0 rows=1)
+
+Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
+alert_event, const, PRIMARY, alert_seq
+
+EXPLAIN ANALYZE, one run on Linux amd64 with 4 processors; the times describe this run only:
+-> Rows fetched before execution  (cost=0..0 rows=1) (actual time=244e-6..283e-6 rows=1 loops=1)

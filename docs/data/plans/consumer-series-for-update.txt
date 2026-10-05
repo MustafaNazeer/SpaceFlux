@@ -1,0 +1,14 @@
+Query: consumer-series-for-update
+Account: spaceflux_consumer
+Parameters: [R, 19]
+Data from 2025-01-01T00:00:00Z, seed 20261004: 365 days of space weather, 365 days of screening runs; 236885 space weather events, 1460 screening runs, 2269 close approaches, 22 catalog objects, 4884 acknowledgements
+MySQL: 8.4.11, statistics from ANALYZE TABLE after seeding
+
+SQL:
+SELECT scale, series_satellite, rules_version, state, derived_level, derived_label, value, unit, xray_class, time_tag, interval_start, sample_time, no_data_reason, no_data_since, ended_by_satellite, freshness_reference, state_alert_seq, last_alert_seq FROM space_weather_series WHERE scale = ? AND series_satellite = ? FOR UPDATE
+
+EXPLAIN FORMAT=TREE:
+-> Rows fetched before execution  (cost=0..0 rows=1)
+
+Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
+space_weather_series, const, PRIMARY, scale series_satellite

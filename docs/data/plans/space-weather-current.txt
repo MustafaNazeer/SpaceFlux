@@ -1,0 +1,21 @@
+Query: space-weather-current
+Account: spaceflux_api
+Parameters: []
+Data from 2025-01-01T00:00:00Z, seed 20261004: 365 days of space weather, 365 days of screening runs; 236885 space weather events, 1460 screening runs, 2269 close approaches, 22 catalog objects, 4884 acknowledgements
+MySQL: 8.4.11, statistics from ANALYZE TABLE after seeding
+
+SQL:
+SELECT scale, series_satellite, rules_version, state, derived_level, derived_label, value, unit, xray_class, time_tag, interval_start, sample_time, no_data_reason, no_data_since, freshness_reference FROM space_weather_series WHERE state <> 'ended' ORDER BY scale, freshness_reference DESC, series_satellite DESC
+
+EXPLAIN FORMAT=TREE:
+-> Sort: space_weather_series.scale, space_weather_series.freshness_reference DESC, space_weather_series.series_satellite DESC  (cost=0.75 rows=5)
+    -> Filter: (space_weather_series.state <> 'ended')  (cost=0.75 rows=5)
+        -> Table scan on space_weather_series  (cost=0.75 rows=5)
+
+Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
+space_weather_series, ALL, none, none
+
+EXPLAIN ANALYZE, one run on Linux amd64 with 4 processors; the times describe this run only:
+-> Sort: space_weather_series.scale, space_weather_series.freshness_reference DESC, space_weather_series.series_satellite DESC  (cost=0.75 rows=5) (actual time=0.103..0.105 rows=5 loops=1)
+    -> Filter: (space_weather_series.state <> 'ended')  (cost=0.75 rows=5) (actual time=0.0499..0.0601 rows=5 loops=1)
+        -> Table scan on space_weather_series  (cost=0.75 rows=5) (actual time=0.0462..0.0549 rows=5 loops=1)

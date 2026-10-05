@@ -113,4 +113,29 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!-- ./mvnw -pl query-api -am -Pplans test: seeds a year of data, then writes the plan of every query the service
+         runs to docs/data/plans. The normal build runs the same test at a smaller size and writes nothing. -->
+    <profile>
+      <id>plans</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <test>QueryPlansIntegrationTest</test>
+              <failIfNoSpecifiedTests>false</failIfNoSpecifiedTests>
+              <systemPropertyVariables>
+                <spaceflux.plans.spaceWeatherDays>365</spaceflux.plans.spaceWeatherDays>
+                <spaceflux.plans.runDays>365</spaceflux.plans.runDays>
+                <spaceflux.plans.write>true</spaceflux.plans.write>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

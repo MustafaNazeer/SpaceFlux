@@ -1,0 +1,36 @@
+Query: screening-listed-approaches
+Account: spaceflux_api
+Parameters: [238797]
+Data from 2025-01-01T00:00:00Z, seed 20261004: 365 days of space weather, 365 days of screening runs; 236885 space weather events, 1460 screening runs, 2269 close approaches, 22 catalog objects, 4884 acknowledgements
+MySQL: 8.4.11, statistics from ANALYZE TABLE after seeding
+
+SQL:
+SELECT e.event_id, e.payload, k.action, k.acted_at FROM screening_run_approach a JOIN alert_event e ON e.event_id = a.approach_event_id LEFT JOIN alert_acknowledgement k ON k.ack_id = (SELECT MAX(x.ack_id) FROM alert_acknowledgement x WHERE x.event_id = e.event_id) WHERE a.run_alert_seq = ? ORDER BY a.position
+
+EXPLAIN FORMAT=TREE:
+-> Nested loop left join  (cost=1.6 rows=1)
+    -> Nested loop inner join  (cost=1.25 rows=1)
+        -> Index lookup on a using PRIMARY (run_alert_seq=238797)  (cost=0.35 rows=1)
+        -> Single-row index lookup on e using uk_alert_event_event_id (event_id=a.approach_event_id)  (cost=0.903 rows=1)
+    -> Filter: (k.ack_id = (select #2))  (cost=0.35 rows=1)
+        -> Single-row index lookup on k using PRIMARY (ack_id=(select #2))  (cost=0.35 rows=1)
+        -> Select #2 (subquery in condition; dependent)
+            -> Aggregate: max(x.ack_id)  (cost=0.454 rows=1)
+                -> Covering index lookup on x using ix_alert_acknowledgement_event (event_id=e.event_id)  (cost=0.352 rows=1.01)
+
+Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
+a, ref, PRIMARY, run_alert_seq
+e, eq_ref, uk_alert_event_event_id, event_id
+k, eq_ref, PRIMARY, ack_id
+x, ref, ix_alert_acknowledgement_event, event_id
+
+EXPLAIN ANALYZE, one run on Linux amd64 with 4 processors; the times describe this run only:
+-> Nested loop left join  (cost=1.6 rows=1) (actual time=0.0116..0.0116 rows=0 loops=1)
+    -> Nested loop inner join  (cost=1.25 rows=1) (actual time=0.0111..0.0111 rows=0 loops=1)
+        -> Index lookup on a using PRIMARY (run_alert_seq=238797)  (cost=0.35 rows=1) (actual time=0.0102..0.0102 rows=0 loops=1)
+        -> Single-row index lookup on e using uk_alert_event_event_id (event_id=a.approach_event_id)  (cost=0.903 rows=1) (never executed)
+    -> Filter: (k.ack_id = (select #2))  (cost=0.35 rows=1) (never executed)
+        -> Single-row index lookup on k using PRIMARY (ack_id=(select #2))  (cost=0.35 rows=1) (never executed)
+        -> Select #2 (subquery in condition; dependent)
+            -> Aggregate: max(x.ack_id)  (cost=0.454 rows=1) (never executed)
+                -> Covering index lookup on x using ix_alert_acknowledgement_event (event_id=e.event_id)  (cost=0.352 rows=1.01) (never executed)
