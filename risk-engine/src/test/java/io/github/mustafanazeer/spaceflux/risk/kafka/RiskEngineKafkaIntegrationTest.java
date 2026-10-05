@@ -149,7 +149,9 @@ class RiskEngineKafkaIntegrationTest {
 
     @Test
     void elementSetsInBecomeOneScreeningRunOut() throws Exception {
-        Instant fetched = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        // The capture's own fetch time (the date header in ingest/testdata/celestrak), so every element set is as old
+        // at the window start as it was when recorded, whatever today's date is.
+        Instant fetched = Instant.parse("2026-09-27T08:57:39Z");
         Properties p = new Properties();
         p.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
         try (KafkaProducer<String, byte[]> producer =
