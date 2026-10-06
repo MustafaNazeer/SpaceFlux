@@ -1,0 +1,10 @@
+bcrypt cost of one password check (Operator.encoder(cost).matches), 2026-10-06T03:50:35.321232643Z
+java 21.0.11 (OpenJDK 64-Bit Server VM), 8 available processors, load average 1.83 at start
+2 warm up and 7 measured checks per cost, times in ms
+cost	median	min	max
+10	59.2	59.0	59.7
+11	118.9	117.6	119.8
+12	244.1	232.5	264.2
+13	471.4	467.9	474.0
+14	945.5	944.8	954.4
+load average 1.73 at end

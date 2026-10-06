@@ -56,8 +56,8 @@ spaceflux:
   operator:
     username: ${ACK_OPERATOR_USERNAME:}
     password-hash: ${ACK_OPERATOR_PASSWORD_HASH:}
-    # The cost of every check; the hash must be made at exactly this cost.
-    bcrypt-cost: ${ACK_OPERATOR_BCRYPT_COST:12}
+    # The cost of every check (docs/perf/bcrypt-cost.md); the hash must be made at exactly this cost.
+    bcrypt-cost: ${ACK_OPERATOR_BCRYPT_COST:14}
 
 # The API's own error controller answers on /error; these pin Boot's defaults as a backstop, so a later change
 # cannot start returning a trace or a message from the error path (SEC-API-08).
