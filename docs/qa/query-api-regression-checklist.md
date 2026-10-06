@@ -454,3 +454,13 @@ One row per check per run. A check is passed only when someone has run it and re
 
 | Date (UTC) | Commit | Check | Result | Notes |
 |---|---|---|---|---|
+| 2026-10-06 | f88459e | Q1 | Held | Every service in its expected state, one start line, no `WARN` or `ERROR` line. |
+| 2026-10-06 | f88459e | Q2 | Held | Every printed value matched the list. |
+| 2026-10-06 | f88459e | Q3 | Held | All three answered `200`; G `none`, R and S `no_data` with reason `age_limit`; the ISS listed with a catalog row; screening `stale` with 0 approaches. |
+| 2026-10-06 | f88459e | Q4 | Held | All eleven lines `ok`. |
+| 2026-10-06 | f88459e | Q5 | Not run | No acknowledgeable alert was stored: 0 screening approaches and no space weather level. An earlier attempt failed at sign in because the password typed did not match the hash in `deploy/.env`; the hash was made again and the service recreated before Q6. |
+| 2026-10-06 | f88459e | Q6 | Held | Attempts 1 to 4 `401 retry-after none`, attempt 5 `429 retry-after 2`, the right password `204`, on a freshly started service. |
+| 2026-10-06 | f88459e | Q7 | Held | 77 event ids on `alerts` and 77 rows, 22 objects on `raw.gp` and 22 rows, nothing missing, lag 0 on both groups; the same after a restart, which logged one start line. |
+| 2026-10-06 | f88459e | Q8 | Held | 0 `query-api` dead letters on both topics, before and after the restart. |
+| 2026-10-06 | f88459e | Q9 | Held | Maximum usage 306.7 MiB for `mysql` and 232.5 MiB for `query-api` over 360 s, no swap, no OOM kill; stop gave `exit=143 oom=false` and 2 `Consumer stopped` lines. |
+| 2026-10-06 | f88459e | Q10 | Held | Google Chrome 151.0.7922.173 printed `xsrf cookie readable: true login: 204 session: 200 logout: 204 session after logout: 401`. |
