@@ -39,14 +39,16 @@ print(f"{sys.argv[1]}: classes {classes} tests {tests} failures {failures} error
 EOF
 ```
 
-Passes when no failure, error, or skipped test is printed and the counts match the last recorded run, or the difference is explained by tests added or removed in the change. On 2026-10-06, at commit c267139, one clean run of each command printed:
+Passes when no failure, error, or skipped test is printed and the counts match the last recorded run, or the difference is explained by tests added or removed in the change. The last recorded runs printed:
 
-| Module | Test classes | Tests | Build time |
-|---|---|---|---|
-| `db-migrate` | 2 | 31 | about 1 minute 25 seconds |
-| `kafka-contracts` | 2 | 40 | about 8 seconds |
-| `risk-engine` | 34 | 364 | about 4 minutes 25 seconds |
-| `query-api` | 35 | 290 | about 4 minutes 10 seconds |
+| Module | Test classes | Tests | Build time | Run |
+|---|---|---|---|---|
+| `db-migrate` | 2 | 31 | about 19 seconds | 2026-10-06, commit a091a86 |
+| `kafka-contracts` | 2 | 40 | about 4 seconds | 2026-10-06, commit a091a86 |
+| `risk-engine` | 34 | 364 | about 4 minutes 25 seconds | 2026-10-06, commit c267139 |
+| `query-api` | 36 | 294 | about 3 minutes 55 seconds | 2026-10-06, commit a091a86 |
+
+The a091a86 rows come from one clean run of `./mvnw -B -pl db-migrate,query-api -am clean verify` on a lightly loaded machine, which builds the three modules in one reactor; it printed `BUILD SUCCESS` and no `[WARNING]` or `[ERROR]` line. The build times are the reactor's per module times, so they are not directly comparable with the separate A1 commands. `query-api` grew by one class and four tests over c267139: `DatabaseDownIntegrationTest` and the new acknowledgement and login cases. The `risk-engine` row was not rerun, because nothing under `risk-engine/` or `kafka-contracts/` changed after c267139.
 
 `BcryptCostBenchmark` is not a test class by Surefire's naming rule and runs only on request ([bcrypt cost](../perf/bcrypt-cost.md)), so it is never counted or skipped.
 
