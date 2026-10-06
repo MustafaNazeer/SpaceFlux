@@ -1,13 +1,13 @@
 # Setup guide
 
-How to build and test the ingest service and the risk engine and run them locally with Kafka. Every command below is run from the repository root unless it says otherwise.
+How to build and test the ingest service, the risk engine, the database migrations, and the query API, and run them locally with Kafka and MySQL. Every command below is run from the repository root unless it says otherwise.
 
 ## Prerequisites
 
 * **Go 1.27.1** or later, the version declared in `ingest/go.mod`. Needed only to run the `ingest` tests or build it outside Docker.
-* **A JDK 21.** Needed only to run the `risk-engine` tests or build it outside Docker. Maven itself does not need to be installed: the Maven wrapper (`./mvnw`) downloads the version the repository pins.
-* **Docker Engine with the Compose plugin** (the `docker compose` command). The local stack runs in Docker, and the integration tests start a Kafka container through Testcontainers, so the Docker daemon has to be running and reachable by your user.
-* **curl**, or any HTTP client, to read the health endpoints.
+* **A JDK 21.** Needed only to run the Java tests (`kafka-contracts`, `risk-engine`, `db-migrate`, and `query-api`) or build those modules outside Docker. Maven itself does not need to be installed: the Maven wrapper (`./mvnw`) downloads the version the repository pins.
+* **Docker Engine with the Compose plugin** (the `docker compose` command). The local stack runs in Docker, and the integration tests start Kafka and MySQL containers through Testcontainers, so the Docker daemon has to be running and reachable by your user.
+* **curl**, or any HTTP client, to read the `ingest` health endpoints and call `query-api`.
 
 No accounts or keys are needed. Both feeds ingested today, CelesTrak and NOAA SWPC, are public.
 
@@ -35,15 +35,27 @@ go test ./...
 
 The integration tests start a single node `apache/kafka:4.3.1` container through Testcontainers and remove it afterwards. The first run pulls the image, so it takes longer. No test contacts CelesTrak or SWPC; feed behavior is tested against the recorded responses.
 
-### risk-engine
+### Java modules
 
-Run the Maven build from the repository root, since the risk engine is a module of the parent `pom.xml` and its tests read the schema files from `schemas/`:
+The root `pom.xml` has four modules: `kafka-contracts` (the topic schema checks and dead letter building that the Java services share), `risk-engine`, `db-migrate` (the database migrations and the program the `migrate` container runs), and `query-api`. Run Maven from the repository root, so the reactor also builds `kafka-contracts`, which `risk-engine` and `query-api` depend on and which is not published anywhere. The tests also read files outside their own module: the schema files in `schemas/`, the MySQL settings and account script in `deploy/mysql/`, and the migrations in `db-migrate/`.
+
+Every module:
 
 ```sh
 ./mvnw -B verify
 ```
 
-This compiles the service and runs every test, including the SGP4 verification cases, the screening cross check against a brute force scan, the storm rules against recorded storm periods, and integration tests that start an `apache/kafka:4.3.1` container through Testcontainers, so the Docker daemon has to be running. The first run downloads Maven, the dependencies, and the image, so it takes longer.
+One module, with the modules it depends on:
+
+```sh
+./mvnw -B -pl risk-engine -am verify
+./mvnw -B -pl db-migrate -am verify
+./mvnw -B -pl query-api -am verify
+```
+
+This compiles each module and runs its tests. The `risk-engine` tests include the SGP4 verification cases, the screening cross check against a brute force scan, the storm rules against recorded storm periods, and integration tests against an `apache/kafka:4.3.1` container. The `db-migrate` tests apply the migrations to a `mysql:8.4.11` container started with the committed `spaceflux.cnf` and account script, then check the accounts, their grants, and the server settings. The `query-api` database tests run against the same MySQL setup, migrated with the same migrations, and its two consumer integration tests also start a Kafka container. All of these containers are started through Testcontainers, so the Docker daemon has to be running; only the `kafka-contracts` suite runs entirely without Docker. The first run downloads Maven, the dependencies, and the images, so it takes longer.
+
+The query plans in [docs/data/plans](data/plans/README.md) are taken by a separate, much longer run of the `plans` profile, described there; the normal build runs the same test over less data and writes nothing.
 
 ## Running the stack
 
@@ -166,6 +178,8 @@ curl -i http://127.0.0.1:8080/readyz
 A halted poller stays halted until `ingest` is restarted. Check the cause in the readiness body and the logs before restarting, since the provider's error is the thing to fix.
 
 `risk-engine` has no health endpoints yet and publishes no ports. Check it through its logs and the `alerts` topic, as below.
+
+`query-api` has no health endpoints yet either. Check it through its logs, the `.dlq` topics, and its API on `127.0.0.1:8081`, for example `curl -i http://127.0.0.1:8081/api/space-weather/current`.
 
 ## Reading events back
 

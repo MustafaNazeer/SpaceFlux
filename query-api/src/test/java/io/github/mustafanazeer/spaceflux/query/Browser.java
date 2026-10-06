@@ -21,11 +21,17 @@ public final class Browser {
     public static final HttpClient HTTP = HttpClient.newHttpClient();
 
     private final String base;
+    private final HttpClient http;
     public final Map<String, String> cookies = new LinkedHashMap<>();
     public boolean sendXsrfHeader = true;
 
     public Browser(String base) {
+        this(base, HTTP);
+    }
+
+    public Browser(String base, HttpClient http) {
         this.base = base;
+        this.http = http;
     }
 
     public HttpResponse<String> get(String path) throws Exception {
@@ -42,9 +48,13 @@ public final class Browser {
     }
 
     public HttpResponse<String> postJson(String path, String json) throws Exception {
+        return post(path, "application/json", json);
+    }
+
+    public HttpResponse<String> post(String path, String contentType, String body) throws Exception {
         return send(HttpRequest.newBuilder(URI.create(base + path))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(json)));
+                .header("Content-Type", contentType)
+                .POST(HttpRequest.BodyPublishers.ofString(body)));
     }
 
     public HttpResponse<String> send(String method, String path, String json) throws Exception {
@@ -68,7 +78,7 @@ public final class Browser {
         if (sendXsrfHeader && !"GET".equals(probe.method()) && cookies.containsKey("XSRF-TOKEN")) {
             b.header("X-XSRF-TOKEN", cookies.get("XSRF-TOKEN"));
         }
-        HttpResponse<String> r = HTTP.send(b.build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> r = http.send(b.build(), HttpResponse.BodyHandlers.ofString());
         for (String c : setCookies(r)) {
             String pair = c.split(";", 2)[0];
             String name = pair.substring(0, pair.indexOf('='));

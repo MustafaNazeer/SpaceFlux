@@ -207,8 +207,9 @@ class MigrationIntegrationTest {
     void theServerRefusesAPlainConnectionAndHasNoNativePasswordPlugin() throws Exception {
         String plain = settings().jdbcUrl().replace("sslMode=REQUIRED", "sslMode=DISABLED")
                 .replace("allowPublicKeyRetrieval=false", "allowPublicKeyRetrieval=true");
-        // The same credentials succeed over TLS, so the refusal can only come from the missing TLS. The account's
-        // REQUIRE SSL refuses it during authentication (1045), before require_secure_transport is consulted.
+        // The same credentials succeed over TLS, so the refusal can only come from the missing TLS. Observed here, not
+        // stated in the manual: the account's REQUIRE SSL refuses it during authentication (1045), before
+        // require_secure_transport is consulted.
         connect(API, API_PASSWORD).close();
         assertThatThrownBy(() -> DriverManager.getConnection(plain, API, API_PASSWORD).close())
                 .isInstanceOf(SQLException.class)
@@ -224,6 +225,10 @@ class MigrationIntegrationTest {
     void theServerRunsWithTheCommittedSettings() throws Exception {
         assertThat(rootSql("SELECT @@global.time_zone, @@global.innodb_buffer_pool_size, "
                 + "@@global.max_connections, @@global.log_bin")).containsExactly("+00:00\t134217728\t32\t0");
+        assertThat(rootSql("SELECT @@global.innodb_log_buffer_size, @@global.temptable_max_ram, "
+                + "@@global.performance_schema_digests_size, "
+                + "@@global.performance_schema_events_statements_history_long_size"))
+                .containsExactly("16777216\t67108864\t1000\t1000");
     }
 
     @Test

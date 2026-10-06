@@ -147,6 +147,7 @@ class AcknowledgementIntegrationTest {
             "{\"action\": \"delete\"}",
             "{\"action\": null}",
             "{\"action\": \"acknowledge\", \"note\": 5}",
+            "{\"action\": \"acknowledge\", \"note\": null}",
             "[\"acknowledge\"]",
             "\"acknowledge\"",
             "{\"action\": \"acknowledge\"} {}",
@@ -155,6 +156,17 @@ class AcknowledgementIntegrationTest {
         };
         for (String body : refused) {
             assertProblem(post(b, id, body), 400);
+        }
+        assertThat(rows(id)).isZero();
+    }
+
+    @Test
+    void aBodyThatIsNotJsonByItsContentTypeIsRefused() throws Exception {
+        String id = stored("valid-close-approach.json");
+        Browser b = app.signedIn();
+
+        for (String type : new String[] {"text/plain", "application/x-www-form-urlencoded", "application/xml"}) {
+            assertProblem(b.post("/api/alerts/acknowledgements?event_id=" + q(id), type, ACK), 415);
         }
         assertThat(rows(id)).isZero();
     }

@@ -2,7 +2,10 @@ package io.github.mustafanazeer.spaceflux.query.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.net.InetAddress;
+import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
+import java.util.Optional;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,6 +13,8 @@ import org.junit.jupiter.api.Test;
 
 import io.github.mustafanazeer.spaceflux.query.Browser;
 import io.github.mustafanazeer.spaceflux.query.OperatorApp;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /** Login backoff over HTTP (ADR 0009, decision 8); a fresh service per test, so no counter carries over. */
 class LoginThrottleIntegrationTest {
@@ -30,6 +35,53 @@ class LoginThrottleIntegrationTest {
         assertThat(r.statusCode()).isEqualTo(429);
         assertThat(r.headers().firstValue("Content-Type").orElseThrow()).startsWith("application/problem+json");
         assertThat(r.headers().firstValue("Retry-After")).hasValue(retryAfter);
+    }
+
+    static void assertProblemBody(HttpResponse<String> r, String path) {
+        JsonNode problem = new ObjectMapper().readTree(r.body());
+        assertThat(problem.get("status").asInt()).isEqualTo(429);
+        assertThat(problem.get("title").asString()).isNotBlank();
+        assertThat(problem.get("instance").asString()).isEqualTo(path);
+        assertThat(problem.get("correlation_id").asString())
+                .isEqualTo(r.headers().firstValue("X-Correlation-Id").orElseThrow());
+    }
+
+    /** A browser whose requests come from this loopback address, so the service sees a different client. */
+    Browser from(String address) throws Exception {
+        return new Browser(app.base, HttpClient.newBuilder().localAddress(InetAddress.getByName(address)).build());
+    }
+
+    @Test
+    void whileTwoPasswordChecksRunALoginIsRefusedWithAProblemBodyAndNoCheck() throws Exception {
+        LoginThrottle throttle = app.context.getBean(LoginThrottle.class);
+        Optional<LoginThrottle.Slot> first = throttle.check();
+        Optional<LoginThrottle.Slot> second = throttle.check();
+        assertThat(first).isPresent();
+        assertThat(second).isPresent();
+        Browser b = app.browser();
+
+        HttpResponse<String> r = b.login(OperatorApp.OPERATOR, app.password);
+
+        assert429(r, "1");
+        assertProblemBody(r, "/api/auth/login");
+        assertThat(Browser.setCookie(r, "SPACEFLUX_SESSION")).isNull();
+        first.get().close();
+        second.get().close();
+        assertThat(b.login(OperatorApp.OPERATOR, app.password).statusCode()).isEqualTo(204);
+    }
+
+    @Test
+    void thirtyFailuresFromThirtyAddressesHoldOffEveryAddress() throws Exception {
+        for (int i = 2; i <= 31; i++) {
+            assertThat(from("127.0.0." + i).login(OperatorApp.OPERATOR, "wrong").statusCode()).isEqualTo(401);
+        }
+
+        HttpResponse<String> r = from("127.0.0.1").login(OperatorApp.OPERATOR, app.password);
+
+        assertThat(r.statusCode()).isEqualTo(429);
+        assertThat(Long.parseLong(r.headers().firstValue("Retry-After").orElseThrow())).isBetween(540L, 600L);
+        assertProblemBody(r, "/api/auth/login");
+        assertThat(Browser.setCookie(r, "SPACEFLUX_SESSION")).isNull();
     }
 
     @Test
