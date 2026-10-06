@@ -51,10 +51,27 @@ spaceflux:
       username: ${CONSUMER_USER:spaceflux_consumer}
     api:
       username: ${API_USER:spaceflux_api}
+  # The one operator who may acknowledge alerts (ADR 0009, decision 2). The hash is bcrypt, generated offline, in
+  # the delegating encoder's form ({bcrypt}...). With either value missing nobody can sign in and every read works.
+  operator:
+    username: ${ACK_OPERATOR_USERNAME:}
+    password-hash: ${ACK_OPERATOR_PASSWORD_HASH:}
+    # The cost of every check; the hash must be made at exactly this cost.
+    bcrypt-cost: ${ACK_OPERATOR_BCRYPT_COST:12}
 
 # The API's own error controller answers on /error; these pin Boot's defaults as a backstop, so a later change
 # cannot start returning a trace or a message from the error path (SEC-API-08).
 server:
+  # The operator's session (ADR 0009, decision 1). The ID travels only in this cookie, never in a URL (SEC-API-13).
+  servlet:
+    session:
+      timeout: 30m
+      tracking-modes: cookie
+      cookie:
+        name: SPACEFLUX_SESSION
+        secure: true
+        http-only: true
+        same-site: strict
   error:
     include-stacktrace: never
     include-message: never
