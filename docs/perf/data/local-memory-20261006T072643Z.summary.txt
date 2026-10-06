@@ -1,0 +1,83 @@
+spaceflux memory summary
+samples file: local-memory-20261006T072643Z.tsv
+window: duration 420s, interval 5s, ended 2026-10-06T07:34:02Z
+source: cgroup v2 files; usage = memory.current - inactive_file (the docker stats figure)
+
+host
+  kernel: 6.17.0-41-generic
+  docker: 29.1.3
+  cgroup: v2 driver systemd
+  memory: total 7.1Gi, swap 11Gi
+
+containers
+  spaceflux-ingest-1
+    image: spaceflux-ingest id sha256:2d609b26b2890ff0f9261ab57b6450d7554949846205a27b533125a9bdfcf1d6
+    started: 2026-10-06T07:26:27.006685083Z
+    limits: mem_limit 134217728 (0 is none), pids_limit 64
+    env: INGEST_FEEDS=celestrak,swpc
+    memory.peak since container start: 16.6 MiB (includes page cache)
+  spaceflux-kafka-1
+    image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837 id sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+    started: 2026-10-06T07:25:29.133114879Z
+    limits: mem_limit 1073741824 (0 is none), pids_limit 512
+    env: KAFKA_HEAP_OPTS=-Xmx512m -Xms512m
+    memory.peak since container start: 760.3 MiB (includes page cache)
+  spaceflux-mysql-1
+    image: mysql:8.4.11@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242 id sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242
+    started: 2026-10-06T07:25:29.316469258Z
+    limits: mem_limit 536870912 (0 is none), pids_limit 256
+    env: none of INGEST_FEEDS, SWPC_INTERVAL, CELESTRAK_INTERVAL, KAFKA_HEAP_OPTS, KAFKA_OPTS, JAVA_TOOL_OPTIONS set
+    memory.peak since container start: 471.8 MiB (includes page cache)
+  spaceflux-query-api-1
+    image: spaceflux-query-api id sha256:5c403543726afbe3b34d9fcaf409e244e8587612828fe3a62dcf900a06468481
+    started: 2026-10-06T07:26:27.281754542Z
+    limits: mem_limit 536870912 (0 is none), pids_limit 128
+    env: JAVA_TOOL_OPTIONS=-Dorg.xerial.snappy.tempdir=/native -DZstdTempFolder=/native
+    memory.peak since container start: 240.6 MiB (includes page cache)
+  spaceflux-risk-engine-1
+    image: spaceflux-risk-engine id sha256:4764ab461d8a307d053fc0d85f7c51723c806e60d1fa7b56972ddee4c3904e7b
+    started: 2026-10-06T07:26:27.151065693Z
+    limits: mem_limit 536870912 (0 is none), pids_limit 128
+    env: JAVA_TOOL_OPTIONS=-Dorg.xerial.snappy.tempdir=/native -DZstdTempFolder=/native
+    memory.peak since container start: 186.0 MiB (includes page cache)
+
+per series over the window (MiB; pids as counts)
+  usage is memory.current minus inactive_file; usage+swap adds memory.swap.current
+  (for _host_used, the swap column is host swap in use)
+  series                    n       min    median       max  swap_max   u+s_med   u+s_max  max_pids
+  _containers_total        80    1446.3    1479.1    1613.4       0.0    1479.1    1613.4         -
+  _host_available          80    2950.7    3108.4    3260.1       0.0    3108.4    3260.1         -
+  _host_used               80    4036.4    4188.1    4345.8    1906.4    6094.2    6247.9         -
+  spaceflux-ingest-1       80      10.6      13.7      16.0       0.0      13.7      16.0        10
+  spaceflux-kafka-1        80     591.6     603.0     728.2       0.0     603.0     728.2       129
+  spaceflux-mysql-1        80     464.4     464.9     466.6       0.0     464.9     466.6        43
+  spaceflux-query-api-1    80     212.8     217.3     224.5       0.0     217.3     224.5        38
+  spaceflux-risk-engine-1   80     156.6     182.1     183.0       0.0     182.1     183.0        23
+
+network bytes received per container over the window (poll evidence)
+  spaceflux-ingest-1 rx delta 80624 bytes
+  spaceflux-kafka-1 rx delta 604501 bytes
+  spaceflux-mysql-1 rx delta 25218 bytes
+  spaceflux-query-api-1 rx delta 286975 bytes
+  spaceflux-risk-engine-1 rx delta 282220 bytes
+  intervals where a container received more than 10 KiB:
+    07:27:13Z spaceflux-kafka-1 +13198 bytes
+    07:27:13Z spaceflux-mysql-1 +12957 bytes
+    07:28:45Z spaceflux-kafka-1 +22835 bytes
+    07:28:45Z spaceflux-query-api-1 +10612 bytes
+    07:28:45Z spaceflux-risk-engine-1 +10776 bytes
+    07:31:30Z spaceflux-ingest-1 +74875 bytes
+    07:31:30Z spaceflux-kafka-1 +13949 bytes
+
+cross check at 2026-10-06T07:26:43Z: cgroup usage read before and after docker stats
+  spaceflux-ingest-1 cgroup_before=16.00MiB docker_stats=16MiB / 128MiB cgroup_after=16.00MiB
+  spaceflux-kafka-1 cgroup_before=595.41MiB docker_stats=595.6MiB / 1GiB cgroup_after=595.64MiB
+  spaceflux-mysql-1 cgroup_before=465.97MiB docker_stats=464.5MiB / 512MiB cgroup_after=464.51MiB
+  spaceflux-query-api-1 cgroup_before=214.05MiB docker_stats=214.7MiB / 512MiB cgroup_after=214.72MiB
+  spaceflux-risk-engine-1 cgroup_before=156.35MiB docker_stats=156.6MiB / 512MiB cgroup_after=156.62MiB
+cross check at 2026-10-06T07:33:53Z: cgroup usage read before and after docker stats
+  spaceflux-ingest-1 cgroup_before=13.68MiB docker_stats=13.68MiB / 128MiB cgroup_after=13.68MiB
+  spaceflux-kafka-1 cgroup_before=621.92MiB docker_stats=618.7MiB / 1GiB cgroup_after=618.52MiB
+  spaceflux-mysql-1 cgroup_before=464.80MiB docker_stats=465.4MiB / 512MiB cgroup_after=465.18MiB
+  spaceflux-query-api-1 cgroup_before=224.37MiB docker_stats=224.4MiB / 512MiB cgroup_after=224.38MiB
+  spaceflux-risk-engine-1 cgroup_before=182.82MiB docker_stats=183.3MiB / 512MiB cgroup_after=183.32MiB
