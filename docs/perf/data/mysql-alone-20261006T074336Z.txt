@@ -1,0 +1,41 @@
+# MySQL alone memory readout, no other spaceflux container running; performance_schema_digests_size and performance_schema_events_statements_history_long_size set to 1000 in deploy/mysql/conf.d/spaceflux.cnf
+# lines: readout time; server start; @@version and the five performance schema sizes (digests, history_long, error, max_digest_length, max_sql_text_length);
+# sys.memory_global_total; per area sum of memory_summary_global_by_event_name (MiB); the largest performance_schema allocations (MiB);
+# row count of events_statements_summary_by_user_by_event_name; the container cgroup's memory.stat anon, file, inactive_file, memory.current, memory.peak
+2026-10-06T07:43:36Z
+started 2026-10-06T07:41:58.417163733Z
+8.4.11	1000	1000	5564	1024	1024
+total_allocated	363.39 MiB
+memory/innodb	195.78
+memory/performance_schema	148.91
+memory/mysys	8.58
+memory/sql	8.51
+memory/temptable	1.00
+memory/mysqld_openssl	0.61
+memory/refcache	0.02
+memory/myisam	0.00
+memory/performance_schema/events_errors_summary_by_thread_by_error	13.89
+memory/performance_schema/events_statements_summary_by_thread_by_event_name	11.60
+memory/performance_schema/memory_summary_by_thread_by_event_name	8.26
+memory/performance_schema/events_errors_summary_by_user_by_error	6.94
+memory/performance_schema/events_errors_summary_by_host_by_error	6.94
+memory/performance_schema/events_errors_summary_by_account_by_error	6.94
+memory/performance_schema/events_statements_summary_by_user_by_event_name	5.80
+memory/performance_schema/events_statements_summary_by_host_by_event_name	5.80
+memory/performance_schema/events_statements_summary_by_account_by_event_name	5.80
+memory/performance_schema/events_waits_summary_by_thread_by_event_name	5.42
+memory/performance_schema/memory_summary_by_host_by_event_name	4.13
+memory/performance_schema/memory_summary_by_account_by_event_name	4.13
+840
+anon 284.8 MiB
+file 0.2 MiB
+inactive_file 0.2 MiB
+memory.current 287.6 MiB
+memory.peak 300.0 MiB
+# a second query against the same server, a few seconds later: the trimmed tables' allocations (MiB), then the sum of the error summary allocations (MiB)
+memory/performance_schema/events_statements_summary_by_digest	4.03
+memory/performance_schema/events_statements_summary_by_digest.digest_text	0.98
+memory/performance_schema/events_statements_history_long	1.44
+memory/performance_schema/events_statements_history_long.digest_text	0.98
+memory/performance_schema/events_statements_history_long.sql_text	0.98
+34.89

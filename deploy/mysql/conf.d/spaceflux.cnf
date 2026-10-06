@@ -8,6 +8,12 @@ innodb_buffer_pool_size = 128M
 innodb_log_buffer_size = 16M
 temptable_max_ram = 64M
 max_connections = 32
+# Both default to 10000 rows here, about 84 MiB together, and both are fixed at startup.
+# The services issue well under 1000 distinct statements (Performance_schema_digest_lost counts any overflow),
+# and the history_long consumer is off by default, so 1000 rows only keeps it usable if it is switched on.
+# The per user statement summaries are sized separately and stay as they are.
+performance_schema_digests_size = 1000
+performance_schema_events_statements_history_long_size = 1000
 # Nothing replicates from this server.
 skip_log_bin
 # Nothing uses the X Protocol, so port 33060 stays closed.
