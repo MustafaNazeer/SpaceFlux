@@ -122,10 +122,16 @@ public final class TestMysql {
 
     /** Runs SQL as root over the socket inside the container; the password never reaches a command line. */
     public static void rootSql(String sql) throws Exception {
+        rootQuery(sql);
+    }
+
+    /** Like {@link #rootSql}, returning what the client printed, one row per line, tab separated. */
+    public static String rootQuery(String sql) throws Exception {
         String quoted = "'" + sql.replace("'", "'\\''") + "'";
         ExecResult result = MYSQL.execInContainer("bash", "-c",
                 "mysql --defaults-extra-file=<(printf '[client]\\npassword=%s\\n' \"$(< /run/secrets/mysql_root_password)\")"
                         + " -uroot -N -B -e " + quoted);
         assertThat(result.getExitCode()).as(result.getStderr()).isZero();
+        return result.getStdout().strip();
     }
 }

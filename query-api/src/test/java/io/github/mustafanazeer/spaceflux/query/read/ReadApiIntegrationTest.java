@@ -19,6 +19,8 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 
+import io.github.mustafanazeer.spaceflux.query.Browser;
+import io.github.mustafanazeer.spaceflux.query.OperatorApp;
 import io.github.mustafanazeer.spaceflux.query.QueryApiApplication;
 import io.github.mustafanazeer.spaceflux.query.TestMysql;
 import tools.jackson.databind.JsonNode;
@@ -30,6 +32,8 @@ class ReadApiIntegrationTest {
     static final ObjectMapper JSON = new ObjectMapper();
     static final HttpClient HTTP = HttpClient.newHttpClient();
 
+    static final String OPERATOR_PASSWORD = TestMysql.password();
+
     static ConfigurableApplicationContext app;
     static String base;
 
@@ -39,7 +43,10 @@ class ReadApiIntegrationTest {
         app = new SpringApplicationBuilder(QueryApiApplication.class, ThrowingFilter.class)
                 .web(WebApplicationType.SERVLET)
                 .run(TestMysql.args("--server.port=0", "--spaceflux.alerts.enabled=false",
-                        "--spaceflux.catalog.enabled=false"));
+                        "--spaceflux.catalog.enabled=false", "--ACK_OPERATOR_USERNAME=" + OperatorApp.OPERATOR,
+                        "--ACK_OPERATOR_BCRYPT_COST=" + OperatorApp.COST, "--ACK_OPERATOR_PASSWORD_HASH={bcrypt}"
+                                + new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(
+                                        OperatorApp.COST).encode(OPERATOR_PASSWORD)));
         base = "http://127.0.0.1:" + ((WebServerApplicationContext) app).getWebServer().getPort();
     }
 
@@ -522,6 +529,25 @@ class ReadApiIntegrationTest {
         assertThat(approaches.get(1).get("close_approach").get("run_id").asString()).isEqualTo(runId);
         assertThat(fields(approaches.get(1).get("acknowledgement"))).containsExactlyInAnyOrder("action", "acted_at");
         assertThat(r.body()).doesNotContain("operator").doesNotContain("seen it");
+    }
+
+    @Test
+    void theOperatorAlsoSeesThePrincipalAndNoteOfEachApproachsAcknowledgement() throws Exception {
+        emptyScreening();
+        Instant ws = Instant.now().minus(1, ChronoUnit.HOURS);
+        String id = approach(runIdFor(ws, 1));
+        run(ws, 1, ws.plus(7, ChronoUnit.DAYS), 0, 1, java.util.List.of(id));
+        TestMysql.rootSql("INSERT INTO spaceflux.alert_acknowledgement (event_id, action, principal, note) VALUES ('"
+                + id + "', 'acknowledge', 'operator', 'seen it')");
+        Browser operator = new Browser(base);
+        assertThat(operator.login(OperatorApp.OPERATOR, OPERATOR_PASSWORD).statusCode()).isEqualTo(204);
+
+        JsonNode ack = JSON.readTree(operator.get("/api/screening/current").body()).get("approaches").get(0)
+                .get("acknowledgement");
+
+        assertThat(fields(ack)).containsExactlyInAnyOrder("action", "acted_at", "principal", "note");
+        assertThat(ack.get("principal").asString()).isEqualTo("operator");
+        assertThat(ack.get("note").asString()).isEqualTo("seen it");
     }
 
     @Test

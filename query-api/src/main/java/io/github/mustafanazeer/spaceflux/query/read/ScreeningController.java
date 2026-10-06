@@ -28,7 +28,7 @@ class ScreeningController {
 
     private static final Logger LOG = LoggerFactory.getLogger(ScreeningController.class);
 
-    private static final String APPROACH_COLUMNS = "e.event_id, e.payload, k.action, k.acted_at";
+    private static final String APPROACH_COLUMNS = "e.event_id, e.payload, k.action, k.acted_at, k.principal, k.note";
     private static final String LATEST_ACK = " LEFT JOIN alert_acknowledgement k ON k.ack_id = (SELECT MAX(x.ack_id) "
             + "FROM alert_acknowledgement x WHERE x.event_id = e.event_id)";
     private static final String CANDIDATE_COLUMNS = "SELECT r.alert_seq, r.run_id, r.window_start, r.window_end, "
@@ -127,11 +127,7 @@ class ScreeningController {
         JdbcClient.StatementSpec sql = run.listsEveryApproach()
                 ? api.sql(LISTED_APPROACHES).param(run.alertSeq())
                 : api.sql(CUT_APPROACHES).param(run.runId());
-        return sql.query((rs, n) -> {
-            String action = rs.getString(3);
-            return new Approach(rs.getString(1), RawJson.member(rs.getString(2), "close_approach"),
-                    action == null ? null
-                            : new Acknowledgement(action, ApiTimes.format(rs.getObject(4, LocalDateTime.class))));
-        }).list();
+        return sql.query((rs, n) -> new Approach(rs.getString(1), RawJson.member(rs.getString(2), "close_approach"),
+                Acknowledgement.from(rs, 3))).list();
     }
 }

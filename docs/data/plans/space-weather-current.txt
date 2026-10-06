@@ -15,7 +15,7 @@ EXPLAIN FORMAT=TREE:
 Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
 space_weather_series, ALL, none, none
 
-EXPLAIN ANALYZE, one run on Linux amd64 with 4 processors; the times describe this run only:
--> Sort: space_weather_series.scale, space_weather_series.freshness_reference DESC, space_weather_series.series_satellite DESC  (cost=0.75 rows=5) (actual time=0.103..0.105 rows=5 loops=1)
-    -> Filter: (space_weather_series.state <> 'ended')  (cost=0.75 rows=5) (actual time=0.0499..0.0601 rows=5 loops=1)
-        -> Table scan on space_weather_series  (cost=0.75 rows=5) (actual time=0.0462..0.0549 rows=5 loops=1)
+EXPLAIN ANALYZE, one run on Linux amd64 with 8 processors; the times describe this run only:
+-> Sort: space_weather_series.scale, space_weather_series.freshness_reference DESC, space_weather_series.series_satellite DESC  (cost=0.75 rows=5) (actual time=0.0341..0.0348 rows=5 loops=1)
+    -> Filter: (space_weather_series.state <> 'ended')  (cost=0.75 rows=5) (actual time=0.0158..0.0186 rows=5 loops=1)
+        -> Table scan on space_weather_series  (cost=0.75 rows=5) (actual time=0.0149..0.0172 rows=5 loops=1)

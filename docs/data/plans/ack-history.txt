@@ -1,19 +1,19 @@
-Query: alert-latest-acknowledgement
+Query: ack-history
 Account: spaceflux_api
-Parameters: [space_weather_level/1/G/-/2025-01-02T15:00:00/2025-01-02T16:21:05Z]
+Parameters: [space_weather_level/1/G/-/2025-01-02T15:00:00/2025-01-02T16:21:05Z, 51]
 Data from 2025-01-01T00:00:00Z, seed 20261004: 365 days of space weather, 365 days of screening runs; 236885 space weather events, 1460 screening runs, 2269 close approaches, 22 catalog objects, 4884 acknowledgements
 MySQL: 8.4.11, statistics from ANALYZE TABLE after seeding
 
 SQL:
-SELECT action, acted_at, principal, note FROM alert_acknowledgement WHERE event_id = ? ORDER BY ack_id DESC LIMIT 1
+SELECT ack_id, action, acted_at, principal, note FROM alert_acknowledgement WHERE event_id = ? ORDER BY ack_id DESC LIMIT ?
 
 EXPLAIN FORMAT=TREE:
--> Limit: 1 row(s)  (cost=0.35 rows=1)
+-> Limit: 51 row(s)  (cost=0.35 rows=1)
     -> Index lookup on alert_acknowledgement using ix_alert_acknowledgement_event (event_id='space_weather_level/1/G/-/2025-01-02T15:00:00/2025-01-02T16:21:05Z') (reverse)  (cost=0.35 rows=1)
 
 Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
 alert_acknowledgement, ref, ix_alert_acknowledgement_event, event_id
 
 EXPLAIN ANALYZE, one run on Linux amd64 with 8 processors; the times describe this run only:
--> Limit: 1 row(s)  (cost=0.35 rows=1) (actual time=0.0111..0.0111 rows=1 loops=1)
-    -> Index lookup on alert_acknowledgement using ix_alert_acknowledgement_event (event_id='space_weather_level/1/G/-/2025-01-02T15:00:00/2025-01-02T16:21:05Z') (reverse)  (cost=0.35 rows=1) (actual time=0.0105..0.0105 rows=1 loops=1)
+-> Limit: 51 row(s)  (cost=0.35 rows=1) (actual time=0.0224..0.029 rows=1 loops=1)
+    -> Index lookup on alert_acknowledgement using ix_alert_acknowledgement_event (event_id='space_weather_level/1/G/-/2025-01-02T15:00:00/2025-01-02T16:21:05Z') (reverse)  (cost=0.35 rows=1) (actual time=0.0218..0.0283 rows=1 loops=1)

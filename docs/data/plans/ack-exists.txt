@@ -1,17 +1,17 @@
-Query: screening-summary
+Query: ack-exists
 Account: spaceflux_api
-Parameters: [238797]
+Parameters: [space_weather_level/1/G/-/2025-01-02T15:00:00/2025-01-02T16:21:05Z]
 Data from 2025-01-01T00:00:00Z, seed 20261004: 365 days of space weather, 365 days of screening runs; 236885 space weather events, 1460 screening runs, 2269 close approaches, 22 catalog objects, 4884 acknowledgements
 MySQL: 8.4.11, statistics from ANALYZE TABLE after seeding
 
 SQL:
-SELECT payload FROM alert_event WHERE alert_seq = ?
+SELECT 1 FROM alert_event WHERE event_id = ?
 
 EXPLAIN FORMAT=TREE:
 -> Rows fetched before execution  (cost=0..0 rows=1)
 
 Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
-alert_event, const, PRIMARY, alert_seq
+alert_event, const, uk_alert_event_event_id, event_id
 
 EXPLAIN ANALYZE, one run on Linux amd64 with 8 processors; the times describe this run only:
--> Rows fetched before execution  (cost=0..0 rows=1) (actual time=210e-6..261e-6 rows=1 loops=1)
+-> Rows fetched before execution  (cost=0..0 rows=1) (actual time=233e-6..264e-6 rows=1 loops=1)

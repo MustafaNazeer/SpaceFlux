@@ -21,6 +21,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 
 import io.github.mustafanazeer.spaceflux.query.QueryApiApplication;
 import io.github.mustafanazeer.spaceflux.query.TestMysql;
+import io.github.mustafanazeer.spaceflux.query.ack.AckPlanQueries;
 import io.github.mustafanazeer.spaceflux.query.alerts.AlertsPlanFeed;
 import io.github.mustafanazeer.spaceflux.query.catalog.CatalogPlanFeed;
 import io.github.mustafanazeer.spaceflux.query.read.PlanQueries;
@@ -100,6 +101,14 @@ class QueryPlansIntegrationTest {
                 .query(LocalDateTime.class).single();
         String acknowledged = api.sql("SELECT event_id FROM alert_acknowledgement ORDER BY ack_id LIMIT 1")
                 .query(String.class).single();
+        long ackId = api.sql("SELECT MAX(ack_id) FROM alert_acknowledgement WHERE event_id = ?").param(acknowledged)
+                .query(Long.class).single();
+        // A continuation cursor in the middle of the table: the oldest row's cursor makes the primary key range
+        // nearly empty, which no real history page would see.
+        long middle = api.sql("SELECT ack_id FROM alert_acknowledgement ORDER BY ack_id LIMIT 1 OFFSET ?")
+                .param(seeded.acknowledgements() / 2).query(Long.class).single();
+        String middleEvent = api.sql("SELECT event_id FROM alert_acknowledgement WHERE ack_id = ?").param(middle)
+                .query(String.class).single();
         LocalDateTime from = LocalDateTime.of(2025, 1, 4, 0, 0);
         LocalDateTime to = from.plusDays(7);
         LocalDateTime cursor = from.plusDays(2);
@@ -141,6 +150,18 @@ class QueryPlansIntegrationTest {
                         "alert_event const uk_alert_event_event_id"),
                 new Plan("alert-latest-acknowledgement", "api", PlanQueries.LATEST_ACKNOWLEDGEMENT,
                         List.of(acknowledged), false, null, "alert_acknowledgement ref " + ack),
+                new Plan("ack-target", "api", AckPlanQueries.TARGET, List.of(acknowledged), false, null,
+                        "e const uk_alert_event_event_id", "s const PRIMARY"),
+                new Plan("ack-current", "api", AckPlanQueries.CURRENT, List.of(acknowledged), false, null,
+                        "alert_acknowledgement ref " + ack),
+                new Plan("ack-written", "api", AckPlanQueries.WRITTEN, List.of(ackId), false, null,
+                        "alert_acknowledgement const PRIMARY"),
+                new Plan("ack-exists", "api", AckPlanQueries.EXISTS, List.of(acknowledged), false, null,
+                        "alert_event const uk_alert_event_event_id"),
+                new Plan("ack-history", "api", AckPlanQueries.HISTORY, List.of(acknowledged, 51), false, null,
+                        "alert_acknowledgement ref " + ack),
+                new Plan("ack-history-after", "api", AckPlanQueries.HISTORY_AFTER, List.of(middleEvent, middle + 1,
+                        51), false, null, "alert_acknowledgement range " + ack + " ack_id"),
                 new Plan("catalog-by-number", "api", PlanQueries.CATALOG_BY_NUMBER, List.of(25544), false, null,
                         "c const PRIMARY"),
                 new Plan("watchlist", "api", PlanQueries.WATCHLIST, List.of(), false, null, "w index PRIMARY",

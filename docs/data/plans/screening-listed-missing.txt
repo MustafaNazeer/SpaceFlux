@@ -8,19 +8,19 @@ SQL:
 SELECT COUNT(*) FROM screening_run_approach a LEFT JOIN alert_event e ON e.event_id = a.approach_event_id WHERE a.run_alert_seq = ? AND e.alert_seq IS NULL
 
 EXPLAIN FORMAT=TREE:
--> Aggregate: count(0)  (cost=2.25 rows=1)
-    -> Filter: (e.alert_seq is null)  (cost=2.15 rows=1)
-        -> Nested loop antijoin  (cost=2.15 rows=1)
+-> Aggregate: count(0)  (cost=2.26 rows=1)
+    -> Filter: (e.alert_seq is null)  (cost=2.16 rows=1)
+        -> Nested loop antijoin  (cost=2.16 rows=1)
             -> Index lookup on a using PRIMARY (run_alert_seq=238797)  (cost=0.35 rows=1)
-            -> Single-row covering index lookup on e using uk_alert_event_event_id (event_id=a.approach_event_id)  (cost=0.813 rows=1)
+            -> Single-row covering index lookup on e using uk_alert_event_event_id (event_id=a.approach_event_id)  (cost=0.821 rows=1)
 
 Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
 a, ref, PRIMARY, run_alert_seq
 e, eq_ref, uk_alert_event_event_id, event_id
 
-EXPLAIN ANALYZE, one run on Linux amd64 with 4 processors; the times describe this run only:
--> Aggregate: count(0)  (cost=2.25 rows=1) (actual time=0.0165..0.0168 rows=1 loops=1)
-    -> Filter: (e.alert_seq is null)  (cost=2.15 rows=1) (actual time=0.0145..0.0145 rows=0 loops=1)
-        -> Nested loop antijoin  (cost=2.15 rows=1) (actual time=0.0139..0.0139 rows=0 loops=1)
-            -> Index lookup on a using PRIMARY (run_alert_seq=238797)  (cost=0.35 rows=1) (actual time=0.0125..0.0125 rows=0 loops=1)
-            -> Single-row covering index lookup on e using uk_alert_event_event_id (event_id=a.approach_event_id)  (cost=0.813 rows=1) (never executed)
+EXPLAIN ANALYZE, one run on Linux amd64 with 8 processors; the times describe this run only:
+-> Aggregate: count(0)  (cost=2.26 rows=1) (actual time=0.00991..0.0101 rows=1 loops=1)
+    -> Filter: (e.alert_seq is null)  (cost=2.16 rows=1) (actual time=0.00884..0.00884 rows=0 loops=1)
+        -> Nested loop antijoin  (cost=2.16 rows=1) (actual time=0.00817..0.00817 rows=0 loops=1)
+            -> Index lookup on a using PRIMARY (run_alert_seq=238797)  (cost=0.35 rows=1) (actual time=0.00768..0.00768 rows=0 loops=1)
+            -> Single-row covering index lookup on e using uk_alert_event_event_id (event_id=a.approach_event_id)  (cost=0.821 rows=1) (never executed)

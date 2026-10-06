@@ -5,18 +5,18 @@ Data from 2025-01-01T00:00:00Z, seed 20261004: 365 days of space weather, 365 da
 MySQL: 8.4.11, statistics from ANALYZE TABLE after seeding
 
 SQL:
-SELECT e.event_id, e.payload, k.action, k.acted_at FROM close_approach c JOIN alert_event e ON e.alert_seq = c.alert_seq LEFT JOIN alert_acknowledgement k ON k.ack_id = (SELECT MAX(x.ack_id) FROM alert_acknowledgement x WHERE x.event_id = e.event_id) WHERE c.run_id = ? ORDER BY c.alert_seq
+SELECT e.event_id, e.payload, k.action, k.acted_at, k.principal, k.note FROM close_approach c JOIN alert_event e ON e.alert_seq = c.alert_seq LEFT JOIN alert_acknowledgement k ON k.ack_id = (SELECT MAX(x.ack_id) FROM alert_acknowledgement x WHERE x.event_id = e.event_id) WHERE c.run_id = ? ORDER BY c.alert_seq
 
 EXPLAIN FORMAT=TREE:
--> Nested loop left join  (cost=2.96 rows=2)
-    -> Nested loop inner join  (cost=2.26 rows=2)
+-> Nested loop left join  (cost=2.98 rows=2)
+    -> Nested loop inner join  (cost=2.28 rows=2)
         -> Covering index lookup on c using ix_close_approach_run (run_id='2025-07-07T06:01:02.093Z/1')  (cost=0.458 rows=2)
-        -> Single-row index lookup on e using PRIMARY (alert_seq=c.alert_seq)  (cost=0.853 rows=1)
+        -> Single-row index lookup on e using PRIMARY (alert_seq=c.alert_seq)  (cost=0.861 rows=1)
     -> Filter: (k.ack_id = (select #2))  (cost=0.3 rows=1)
         -> Single-row index lookup on k using PRIMARY (ack_id=(select #2))  (cost=0.3 rows=1)
         -> Select #2 (subquery in condition; dependent)
-            -> Aggregate: max(x.ack_id)  (cost=0.454 rows=1)
-                -> Covering index lookup on x using ix_alert_acknowledgement_event (event_id=e.event_id)  (cost=0.352 rows=1.01)
+            -> Aggregate: max(x.ack_id)  (cost=0.45 rows=1)
+                -> Covering index lookup on x using ix_alert_acknowledgement_event (event_id=e.event_id)  (cost=0.35 rows=1)
 
 Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
 c, ref, ix_close_approach_run, run_id
@@ -24,13 +24,13 @@ e, eq_ref, PRIMARY, alert_seq
 k, eq_ref, PRIMARY, ack_id
 x, ref, ix_alert_acknowledgement_event, event_id
 
-EXPLAIN ANALYZE, one run on Linux amd64 with 4 processors; the times describe this run only:
--> Nested loop left join  (cost=2.96 rows=2) (actual time=0.0681..0.0866 rows=2 loops=1)
-    -> Nested loop inner join  (cost=2.26 rows=2) (actual time=0.0302..0.0404 rows=2 loops=1)
-        -> Covering index lookup on c using ix_close_approach_run (run_id='2025-07-07T06:01:02.093Z/1')  (cost=0.458 rows=2) (actual time=0.0161..0.0205 rows=2 loops=1)
-        -> Single-row index lookup on e using PRIMARY (alert_seq=c.alert_seq)  (cost=0.853 rows=1) (actual time=0.00908..0.00914 rows=1 loops=2)
-    -> Filter: (k.ack_id = (select #2))  (cost=0.3 rows=1) (actual time=0.022..0.022 rows=0 loops=2)
-        -> Single-row index lookup on k using PRIMARY (ack_id=(select #2))  (cost=0.3 rows=1) (actual time=0.0217..0.0217 rows=0 loops=2)
+EXPLAIN ANALYZE, one run on Linux amd64 with 8 processors; the times describe this run only:
+-> Nested loop left join  (cost=2.98 rows=2) (actual time=0.0319..0.0404 rows=2 loops=1)
+    -> Nested loop inner join  (cost=2.28 rows=2) (actual time=0.0168..0.0216 rows=2 loops=1)
+        -> Covering index lookup on c using ix_close_approach_run (run_id='2025-07-07T06:01:02.093Z/1')  (cost=0.458 rows=2) (actual time=0.00821..0.0101 rows=2 loops=1)
+        -> Single-row index lookup on e using PRIMARY (alert_seq=c.alert_seq)  (cost=0.861 rows=1) (actual time=0.0052..0.00523 rows=1 loops=2)
+    -> Filter: (k.ack_id = (select #2))  (cost=0.3 rows=1) (actual time=0.00885..0.00885 rows=0 loops=2)
+        -> Single-row index lookup on k using PRIMARY (ack_id=(select #2))  (cost=0.3 rows=1) (actual time=0.00868..0.00868 rows=0 loops=2)
         -> Select #2 (subquery in condition; dependent)
-            -> Aggregate: max(x.ack_id)  (cost=0.454 rows=1) (actual time=0.0154..0.0156 rows=1 loops=2)
-                -> Covering index lookup on x using ix_alert_acknowledgement_event (event_id=e.event_id)  (cost=0.352 rows=1.01) (actual time=0.0143..0.0143 rows=0 loops=2)
+            -> Aggregate: max(x.ack_id)  (cost=0.45 rows=1) (actual time=0.00507..0.00518 rows=1 loops=2)
+                -> Covering index lookup on x using ix_alert_acknowledgement_event (event_id=e.event_id)  (cost=0.35 rows=1) (actual time=0.00422..0.00422 rows=0 loops=2)

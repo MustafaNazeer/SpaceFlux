@@ -8,28 +8,28 @@ SQL:
 SELECT e.sample_time, e.interval_end, e.time_tag, e.state, e.derived_level, e.derived_label, e.value, e.unit, e.xray_class, e.no_data_reason, e.no_data_since, e.trigger_kind, a.event_id FROM space_weather_event e JOIN alert_event a ON a.alert_seq = e.alert_seq WHERE e.scale = ? AND e.satellite = ? AND e.sample_time >= ? AND e.sample_time < ? AND e.alert_seq = (SELECT MAX(x.alert_seq) FROM space_weather_event x WHERE x.scale = e.scale AND x.satellite = e.satellite AND x.sample_time = e.sample_time) ORDER BY e.sample_time LIMIT ?
 
 EXPLAIN FORMAT=TREE:
--> Limit: 51 row(s)  (cost=4121 rows=51)
-    -> Nested loop inner join  (cost=4121 rows=2023)
-        -> Filter: (e.alert_seq = (select #2))  (cost=2293 rows=2023)
-            -> Index range scan on e using ix_space_weather_event_sample over (scale = 'R' AND satellite = 18 AND '2025-01-04 00:00:00.000000' <= sample_time < '2025-01-11 00:00:00.000000'), with index condition: ((e.satellite = 18) and (e.scale = 'R') and (e.sample_time >= TIMESTAMP'2025-01-04 00:00:00') and (e.sample_time < TIMESTAMP'2025-01-11 00:00:00'))  (cost=2293 rows=2023)
+-> Limit: 51 row(s)  (cost=4096 rows=51)
+    -> Nested loop inner join  (cost=4096 rows=2023)
+        -> Filter: (e.alert_seq = (select #2))  (cost=2252 rows=2023)
+            -> Index range scan on e using ix_space_weather_event_sample over (scale = 'R' AND satellite = 18 AND '2025-01-04 00:00:00.000000' <= sample_time < '2025-01-11 00:00:00.000000'), with index condition: ((e.satellite = 18) and (e.scale = 'R') and (e.sample_time >= TIMESTAMP'2025-01-04 00:00:00') and (e.sample_time < TIMESTAMP'2025-01-11 00:00:00'))  (cost=2252 rows=2023)
             -> Select #2 (subquery in condition; dependent)
-                -> Aggregate: max(x.alert_seq)  (cost=1.03 rows=1)
-                    -> Covering index lookup on x using ix_space_weather_event_sample (scale=e.scale, satellite=e.satellite, sample_time=e.sample_time)  (cost=0.921 rows=1.08)
-        -> Filter: (a.alert_seq = e.alert_seq)  (cost=0.804 rows=1)
-            -> Single-row index lookup on a using PRIMARY (alert_seq=(select #2))  (cost=0.804 rows=1)
+                -> Aggregate: max(x.alert_seq)  (cost=1.02 rows=1)
+                    -> Covering index lookup on x using ix_space_weather_event_sample (scale=e.scale, satellite=e.satellite, sample_time=e.sample_time)  (cost=0.908 rows=1.14)
+        -> Filter: (a.alert_seq = e.alert_seq)  (cost=0.812 rows=1)
+            -> Single-row index lookup on a using PRIMARY (alert_seq=(select #2))  (cost=0.812 rows=1)
 
 Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
 e, range, ix_space_weather_event_sample, scale satellite sample_time
 x, ref, ix_space_weather_event_sample, scale satellite sample_time
 a, eq_ref, PRIMARY, alert_seq
 
-EXPLAIN ANALYZE, one run on Linux amd64 with 4 processors; the times describe this run only:
--> Limit: 51 row(s)  (cost=4121 rows=51) (actual time=10.4..15.9 rows=51 loops=1)
-    -> Nested loop inner join  (cost=4121 rows=2023) (actual time=10.4..15.8 rows=51 loops=1)
-        -> Filter: (e.alert_seq = (select #2))  (cost=2293 rows=2023) (actual time=3.64..4.6 rows=51 loops=1)
-            -> Index range scan on e using ix_space_weather_event_sample over (scale = 'R' AND satellite = 18 AND '2025-01-04 00:00:00.000000' <= sample_time < '2025-01-11 00:00:00.000000'), with index condition: ((e.satellite = 18) and (e.scale = 'R') and (e.sample_time >= TIMESTAMP'2025-01-04 00:00:00') and (e.sample_time < TIMESTAMP'2025-01-11 00:00:00'))  (cost=2293 rows=2023) (actual time=3.61..3.68 rows=51 loops=1)
+EXPLAIN ANALYZE, one run on Linux amd64 with 8 processors; the times describe this run only:
+-> Limit: 51 row(s)  (cost=4096 rows=51) (actual time=1.9..3.67 rows=51 loops=1)
+    -> Nested loop inner join  (cost=4096 rows=2023) (actual time=1.89..3.67 rows=51 loops=1)
+        -> Filter: (e.alert_seq = (select #2))  (cost=2252 rows=2023) (actual time=1.61..1.85 rows=51 loops=1)
+            -> Index range scan on e using ix_space_weather_event_sample over (scale = 'R' AND satellite = 18 AND '2025-01-04 00:00:00.000000' <= sample_time < '2025-01-11 00:00:00.000000'), with index condition: ((e.satellite = 18) and (e.scale = 'R') and (e.sample_time >= TIMESTAMP'2025-01-04 00:00:00') and (e.sample_time < TIMESTAMP'2025-01-11 00:00:00'))  (cost=2252 rows=2023) (actual time=1.58..1.61 rows=51 loops=1)
             -> Select #2 (subquery in condition; dependent)
-                -> Aggregate: max(x.alert_seq)  (cost=1.03 rows=1) (actual time=0.0121..0.0122 rows=1 loops=153)
-                    -> Covering index lookup on x using ix_space_weather_event_sample (scale=e.scale, satellite=e.satellite, sample_time=e.sample_time)  (cost=0.921 rows=1.08) (actual time=0.00907..0.0103 rows=1 loops=153)
-        -> Filter: (a.alert_seq = e.alert_seq)  (cost=0.804 rows=1) (actual time=0.219..0.22 rows=1 loops=51)
-            -> Single-row index lookup on a using PRIMARY (alert_seq=(select #2))  (cost=0.804 rows=1) (actual time=0.219..0.219 rows=1 loops=51)
+                -> Aggregate: max(x.alert_seq)  (cost=1.02 rows=1) (actual time=0.0035..0.00353 rows=1 loops=153)
+                    -> Covering index lookup on x using ix_space_weather_event_sample (scale=e.scale, satellite=e.satellite, sample_time=e.sample_time)  (cost=0.908 rows=1.14) (actual time=0.00267..0.00301 rows=1 loops=153)
+        -> Filter: (a.alert_seq = e.alert_seq)  (cost=0.812 rows=1) (actual time=0.0352..0.0353 rows=1 loops=51)
+            -> Single-row index lookup on a using PRIMARY (alert_seq=(select #2))  (cost=0.812 rows=1) (actual time=0.035..0.0351 rows=1 loops=51)

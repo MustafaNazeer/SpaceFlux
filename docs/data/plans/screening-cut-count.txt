@@ -14,6 +14,6 @@ EXPLAIN FORMAT=TREE:
 Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
 close_approach, ref, ix_close_approach_run, run_id
 
-EXPLAIN ANALYZE, one run on Linux amd64 with 4 processors; the times describe this run only:
--> Aggregate: count(0)  (cost=0.658 rows=1) (actual time=0.0221..0.0222 rows=1 loops=1)
-    -> Covering index lookup on close_approach using ix_close_approach_run (run_id='2025-07-07T06:01:02.093Z/1')  (cost=0.458 rows=2) (actual time=0.0165..0.0196 rows=2 loops=1)
+EXPLAIN ANALYZE, one run on Linux amd64 with 8 processors; the times describe this run only:
+-> Aggregate: count(0)  (cost=0.658 rows=1) (actual time=0.0123..0.0123 rows=1 loops=1)
+    -> Covering index lookup on close_approach using ix_close_approach_run (run_id='2025-07-07T06:01:02.093Z/1')  (cost=0.458 rows=2) (actual time=0.00888..0.0109 rows=2 loops=1)

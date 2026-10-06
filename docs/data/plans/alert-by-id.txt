@@ -13,5 +13,5 @@ EXPLAIN FORMAT=TREE:
 Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
 alert_event, const, uk_alert_event_event_id, event_id
 
-EXPLAIN ANALYZE, one run on Linux amd64 with 4 processors; the times describe this run only:
--> Rows fetched before execution  (cost=0..0 rows=1) (actual time=259e-6..302e-6 rows=1 loops=1)
+EXPLAIN ANALYZE, one run on Linux amd64 with 8 processors; the times describe this run only:
+-> Rows fetched before execution  (cost=0..0 rows=1) (actual time=219e-6..260e-6 rows=1 loops=1)

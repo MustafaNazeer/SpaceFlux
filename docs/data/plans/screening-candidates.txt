@@ -14,6 +14,6 @@ EXPLAIN FORMAT=TREE:
 Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
 r, index, ix_screening_run_window, window_start rules_version
 
-EXPLAIN ANALYZE, one run on Linux amd64 with 4 processors; the times describe this run only:
--> Limit: 8 row(s)  (cost=0.0263 rows=8) (actual time=0.0916..0.0963 rows=8 loops=1)
-    -> Index scan on r using ix_screening_run_window (reverse)  (cost=0.0263 rows=8) (actual time=0.0711..0.0749 rows=8 loops=1)
+EXPLAIN ANALYZE, one run on Linux amd64 with 8 processors; the times describe this run only:
+-> Limit: 8 row(s)  (cost=0.0263 rows=8) (actual time=0.0369..0.0385 rows=8 loops=1)
+    -> Index scan on r using ix_screening_run_window (reverse)  (cost=0.0263 rows=8) (actual time=0.0273..0.0286 rows=8 loops=1)

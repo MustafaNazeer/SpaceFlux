@@ -1,6 +1,6 @@
 # MySQL indexes
 
-* **Status:** decided on 2026-10-02; the queries of Q1, Q2, Q4 and Q7, the single alert and catalog lookups, and the consumers' lookups were checked with `EXPLAIN` on 2026-10-05 (see [Results](#results)). Q3, Q5, Q6, Q8 and Q9 have no query in the code yet, so their indexes are not proven; each is checked when its query is written.
+* **Status:** decided on 2026-10-02; the queries of Q1, Q2, Q4, Q7 and Q8, the single alert and catalog lookups, the acknowledgement write path, and the consumers' lookups were checked with `EXPLAIN` (see [Results](#results)). Q3, Q5, Q6 and Q9 have no query in the code yet, so their indexes are not proven; each is checked when its query is written.
 * **Applies to:** the schema in [mysql-schema.md](mysql-schema.md), on MySQL 8.4 LTS with InnoDB. The query numbers (Q1 to Q9) are the rows of its [Queries the API needs](mysql-schema.md#queries-the-api-needs) table.
 
 ## Rules I follow
@@ -88,7 +88,7 @@ No index on `object_name`. None of the queries searches by name. If a search is 
 
 | Index | Columns | Used by | Why |
 | --- | --- | --- | --- |
-| Primary key | `ack_id` | Insert order | |
+| Primary key | `ack_id` | Insert order; reading back the row just written | |
 | Secondary | (`event_id`, `ack_id`) | Q3, Q4, Q8, one alert | The latest action for an alert is the last entry for its `event_id`; its history is the whole range. Also covers the foreign key to `alert_event.event_id` |
 
 No index on (`principal`, `acted_at`). None of the queries reads by principal, and there is one operator.
@@ -118,9 +118,10 @@ The bar is that every hot query has an index justified by an `EXPLAIN` plan. Onc
 
 ### Results
 
-The plans are in [plans/](plans/), one file per query the service runs today: the six read endpoints, split into each statement they issue, and the consumers' two lookups before a write. Q3, Q5, Q6, Q8 and Q9 have no query in the code yet; each gets its plan and assertion when its endpoint is built. The data is a year from 2025-01-01 at the rates under "Expected volume" on the schema page (12 events an hour for each R and S series, 3 an hour for G, 4 screening runs a day), built by `query-api/src/test/java/io/github/mustafanazeer/spaceflux/query/plans/PlanData.java` with a fixed seed and stored through the consumers' own processors and stores; each file's header gives the exact counts.
+The plans are in [plans/](plans/), one file per query the service runs today: the read endpoints, split into each statement they issue, the acknowledgement write path and history (Q8), and the consumers' two lookups before a write. Q3, Q5, Q6 and Q9 have no query in the code yet; each gets its plan and assertion when its endpoint is built. The data is a year from 2025-01-01 at the rates under "Expected volume" on the schema page (12 events an hour for each R and S series, 3 an hour for G, 4 screening runs a day), built by `query-api/src/test/java/io/github/mustafanazeer/spaceflux/query/plans/PlanData.java` with a fixed seed and stored through the consumers' own processors and stores; each file's header gives the exact counts.
 
 * Every query reads each table through the index the tables above name for it, every history and run query reads its range in index order with no sort, and no table that grows with time is read whole.
+* A history page after the first reads (`event_id`, `ack_id`) from the cursor down. The plan is taken with a cursor in the middle of the table; for a cursor near the start of the table the optimizer rightly reads the primary key instead, since only the few rows below that `ack_id` are in range.
 * The only table scan is of `space_weather_series` (Q1, a few rows, one per series); `watchlist_object` (Q7, a handful of configured objects) is read whole through its primary key.
 * The newest run is read backward from the end of (`window_start`, `rules_version`), as the plan note "(reverse)" shows, and the next batch is a range on the same index.
 * `QueryPlansIntegrationTest` in the normal build seeds a week of space weather and a year of screening runs, then asserts for every query each table's access type and index, the column each range is on, both bounds of each history range, and that only Q1 sorts. With too few runs the optimizer rightly sorts the whole run table instead, which would prove nothing, so the build keeps a year of them.
