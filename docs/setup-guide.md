@@ -145,6 +145,7 @@ read -rs -p 'Password: ' pw; echo
 printf %s "$pw" | curl -s -b "$jar" -c "$jar" -H "X-XSRF-TOKEN: $token" --data-urlencode username=operator \
     --data-urlencode password@- -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8081/api/auth/login
 unset pw
+token=$(awk '$6 == "XSRF-TOKEN" {print $7}' "$jar")
 curl -s -b "$jar" http://127.0.0.1:8081/api/auth/session
 curl -s -b "$jar" -H "X-XSRF-TOKEN: $token" -X POST -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8081/api/auth/logout
 rm -f "$jar"
