@@ -3,16 +3,18 @@
 * **Status:** accepted, 2026-10-04.
 * **Served by:** `query-api`, under the `/api` prefix, read only for anonymous viewers ([ADR 0009](../adr/0009-alert-acknowledgement-auth.md), decision 6). Conventions are in [ADR 0010](../adr/0010-query-api-stack.md), decision 6 and its amendment: `snake_case` fields with the contract names, keyset paging, RFC 9457 problem details, and an `X-Correlation-Id` header on every response.
 
-This page covers the first six read endpoints. Login, logout, and acknowledgement come with the authentication work; the newest alerts list, acknowledgement history, the paged catalog, and an object's full coverage come later.
+This page covers six read endpoints, the operator's session, and acknowledgement. The newest alerts list, the paged catalog, and an object's full coverage come later.
 
 ## Common rules
 
 * **Times** are RFC 3339 UTC strings ending in `Z`, written with the microseconds the database holds; a time copied from a contract field that is kept as text (`time_tag`, `epoch_text`, `run_id`, `event_id`) is returned exactly as received.
 * **Numbers.** An event or summary returned whole (`event` in section 4, `summary` and `close_approach` in section 3) is the stored text, so its numbers keep the spelling they were received with. Every other number is written by the API from the stored value, so a value received as `8.483063140829472e-09` is returned as the equal `8.483063140829472E-9`.
 * **Absent, not null.** A field with no value is left out of the response, as the contracts leave it out of an event.
-* **Errors** are `application/problem+json` bodies with `title`, `status`, `detail`, `instance` (the request path), and `correlation_id`; `type` is left out, which RFC 9457 reads as `about:blank`. `detail` never holds SQL, a stack trace, or a value from the database. An unknown path or a malformed parameter is `400` or `404`; anything unexpected is `500` with the same generic body.
+* **Errors** are `application/problem+json` bodies with `title`, `status`, `detail`, `instance` (the request path), and `correlation_id`, the answers of the security layer (`401`, both kinds of `403`, and `429`) included; `type` is left out, which RFC 9457 reads as `about:blank`. `detail` never holds SQL, a stack trace, or a value from the database. An unknown path or a malformed parameter is `400` or `404`; anything unexpected is `500` with the same generic body.
 * **Paging.** A list that can grow takes `limit` (default 50, at most 200) and `after`, an opaque cursor the previous page returned as `next`. A `limit` out of range, or a cursor the server cannot read, is `400`. A page with no `next` is the last one.
-* **Acknowledgement**, wherever an alert appears, is the newest acknowledgement row for its `event_id` as `{"action": ..., "acted_at": ...}`, or absent when there is none. Anonymous responses never carry the note or the principal.
+* **Acknowledgement**, wherever an alert appears, is the newest acknowledgement row for its `event_id` as `{"action": ..., "acted_at": ...}`, or absent when there is none. Anonymous responses never carry the note or the principal; a request from the signed in operator also gets `principal` and, when the row has one, `note` ([ADR 0009](../adr/0009-alert-acknowledgement-auth.md), decision 5).
+* **Headers.** Every response, problem bodies and the `/error` path included, carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Cache-Control: no-cache, no-store, max-age=0, must-revalidate`. A session ID travels only in the session cookie, never in a URL.
+* **Unsafe methods** (`POST`) need the `X-XSRF-TOKEN` header with the value of the `XSRF-TOKEN` cookie; without it the answer is `403`. Only the three `POST` endpoints on this page accept an unsafe method; any other `POST`, `PUT`, `PATCH` or `DELETE` is refused by the filter chain.
 
 ## 1. Current space weather
 
@@ -142,6 +144,63 @@ The object's row in the catalog: its newest element set, `object_name` and `obje
 `GET /api/watchlist`
 
 Every watchlist object with its `catalog_number`, `name`, and `rules_version`, and its catalog row under `catalog` when the catalog has one. Ordered by `catalog_number`. Not paged: the list is a handful of objects configured with the risk engine.
+
+## 7. The operator's session
+
+There is one operator account ([ADR 0009](../adr/0009-alert-acknowledgement-auth.md), decision 2). Reads need no session; anonymous requests never create one.
+
+`GET /api/auth/session`
+
+`200` with `{"username": "..."}` while signed in, `401` otherwise. Like every response, it sets the `XSRF-TOKEN` cookie (`Secure`, `SameSite=Strict`, readable by page script) when the request does not carry one, so the dashboard can call it before the login form. That cookie holds a random value, names no one, and keeps no state on the server.
+
+`POST /api/auth/login`
+
+Form parameters `username` and `password` (`application/x-www-form-urlencoded`) and the `X-XSRF-TOKEN` header. `204` on success, with a new session cookie `SPACEFLUX_SESSION` (`Secure`, `HttpOnly`, `SameSite=Strict`, path `/`) and a new `XSRF-TOKEN` cookie; a session that existed before the login is replaced. `401` for a wrong username or password, with the same body for both. `429` with `Retry-After` (seconds) while the client address or the whole service is backing off ([ADR 0009](../adr/0009-alert-acknowledgement-auth.md), decision 8), or with `Retry-After: 1` while two password checks are already running; the password is not checked then. `400` when the URL has a query string, since credentials belong in the body. When the service has no operator configured, every login is `401`. Errors in order: `403` without a valid `X-XSRF-TOKEN` (not counted as a failure), then `429`, then `401`.
+
+A session ends after 30 minutes without a request, 8 hours after the login, when a newer login replaces it, or at logout, whichever comes first. After that, a request carrying its cookie is answered exactly as one without it: the read endpoints serve the anonymous view, and the session and acknowledgement endpoints answer `401` with a problem body.
+
+`POST /api/auth/logout`
+
+With the `X-XSRF-TOKEN` header. `204`, the session ended, and on HTTPS `Clear-Site-Data: "cookies"` (in the cloud this needs the ingress's forwarded protocol to be trusted, [ADR 0009](../adr/0009-alert-acknowledgement-auth.md), decision 8). Logging out without a session is also `204`.
+
+## 8. Acknowledge an alert
+
+`POST /api/alerts/acknowledgements?event_id=...`
+
+Signed in operator only, with the `X-XSRF-TOKEN` header. The body is JSON with exactly these fields:
+
+| Field | Required | Rule |
+|---|---|---|
+| `action` | yes | `acknowledge` or `unacknowledge` |
+| `note` | no | Text of at most 500 Unicode code points; a longer note is refused, never cut |
+
+`201` with the row written:
+
+```json
+{ "event_id": "...", "action": "acknowledge", "principal": "...", "acted_at": "...", "note": "..." }
+```
+
+`principal` is the signed in username and `acted_at` the database's time of the insert; neither can be sent. Errors, in the order they are checked; the first three are answered before any database access:
+
+| Status | When |
+|---|---|
+| `403` | No operator is configured: every request, before any other check |
+| `403` | Missing or wrong `X-XSRF-TOKEN` |
+| `401` | No session |
+| `415` | The `Content-Type` is not `application/json` |
+| `400` | `event_id` missing or longer than 512 characters; a body that is not one JSON object, or that repeats a field; a missing or unknown `action`; a `note` that is not text (`null` included) or is over 500 code points; any other field |
+| `404` | No alert has this `event_id` |
+| `409` | The alert cannot be acknowledged (only `close_approach` events and `space_weather_level` events in state `level` can), or `action` equals its current state |
+
+## 9. Acknowledgement history
+
+`GET /api/alerts/acknowledgements?event_id=...`
+
+Every acknowledgement row of one alert, newest first, each `{"action": ..., "acted_at": ...}`, plus `principal` and `note` for the signed in operator as the common rules say. Paged. `404` when no alert has this `event_id`; `400` when it is missing or longer than 512 characters. An alert with no rows has an empty `items`.
+
+```json
+{ "event_id": "...", "items": [ { "action": "unacknowledge", "acted_at": "..." }, { "action": "acknowledge", "acted_at": "..." } ], "next": "..." }
+```
 
 ## Tests
 
