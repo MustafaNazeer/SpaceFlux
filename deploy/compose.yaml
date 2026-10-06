@@ -197,6 +197,12 @@ services:
       CONSUMER_USER: spaceflux_consumer
       API_USER: spaceflux_api
       KAFKA_BROKERS: kafka:19092
+      # The operator who may acknowledge alerts, from deploy/.env (git ignored). The hash is bcrypt, single quoted
+      # there so Compose keeps its $ characters; with either value empty nobody can sign in and reads still work.
+      ACK_OPERATOR_USERNAME: ${ACK_OPERATOR_USERNAME:-}
+      ACK_OPERATOR_PASSWORD_HASH: ${ACK_OPERATOR_PASSWORD_HASH:-}
+      # Never empty: an empty value would replace the service's default and fail to start it.
+      ACK_OPERATOR_BCRYPT_COST: ${ACK_OPERATOR_BCRYPT_COST:-14}
       # As for risk-engine: snappy and zstd unpack a native library, so they get an exec tmpfs of their own
       # and /tmp stays noexec. query-api checks every codec at startup.
       JAVA_TOOL_OPTIONS: -Dorg.xerial.snappy.tempdir=/native -DZstdTempFolder=/native

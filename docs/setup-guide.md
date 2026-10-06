@@ -118,6 +118,38 @@ The account script runs only on the first start, while the data volume is empty.
 
 `risk-engine` reads the broker address from `KAFKA_BROKERS` (default `localhost:9092`; Compose sets `kafka:19092`). Its other settings, including the screening watchlist in `risk-engine/src/main/resources/screening/watchlist.json`, are built into the image. The Compose file also sets `JAVA_TOOL_OPTIONS` to point the snappy and zstd compression libraries at `/native`: `ingest`'s producer compresses with snappy, both Java libraries extract a native library before loading it, and the container's `/tmp` does not allow execution, so `/native` is a small tmpfs of its own that does. At startup the risk engine decodes a test record in every codec Kafka supports and exits with a message naming the setting if one cannot be loaded. Every Compose service keeps at most three 10 MB log files.
 
+### The operator account
+
+Reading needs no account. Acknowledging an alert needs the one operator account, set from two values in `deploy/.env`, which git ignores; without them `query-api` starts, every read works, and nobody can sign in ([ADR 0009](adr/0009-alert-acknowledgement-auth.md)). The password itself is never stored anywhere in the stack, only its bcrypt hash, made at cost 14 ([bcrypt cost](perf/bcrypt-cost.md)). This makes one, asking for the password without echoing it or putting it in the shell history (it needs Python's `bcrypt` package; keep the password to 72 bytes, the most bcrypt reads):
+
+```sh
+python3 -c 'import bcrypt, getpass; print("{bcrypt}" + bcrypt.hashpw(getpass.getpass().encode(), bcrypt.gensalt(14)).decode())'
+```
+
+Then write `deploy/.env`, with the hash in single quotes, because Compose reads `$` in an unquoted or double quoted value as the start of a variable:
+
+```sh
+ACK_OPERATOR_USERNAME=operator
+ACK_OPERATOR_PASSWORD_HASH='{bcrypt}$2b$14$...'
+```
+
+A hash in any other form, at any other cost, or mangled on the way in counts as missing: the service logs a warning naming `ACK_OPERATOR_PASSWORD_HASH`, never its value, and nobody can sign in. `ACK_OPERATOR_BCRYPT_COST` changes the expected cost, for a machine where 14 is far from one second. The session cookie is `Secure`; whether a browser sends it to `http://127.0.0.1:8081` is not yet checked.
+
+Signing in from the command line, for a check by hand (the password prompt again keeps it out of the history):
+
+```sh
+jar=$(mktemp)
+curl -s -c "$jar" -o /dev/null http://127.0.0.1:8081/api/auth/session
+token=$(awk '$6 == "XSRF-TOKEN" {print $7}' "$jar")
+read -rs -p 'Password: ' pw; echo
+printf %s "$pw" | curl -s -b "$jar" -c "$jar" -H "X-XSRF-TOKEN: $token" --data-urlencode username=operator \
+    --data-urlencode password@- -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8081/api/auth/login
+unset pw
+curl -s -b "$jar" http://127.0.0.1:8081/api/auth/session
+curl -s -b "$jar" -H "X-XSRF-TOKEN: $token" -X POST -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8081/api/auth/logout
+rm -f "$jar"
+```
+
 ## Health endpoints
 
 With the stack running, the `ingest` health server is on `127.0.0.1:8080`:
