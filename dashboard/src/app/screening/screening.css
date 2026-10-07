@@ -1,0 +1,75 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+.run-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.run-head .section-title {
+  margin: 0;
+}
+.run-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: var(--space-3) var(--space-5);
+  margin: 0 0 var(--space-4);
+}
+.run-meta div {
+  display: grid;
+  gap: var(--space-1);
+}
+.run-meta dt {
+  margin: 0;
+}
+.run-meta dd {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.coverage {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-2);
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  list-style: none;
+}
+.coverage li {
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  display: grid;
+  gap: var(--space-1);
+}
+.coverage .num {
+  font-size: 18px;
+  line-height: 26px;
+  color: var(--text-primary);
+}
+
+.subhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+}
+.subhead h3 {
+  font-size: 18px;
+  line-height: 26px;
+  margin-right: auto;
+}
+.note {
+  margin-bottom: var(--space-2);
+}
+
+table.is-stale td,
+table.is-stale td .sub {
+  color: var(--stale);
+}

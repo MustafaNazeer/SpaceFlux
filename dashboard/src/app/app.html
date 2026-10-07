@@ -1,0 +1,60 @@
+<app-icon-sprite />
+
+<a class="skip-link" href="#main">Skip to space weather</a>
+<a class="skip-link" href="#alerts">Skip to recent alerts</a>
+
+<header class="app-header">
+  <div class="brand">
+    <h1>SpaceFlux</h1>
+    <span class="view-name">Operator console</span>
+  </div>
+  <p class="live" [class]="'live is-' + live().state">
+    <span class="live-dot" [class.pulse]="pulsed()" aria-hidden="true"></span>
+    <span class="live-label">{{ label[live().state] }}</span>
+    @if (live().datetime) {
+      <time [attr.datetime]="live().datetime">{{ live().time }}</time>
+    }
+  </p>
+  <button class="btn btn-secondary" type="button" (click)="togglePause()">
+    {{ data.paused() ? 'Resume updates' : 'Pause updates' }}
+  </button>
+  <div class="session">
+    @switch (session().kind) {
+      @case ('signed_in') {
+        <p class="who">
+          Signed in as <strong>{{ $any(session()).username }}</strong>
+        </p>
+      }
+      @case ('anonymous') {
+        <p class="who">Not signed in, read only</p>
+      }
+      @case ('unknown') {
+        <p class="who">Sign in state unknown</p>
+      }
+    }
+  </div>
+</header>
+
+<div class="page">
+  <app-stale-banners [banners]="banners()" />
+
+  <main id="main" class="primary-col" tabindex="-1">
+    <app-space-weather [current]="spaceWeather()" [failedAt]="data.spaceWeather.failedAt()" [paused]="data.paused()" />
+    <app-screening [current]="screening()" [now]="now()" [failedAt]="data.screening.failedAt()" [paused]="data.paused()" />
+  </main>
+
+  <app-recent-alerts [page]="alerts()" [now]="now()" [failedAt]="data.alerts.failedAt()" [paused]="data.paused()" />
+</div>
+
+<footer class="app-footer">
+  <p>
+    SpaceFlux is a public data demonstration, not an operational space weather warning or collision avoidance
+    service. Levels are derived from one published SWPC measurement each and are not NOAA's issued scale levels.
+    Close approaches come from public element sets propagated with SGP4, with no covariance, and are not
+    conjunction assessments or collision probabilities.
+  </p>
+  <p>
+    For official space weather alerts, watches, warnings and forecasts, see
+    <a href="https://www.spaceweather.gov">spaceweather.gov</a>.
+  </p>
+</footer>

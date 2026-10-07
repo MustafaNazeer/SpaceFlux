@@ -1,0 +1,3 @@
+# Component templates are whitespace sensitive: text, <time> and inline elements sit next to each other
+# without spaces on purpose, and reformatting would add spaces between them.
+src/app/**/*.html

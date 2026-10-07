@@ -1,0 +1,35 @@
+<aside id="alerts" class="panel alerts" aria-labelledby="alerts-title" tabindex="-1">
+  <h2 id="alerts-title" class="section-title">Recent alerts</h2>
+  <p role="status" [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</p>
+  @if (page(); as p) {
+    @if (p.items.length) {
+      <ol class="alert-list">
+        @for (item of views(); track item.view.eventId) {
+          <li class="alert-item">
+            <div class="alert-top">
+              @if (item.view.badge; as b) {
+                <app-badge [badge]="b" />
+              }
+              <span class="caption"><app-segments [segments]="item.view.received" /></span>
+            </div>
+            <h3><app-segments [segments]="item.view.title" /></h3>
+            @if (item.view.acknowledgeable) {
+              <app-ack-state [ack]="item.alert.acknowledgement" [showNote]="true" />
+            }
+          </li>
+        }
+      </ol>
+      @if (p.next) {
+        <p class="caption">Showing the {{ p.items.length }} newest.</p>
+      }
+    } @else {
+      <div class="empty">
+        <strong>No alerts are stored yet.</strong>
+        <p class="secondary">
+          Close approaches, and each change into, between or out of a derived space weather level, are listed here
+          newest first. Changes between none and no data are not listed; the space weather panels show the current state.
+        </p>
+      </div>
+    }
+  }
+</aside>

@@ -1,0 +1,24 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`dashboard queries > reports the measured numbers, so a change that nears a limit is visible in review 1`] = `
+[
+  [
+    "SpaceWeatherCurrent",
+    3,
+    20,
+    18,
+  ],
+  [
+    "ScreeningCurrent",
+    5,
+    75,
+    63,
+  ],
+  [
+    "RecentAlerts",
+    5,
+    52,
+    880,
+  ],
+]
+`;

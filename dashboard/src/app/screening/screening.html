@@ -1,0 +1,161 @@
+<section class="panel" aria-labelledby="run-title">
+  <div class="run-head">
+    <h2 id="run-title" class="section-title">Latest screening run</h2>
+    @if (view(); as v) {
+      <span class="caption">Run <span class="mono">{{ v.run.run_id }}</span></span>
+    }
+  </div>
+
+  <p role="status" [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</p>
+  @if (view(); as v) {
+    <dl class="run-meta">
+      <div>
+        <dt class="label">Window</dt>
+        <dd><time [attr.datetime]="time(v.run.window_start).datetime">{{ time(v.run.window_start).label }}</time> to <time [attr.datetime]="time(v.run.window_end).datetime">{{ time(v.run.window_end).label }} UTC</time></dd>
+      </div>
+      <div>
+        <dt class="label">Input fetched</dt>
+        <dd><time [attr.datetime]="time(v.run.input_fetched_at).datetime">{{ time(v.run.input_fetched_at).label }} UTC</time></dd>
+      </div>
+      <div>
+        <dt class="label">Current until</dt>
+        <dd><time [attr.datetime]="v.currentUntil.datetime">{{ v.currentUntil.label }} UTC</time>{{ v.stale ? ', stale since then' : ', then stale' }}</dd>
+      </div>
+      <div>
+        <dt class="label">Report distance</dt>
+        <dd><span class="num">{{ v.reportDistance }}</span></dd>
+      </div>
+    </dl>
+
+    <h3 class="visually-hidden">Coverage</h3>
+    <ul class="coverage" aria-label="Coverage counts">
+      <li><span class="label">Watchlist</span><span class="num">{{ v.run.coverage.watchlist_accepted }}</span><span class="caption">objects accepted</span></li>
+      <li><span class="label">Catalog</span><span class="num">{{ v.run.coverage.catalog_admitted }}</span><span class="caption">objects admitted</span></li>
+      <li><span class="label">Pairs</span><span class="num">{{ v.run.coverage.pairs }}</span><span class="caption">in total</span></li>
+      <li><span class="label">Searched</span><span class="num">{{ v.run.coverage.pairs_searched }}</span><span class="caption">pairs</span></li>
+      <li><span class="label">Prefilter</span><span class="num">{{ v.run.coverage.pairs_removed_by_prefilter }}</span><span class="caption">pairs removed</span></li>
+      <li><span class="label">Suppressed</span><span class="num">{{ v.suppressedCount }}</span><span class="caption">pairs not screened</span></li>
+      <li><span class="label">Not screenable</span><span class="num">{{ v.run.coverage.pairs_not_screenable }}</span><span class="caption">pairs</span></li>
+    </ul>
+
+    <div class="subhead">
+      <h3 id="appr-title">Close approaches</h3>
+      @if (v.staleBadge; as b) {
+        <app-badge [badge]="b" />
+      }
+      <span class="caption">{{ v.approaches.length }} of {{ v.run.approach_count }} listed</span>
+    </div>
+
+    @if (v.approaches.length) {
+      <p id="appr-note" class="caption note">Two public element sets propagated with SGP4 that come within {{ v.reportDistance }}. Not a collision probability or a conjunction assessment; distances carry an uncertainty of kilometres.</p>
+      <div class="table-wrap" role="region" aria-labelledby="appr-title" tabindex="0">
+        <table aria-labelledby="appr-title" aria-describedby="appr-note" [class.is-stale]="v.stale">
+          <thead>
+            <tr>
+              <th scope="col">Watchlist object</th>
+              <th scope="col">Other object</th>
+              <th scope="col">Closest approach</th>
+              <th scope="col" class="num">Miss distance</th>
+              <th scope="col" class="num">Relative speed</th>
+              <th scope="col">Acknowledgement</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (a of v.approaches; track a.event_id) {
+              <tr>
+                <td>{{ objectName(a.close_approach.watchlist_object) }}<span class="sub mono">{{ a.close_approach.watchlist_object.catalog_number }}, elements {{ days(a.close_approach.watchlist_object.element_age_days) }} old</span></td>
+                <td>{{ objectName(a.close_approach.other_object) }}<span class="sub mono">{{ a.close_approach.other_object.catalog_number }}, elements {{ days(a.close_approach.other_object.element_age_days) }} old</span></td>
+                <td><time [attr.datetime]="time(a.close_approach.time_of_closest_approach).datetime">{{ time(a.close_approach.time_of_closest_approach).label }} UTC</time></td>
+                <td class="num"><span class="num">{{ distance(a.close_approach.miss_distance_m) }}</span></td>
+                <td class="num"><span class="num">{{ kmPerS(a.close_approach.relative_speed_m_per_s) }}</span></td>
+                <td><app-ack-state [ack]="a.acknowledgement" /></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else if (v.run.approach_count > 0) {
+      <div class="empty">
+        <strong>This run reported {{ v.run.approach_count }} close {{ v.run.approach_count === 1 ? 'approach' : 'approaches' }}, and none is stored yet.</strong>
+        <p class="secondary">They are listed here once the API has received them.</p>
+      </div>
+    } @else {
+      <div class="empty">
+        <strong>No searched pair came within {{ v.reportDistance }} in this window.</strong>
+        <p class="secondary">This covers the {{ count(v.run.coverage.pairs_searched, 'searched pair', 'searched pairs') }} only. {{ count(v.suppressedCount, 'suppressed pair was', 'suppressed pairs were') }} not screened,@if (v.outsideCount) { {{ count(v.outsideCount, 'object was', 'objects were') }} rejected or not screened,} and objects missing from the input are not covered. Element sets are accurate to about a kilometre at epoch and degrade from there, so a pair above {{ v.reportDistance }} may in reality pass closer.</p>
+      </div>
+    }
+
+    <details class="disclosure">
+      <summary>Suppressed pairs, {{ v.suppressedCount }} <span class="caption">not screened for close approaches</span></summary>
+      @if (v.run.suppressed.length) {
+        <p id="supp-note" class="caption note">Separations are between the members' propagated element sets, sampled every 10 s, not measured distances; the true minimum can be smaller. A list entry is flagged as possibly stale when its pair separates by more than 500 km.</p>
+        <div class="table-wrap" role="region" aria-label="Suppressed pairs" tabindex="0">
+          <table aria-label="Suppressed pairs" aria-describedby="supp-note">
+            <thead>
+              <tr>
+                <th scope="col">Watchlist object</th>
+                <th scope="col">Other object</th>
+                <th scope="col">Reason</th>
+                <th scope="col" class="num">Sampled separation</th>
+                <th scope="col">List entry</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of v.run.suppressed; track p.watchlist_number + '/' + p.other_number) {
+                <tr>
+                  <td>{{ p.watchlist_name ?? 'Object ' + p.watchlist_number }}<span class="sub mono">{{ p.watchlist_number }}</span></td>
+                  <td>{{ p.other_name ?? 'Object ' + p.other_number }}<span class="sub mono">{{ p.other_number }}</span></td>
+                  <td>{{ suppressionReason(p, v.run.report_distance_m, v.reportDistance) }}</td>
+                  <td class="num"><span class="num">{{ separation(p.min_separation_m, p.max_separation_m) }}</span></td>
+                  <td>{{ listEntry(p) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else if (!v.suppressedNotListed) {
+        <p class="secondary">No pair was suppressed in this run.</p>
+      }
+      @if (v.suppressedNotListed) {
+        <p class="caption">{{ v.suppressedNotListed }} more not listed, to keep the run summary within its size budget.</p>
+      }
+    </details>
+
+    <details class="disclosure">
+      <summary>Rejected and not screened, {{ v.outsideCount }} <span class="caption">objects outside this run</span></summary>
+      @if (v.outsideRows.length) {
+        <div class="table-wrap" role="region" aria-label="Rejected and not screened objects" tabindex="0">
+          <table aria-label="Rejected and not screened objects">
+            <thead>
+              <tr>
+                <th scope="col">Object</th>
+                <th scope="col">Role</th>
+                <th scope="col">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of v.outsideRows; track $index) {
+                <tr>
+                  <td>{{ r.name ?? 'Object ' + r.number }}<span class="sub mono">{{ r.number }}</span></td>
+                  <td>{{ r.role }}</td>
+                  <td>{{ r.reason }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else if (!v.outsideNotListed) {
+        <p class="secondary">Every input object was screened. An object that never reached the input cannot be listed here, so an empty list does not mean nothing comes within {{ v.reportDistance }}.</p>
+      }
+      @if (v.outsideNotListed) {
+        <p class="caption">{{ v.outsideNotListed }} more not listed, to keep the run summary within its size budget.</p>
+      }
+    </details>
+  } @else if (current() === null) {
+    <div class="empty">
+      <strong>No complete screening run is stored.</strong>
+      <p class="secondary">Close approaches are listed here once the first complete run arrives. Until then nothing is known about close approaches; this is not an all clear.</p>
+    </div>
+  }
+</section>

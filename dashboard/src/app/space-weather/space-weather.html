@@ -1,0 +1,33 @@
+<section aria-labelledby="sw-title">
+  <h2 id="sw-title" class="section-title">Space weather, derived levels</h2>
+  <p role="status" [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</p>
+  @if (current()) {
+    <div class="scales">
+      @for (v of views(); track v.scale) {
+        <article class="panel scale-panel" [attr.aria-labelledby]="'scale-' + v.scale + '-title'">
+          <div class="scale-head">
+            <h3 [id]="'scale-' + v.scale + '-title'">{{ v.scale }} scale</h3>
+            <app-badge [badge]="v.badge" />
+          </div>
+          @if (v.readout; as r) {
+            <p class="readout">{{ r.value }}@if (r.unit) {<span class="unit"><app-segments [segments]="[{ kind: 'unit', unit: r.unit }]" /></span>}</p>
+          } @else {
+            <p class="readout is-nodata">No data</p>
+          }
+          <p><app-segments [segments]="v.sentence" /></p>
+          @if (v.facts.length) {
+            <dl class="facts">
+              @for (f of v.facts; track f.term) {
+                <dt>{{ f.term }}</dt>
+                <dd><app-segments [segments]="f.value" /></dd>
+              }
+            </dl>
+          }
+          @if (v.caption) {
+            <p class="caption">{{ v.caption }}</p>
+          }
+        </article>
+      }
+    </div>
+  }
+</section>
