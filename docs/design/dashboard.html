@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpaceFlux operator dashboard, canonical design</title>
+<!--
+  Canonical design for the SpaceFlux operator dashboard.
+  Static and self contained: inline CSS, no scripts, no external requests.
+  Every color, size, spacing, radius, shadow and duration comes from docs/design/tokens.md.
+
+  SAMPLE DATA. Every value on this page is sample data shaped after docs/api/rest.md,
+  docs/data/topics.md and schemas/alerts/examples/. The close approach is the committed
+  example (OBJECT AJ and SL-12 DEB, run 2026-09-29T05:20:09Z/1); the R1 value is the
+  rest.md example re-timed to the page clock. The screening coverage counts, the suppressed
+  pair separations, the operator name, the acknowledgement note and the ended series example
+  (GOES-19 to GOES-18 on 2026-09-28, before the page clock) are illustrative,
+  composed for this page, and are not taken from one real run.
+  Page clock (as_of): 2026-09-29T18:00:00Z.
+
+  Fonts are named by family only. The dashboard build self hosts IBM Plex Sans and IBM Plex Mono
+  as tokens.md describes; this file falls back to system fonts where Plex is not installed.
+-->
+<style>
+:root {
+  --bg-base: #0A0F17;
+  --surface-1: #111A26;
+  --surface-2: #172233;
+  --surface-3: #1E2B3F;
+  --border-subtle: #26364D;
+  --border-strong: #647A98;
+  --text-primary: #E6EDF5;
+  --text-secondary: #A9B7C9;
+  --text-muted: #8595AB;
+  --on-fill: #06111A;
+  --accent: #3CCFE6;
+  --accent-hover: #6ADCEE;
+  --accent-active: #22B3CA;
+  --focus-ring: #8FE6F5;
+  --alert-none: #9AA8BA;
+  --alert-1: #F5EE4C;
+  --alert-2: #FFD28C;
+  --alert-3: #FDA44A;
+  --alert-4: #FB7472;
+  --alert-5: #D65BFF;
+  --stale: #A99CD6;
+
+  --font-ui: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-full: 9999px;
+
+  --elevation-3-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  --duration-instant: 80ms;
+  --duration-fast: 160ms;
+  --duration-base: 240ms;
+  --duration-slow: 400ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { background: var(--bg-base); }
+
+body {
+  margin: 0;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 400;
+}
+
+.mono, time, .num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+a { color: var(--accent); text-decoration: underline; }
+a:hover { color: var(--accent-hover); }
+
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: var(--space-2);
+  z-index: 10;
+  white-space: nowrap;
+  transform: translateY(-200%);
+  clip-path: inset(50%);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-3);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-3-shadow);
+}
+.skip-link:focus-visible { transform: none; clip-path: none; }
+
+/* Header */
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-3) var(--space-5);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.brand { display: flex; align-items: baseline; gap: var(--space-3); margin-right: auto; }
+.brand h1 { margin: 0; font-size: 28px; line-height: 36px; font-weight: 600; }
+.brand .view-name { color: var(--text-secondary); font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+
+.live {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  color: var(--text-secondary);
+}
+.live-dot {
+  width: 10px; height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  animation: live-pulse 2s var(--ease-standard) 2;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.live time { color: var(--text-muted); font-size: 12px; line-height: 16px; }
+.live.is-paused .live-dot { background: transparent; border: 2px solid var(--border-strong); animation: none; }
+
+.session { display: flex; align-items: center; gap: var(--space-3); }
+.session .who { color: var(--text-secondary); }
+.session .who strong { color: var(--text-primary); font-weight: 500; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--duration-instant) var(--ease-standard),
+              color var(--duration-instant) var(--ease-standard),
+              border-color var(--duration-instant) var(--ease-standard);
+}
+.btn-primary { background: var(--accent); color: var(--on-fill); border: 1px solid var(--accent); }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-primary:active { background: var(--accent-active); border-color: var(--accent-active); }
+.btn-secondary { background: transparent; color: var(--text-primary); border: 1px solid var(--border-strong); }
+.btn-secondary:hover { background: var(--surface-3); }
+.btn-secondary:active { background: var(--surface-2); }
+
+/* Layout */
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  max-width: 1440px;
+  margin: 0 auto;
+}
+.page > .banners { grid-column: 1 / -1; }
+.primary-col { display: grid; gap: var(--space-5); align-content: start; min-width: 0; }
+
+.panel {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  min-width: 0;
+}
+.section-title { margin: 0 0 var(--space-4); font-size: 22px; line-height: 30px; font-weight: 600; }
+.panel h3 { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; }
+.label {
+  font-size: 12px; line-height: 16px; font-weight: 500;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.caption { font-size: 12px; line-height: 16px; color: var(--text-muted); }
+.secondary { color: var(--text-secondary); }
+p { margin: 0; }
+
+/* Stale banners */
+.banners { display: grid; gap: var(--space-3); }
+.banner {
+  display: flex; gap: var(--space-3); align-items: flex-start;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--stale);
+  border-radius: var(--radius-md);
+}
+.banner .icon { color: var(--stale); flex: none; margin-top: 3px; }
+.banner strong.stale-word { color: var(--stale); font-weight: 600; }
+
+/* Space weather */
+.scales { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.scale-panel { display: grid; gap: var(--space-3); align-content: start; }
+.scale-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
+.readout {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 24px; line-height: 28px; font-weight: 500;
+  color: var(--text-primary);
+}
+.readout .unit { font-size: 12px; line-height: 16px; color: var(--text-muted); font-weight: 400; margin-left: var(--space-1); }
+.readout.is-nodata { font-family: var(--font-ui); color: var(--text-secondary); }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: var(--space-1) var(--space-3); margin: 0; }
+.facts dt { color: var(--text-muted); font-size: 12px; line-height: 22px; }
+.facts dd { margin: 0; color: var(--text-secondary); }
+
+/* Badges: icon shape, code, NOAA name */
+.badge {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.badge .icon { width: 14px; height: 14px; }
+.badge.solid { color: var(--on-fill); }
+.badge.solid.l1 { background: var(--alert-1); }
+.badge.solid.l2 { background: var(--alert-2); }
+.badge.solid.l3 { background: var(--alert-3); }
+.badge.solid.l4 { background: var(--alert-4); }
+.badge.solid.l5 { background: var(--alert-5); }
+.badge.outline { background: transparent; border: 1px solid currentColor; }
+.badge.outline.none { color: var(--alert-none); }
+.badge.outline.l1 { color: var(--alert-1); }
+.badge.outline.l2 { color: var(--alert-2); }
+.badge.outline.l3 { color: var(--alert-3); }
+.badge.outline.l4 { color: var(--alert-4); }
+.badge.outline.l5 { color: var(--alert-5); }
+.badge.nodata { color: var(--text-secondary); border: 1px dashed var(--border-strong); }
+.badge.stale { color: var(--stale); border: 1px solid var(--stale); }
+.badge.approach { color: var(--text-primary); border: 1px solid var(--border-strong); }
+
+.icon { width: 16px; height: 16px; display: inline-block; vertical-align: middle; flex: none; }
+
+/* Screening */
+.run-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--space-2) var(--space-4); margin-bottom: var(--space-4); }
+.run-head .section-title { margin: 0; }
+.run-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: var(--space-3) var(--space-5); margin: 0 0 var(--space-4); }
+.run-meta div { display: grid; gap: var(--space-1); }
+.run-meta dt { margin: 0; }
+.run-meta dd { margin: 0; color: var(--text-primary); }
+
+.coverage {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-2);
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  list-style: none;
+}
+.coverage li { background: var(--surface-2); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); display: grid; gap: var(--space-1); }
+.coverage .num { font-size: 18px; line-height: 26px; color: var(--text-primary); }
+
+.subhead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-3); margin: 0 0 var(--space-2); }
+.subhead h3 { font-size: 18px; line-height: 26px; }
+
+.table-wrap {
+  overflow-x: auto;
+  padding: var(--space-1);
+  margin: 0 calc(var(--space-1) * -1) var(--space-4);
+}
+table { width: 100%; border-collapse: collapse; }
+caption { text-align: left; padding: 0 0 var(--space-2); color: var(--text-muted); font-size: 12px; line-height: 16px; }
+th, td { padding: var(--space-2) var(--space-3); text-align: left; vertical-align: top; border-bottom: 1px solid var(--border-subtle); }
+thead th {
+  background: var(--surface-2);
+  font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+tbody tr:hover { background: var(--surface-3); }
+td.num, th.num { text-align: right; }
+td time, td .num { white-space: nowrap; }
+td .sub { display: block; color: var(--text-muted); font-size: 12px; line-height: 16px; }
+
+.empty {
+  display: grid; gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+.empty strong { font-weight: 600; }
+
+details.disclosure { border-top: 1px solid var(--border-subtle); padding-top: var(--space-3); }
+details.disclosure > summary {
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: 32px;
+  font-weight: 500;
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+}
+details.disclosure > summary::before {
+  content: "";
+  flex: none;
+  width: 6px; height: 6px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  margin: 0 var(--space-1);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+details.disclosure[open] > summary::before { transform: rotate(45deg); }
+details.disclosure > summary .caption { font-weight: 400; }
+details.disclosure[open] > summary { margin-bottom: var(--space-3); }
+
+/* Alerts */
+.alerts { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); align-content: start; }
+.alert-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+.alert-item {
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2);
+}
+.alert-item.is-new.l1 { border-left-color: var(--alert-1); }
+.alert-item.is-new { transition: border-left-color var(--duration-slow) var(--ease-standard); }
+.alert-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-2); }
+.alert-item h3 { font-size: 14px; line-height: 22px; font-weight: 500; }
+.ack-state { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--text-secondary); }
+.ack-state .icon { color: var(--text-secondary); }
+.ack-note { color: var(--text-secondary); border-left: 2px solid var(--border-subtle); padding-left: var(--space-2); }
+.ack-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+.ack-form { display: grid; gap: var(--space-2); }
+.ack-form label { color: var(--text-secondary); font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+textarea, input[type="text"], input[type="password"] {
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  width: 100%;
+}
+textarea { min-height: 72px; resize: vertical; }
+textarea::placeholder, input::placeholder { color: var(--text-muted); }
+
+/* Footer */
+.app-footer {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  display: grid; gap: var(--space-2);
+}
+
+/* State gallery */
+.gallery { max-width: 1440px; margin: 0 auto; padding: 0 var(--space-5) var(--space-5); }
+.gallery > h2 { font-size: 22px; line-height: 30px; font-weight: 600; margin: var(--space-6) 0 var(--space-2); }
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: var(--space-4); }
+figure { margin: 0; display: grid; gap: var(--space-2); align-content: start; }
+figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
+.badge-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+@media (max-width: 1100px) {
+  .page { grid-template-columns: minmax(0, 1fr); }
+  .scales { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+}
+@media (max-width: 640px) {
+  .page { padding: var(--space-4); gap: var(--space-4); }
+  .app-header { padding: var(--space-3) var(--space-4); }
+  .brand h1 { font-size: 22px; line-height: 30px; }
+  .scales { grid-template-columns: minmax(0, 1fr); }
+  .gallery, .app-footer { padding-left: var(--space-4); padding-right: var(--space-4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+  }
+  .live-dot { animation: none; opacity: 1; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-none" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-l1" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="5" y="7.25" width="6" height="1.5" fill="currentColor"/></symbol>
+  <symbol id="i-l2" viewBox="0 0 16 16"><path d="M8 1.75 14.75 14H1.25Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="5.5" y="9.5" width="5" height="1.5" fill="currentColor"/></symbol>
+  <symbol id="i-l3" viewBox="0 0 16 16"><path d="M8 1.75 14.75 14H1.25Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="7.25" y="6" width="1.5" height="4.5" fill="currentColor"/><rect x="7.25" y="11.25" width="1.5" height="1.5" fill="currentColor"/></symbol>
+  <symbol id="i-l4" viewBox="0 0 16 16"><path d="M5.2 1.5h5.6l3.7 3.7v5.6l-3.7 3.7H5.2l-3.7-3.7V5.2Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="7.25" y="4.25" width="1.5" height="5" fill="currentColor"/><rect x="7.25" y="10.25" width="1.5" height="1.5" fill="currentColor"/></symbol>
+  <symbol id="i-l5" viewBox="0 0 16 16"><path fill-rule="evenodd" fill="currentColor" d="M5 1h6l4 4v6l-4 4H5l-4-4V5Zm.75 3.25v5h1.5v-5Zm3 0v5h1.5v-5Zm-3 6v1.5h1.5v-1.5Zm3 0v1.5h1.5v-1.5Z"/></symbol>
+  <symbol id="i-nodata" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.5 2"/><path d="M3.8 12.2 12.2 3.8" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5V8l2.5 1.75" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-approach" viewBox="0 0 16 16"><circle cx="6" cy="8" r="4.25" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="8" r="4.25" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-open" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+</svg>
+
+<a class="skip-link" href="#main">Skip to space weather</a>
+<a class="skip-link" href="#alerts">Skip to recent alerts</a>
+
+<header class="app-header">
+  <div class="brand">
+    <h1>SpaceFlux</h1>
+    <span class="view-name">Operator console</span>
+  </div>
+  <p class="live">
+    <span class="live-dot" aria-hidden="true"></span>
+    <span>Live</span>
+    <time datetime="2026-09-29T18:00:00Z">18:00:00 UTC</time>
+  </p>
+  <button class="btn btn-secondary" type="button">Pause updates</button>
+  <div class="session">
+    <p class="who">Signed in as <strong>operator</strong></p>
+    <button class="btn btn-secondary" type="button">Sign out</button>
+  </div>
+</header>
+
+<div class="page">
+
+  <p class="visually-hidden" role="status">GOES-18 &ge;10 MeV proton flux is stale; the S scale reads no data.</p>
+  <section class="banners" aria-label="Feed freshness">
+    <div class="banner">
+      <svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+      <p><strong class="stale-word">Stale, 55 min.</strong> GOES-18 &ge;10 MeV proton flux: newest record at <time datetime="2026-09-29T17:05:00Z">17:05 UTC</time>, age limit 40 min. The S scale reads no data from <time datetime="2026-09-29T17:45:00Z">17:45 UTC</time> until a current record arrives.</p>
+    </div>
+  </section>
+
+  <main id="main" class="primary-col" tabindex="-1">
+
+    <section aria-labelledby="sw-title">
+      <h2 id="sw-title" class="section-title">Space weather, derived levels</h2>
+      <p class="visually-hidden" role="status"></p>
+      <div class="scales">
+
+        <article class="panel scale-panel" aria-labelledby="g-title">
+          <div class="scale-head">
+            <h3 id="g-title">G scale</h3>
+            <span class="badge outline none"><svg class="icon" aria-hidden="true"><use href="#i-none"/></svg>none</span>
+          </div>
+          <p class="readout">2.00<span class="unit">Kp index</span></p>
+          <p>Below G1: SWPC estimated planetary Kp 2.00, <time datetime="2026-09-29T12:00:00Z">12:00</time> to <time datetime="2026-09-29T15:00:00Z">15:00 UTC</time>.</p>
+          <dl class="facts">
+            <dt>Interval</dt><dd><time datetime="2026-09-29T12:00:00Z">2026-09-29 12:00</time> to <time datetime="2026-09-29T15:00:00Z">15:00 UTC</time></dd>
+            <dt>Newest record</dt><dd><span class="num">6 h 0 min</span> old, limit <span class="num">6 h 30 min</span></dd>
+          </dl>
+          <p class="caption">Kp is an estimate; SWPC can revise it, so this interval can change.</p>
+        </article>
+
+        <article class="panel scale-panel" aria-labelledby="r-title">
+          <div class="scale-head">
+            <h3 id="r-title">R scale</h3>
+            <span class="badge solid l1"><svg class="icon" aria-hidden="true"><use href="#i-l1"/></svg>R1 Minor</span>
+          </div>
+          <p class="readout">1.06e-5<span class="unit">W m<sup>&minus;2</sup></span></p>
+          <p>R1 level from GOES-18 X-ray flux 1.06e-5 W m<sup>&minus;2</sup> (class M1.0) at <time datetime="2026-09-29T17:52:00Z">17:52 UTC</time>.</p>
+          <dl class="facts">
+            <dt>Sample</dt><dd>1 minute average, <time datetime="2026-09-29T17:52:00Z">17:52 UTC</time></dd>
+            <dt>Newest record</dt><dd><span class="num">8 min</span> old, limit <span class="num">20 min</span></dd>
+          </dl>
+          <p class="caption">Derived from this one sample; it does not mark the start of an event. Not an issued NOAA scale level.</p>
+        </article>
+
+        <article class="panel scale-panel" aria-labelledby="s-title">
+          <div class="scale-head">
+            <h3 id="s-title">S scale</h3>
+            <span class="badge nodata"><svg class="icon" aria-hidden="true"><use href="#i-nodata"/></svg>No data</span>
+          </div>
+          <p class="readout is-nodata">No data</p>
+          <p>No current GOES-18 &ge;10 MeV proton flux record. No data since <time datetime="2026-09-29T17:45:00Z">17:45 UTC</time>, when the newest record passed the 40 min age limit.</p>
+          <dl class="facts">
+            <dt>Newest record</dt><dd><time datetime="2026-09-29T17:05:00Z">17:05 UTC</time>, <span class="num">55 min</span> old</dd>
+            <dt>Reason</dt><dd>Age limit passed</dd>
+          </dl>
+          <p class="caption">No data is not quiet: the level is unknown.</p>
+        </article>
+
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="run-title">
+      <div class="run-head">
+        <h2 id="run-title" class="section-title">Latest screening run</h2>
+        <span class="caption">Run <span class="mono">2026-09-29T05:20:09Z/1</span></span>
+      </div>
+
+      <p class="visually-hidden" role="status"></p>
+      <dl class="run-meta">
+        <div><dt class="label">Window</dt><dd><time datetime="2026-09-29T05:20:09Z">2026-09-29 05:20:09</time> to <time datetime="2026-10-06T05:20:09Z">2026-10-06 05:20:09 UTC</time></dd></div>
+        <div><dt class="label">Input fetched</dt><dd><time datetime="2026-09-29T05:20:09Z">2026-09-29 05:20:09 UTC</time></dd></div>
+        <div><dt class="label">Current until</dt><dd><time datetime="2026-09-30T05:20:09Z">2026-09-30 05:20:09 UTC</time>, then stale</dd></div>
+        <div><dt class="label">Report distance</dt><dd><span class="num">5 km</span></dd></div>
+      </dl>
+
+      <h3 class="visually-hidden">Coverage</h3>
+      <ul class="coverage" aria-label="Coverage counts">
+        <li><span class="label">Watchlist</span><span class="num">2</span><span class="caption">objects accepted</span></li>
+        <li><span class="label">Catalog</span><span class="num">23</span><span class="caption">objects admitted</span></li>
+        <li><span class="label">Pairs</span><span class="num">44</span><span class="caption">in total</span></li>
+        <li><span class="label">Searched</span><span class="num">6</span><span class="caption">pairs</span></li>
+        <li><span class="label">Prefilter</span><span class="num">31</span><span class="caption">pairs removed</span></li>
+        <li><span class="label">Suppressed</span><span class="num">7</span><span class="caption">pairs not screened</span></li>
+        <li><span class="label">Not screenable</span><span class="num">0</span><span class="caption">pairs</span></li>
+      </ul>
+
+      <div class="subhead">
+        <h3 id="appr-title">Close approaches</h3>
+        <span class="caption">1 of 1 listed</span>
+      </div>
+      <p id="appr-note" class="caption" style="margin-bottom: var(--space-2);">Two public element sets propagated with SGP4 that come within 5 km. Not a collision probability or a conjunction assessment; distances carry an uncertainty of kilometres.</p>
+      <div class="table-wrap" role="region" aria-labelledby="appr-title" tabindex="0">
+        <table aria-labelledby="appr-title" aria-describedby="appr-note">
+          <thead>
+            <tr>
+              <th scope="col">Watchlist object</th>
+              <th scope="col">Other object</th>
+              <th scope="col">Closest approach</th>
+              <th scope="col" class="num">Miss distance</th>
+              <th scope="col" class="num">Relative speed</th>
+              <th scope="col">Acknowledgement</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>OBJECT AJ<span class="sub mono">57036, elements 1.6 d old</span></td>
+              <td>SL-12 DEB<span class="sub mono">27958, elements 4.2 d old</span></td>
+              <td><time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></td>
+              <td class="num"><span class="num">2 km</span></td>
+              <td class="num"><span class="num">15.7 km/s</span></td>
+              <td><span class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">06:02 UTC</time></span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <details class="disclosure">
+        <summary>Suppressed pairs, 7 <span class="caption">not screened for close approaches</span></summary>
+        <p id="supp-note" class="caption" style="margin-bottom: var(--space-2);">Separations are between the members' propagated element sets, sampled every 10 s, not measured distances; the true minimum can be smaller. A list entry is flagged as possibly stale when its pair separates by more than 500 km.</p>
+        <div class="table-wrap" role="region" aria-label="Suppressed pairs" tabindex="0">
+          <table aria-label="Suppressed pairs" aria-describedby="supp-note">
+            <thead>
+              <tr>
+                <th scope="col">Watchlist object</th>
+                <th scope="col">Other object</th>
+                <th scope="col">Reason</th>
+                <th scope="col" class="num">Sampled separation</th>
+                <th scope="col">List entry</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>ISS (ZARYA)<span class="sub mono">25544</span></td><td>POISK<span class="sub mono">36086</span></td><td>Listed in the same station stack, International Space Station</td><td class="num"><span class="num">under 1 to 21 km</span></td><td>Not flagged</td></tr>
+              <tr><td>ISS (ZARYA)<span class="sub mono">25544</span></td><td>ISS (NAUKA)<span class="sub mono">49044</span></td><td>Listed in the same station stack, International Space Station</td><td class="num"><span class="num">under 1 to 19 km</span></td><td>Not flagged</td></tr>
+              <tr><td>ISS (ZARYA)<span class="sub mono">25544</span></td><td>CREW DRAGON 12<span class="sub mono">67796</span></td><td>Listed in the same station stack, International Space Station</td><td class="num"><span class="num">under 1 to 44 km</span></td><td>Not flagged</td></tr>
+              <tr><td>ISS (ZARYA)<span class="sub mono">25544</span></td><td>CYGNUS NG-24<span class="sub mono">68689</span></td><td>Listed in the same station stack, International Space Station</td><td class="num"><span class="num">under 1 to 13 km</span></td><td>Not flagged</td></tr>
+              <tr><td>ISS (ZARYA)<span class="sub mono">25544</span></td><td>PROGRESS-MS 34<span class="sub mono">68837</span></td><td>Listed in the same station stack, International Space Station</td><td class="num"><span class="num">under 1 to 10 km</span></td><td>Not flagged</td></tr>
+              <tr><td>ISS (ZARYA)<span class="sub mono">25544</span></td><td>SOYUZ-MS 29<span class="sub mono">100057</span></td><td>Listed in the same station stack, International Space Station</td><td class="num"><span class="num">under 1 to 15 km</span></td><td>Not flagged</td></tr>
+              <tr><td>ISS (ZARYA)<span class="sub mono">25544</span></td><td>PROGRESS-MS 35<span class="sub mono">100712</span></td><td>Listed in the same station stack, International Space Station</td><td class="num"><span class="num">under 1 to 12 km</span></td><td>Not flagged</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <details class="disclosure">
+        <summary>Rejected and not screened, 0 <span class="caption">objects outside this run</span></summary>
+        <p class="secondary">Every input object was screened. An object that never reached the input cannot be listed here, so an empty list does not mean nothing comes within 5 km.</p>
+      </details>
+    </section>
+
+  </main>
+
+  <aside id="alerts" class="panel alerts" aria-labelledby="alerts-title" tabindex="-1">
+    <h2 id="alerts-title" class="section-title">Recent alerts</h2>
+    <p class="visually-hidden" role="status"></p>
+    <ol class="alert-list">
+
+      <li class="alert-item is-new l1">
+        <div class="alert-top">
+          <span class="badge solid l1"><svg class="icon" aria-hidden="true"><use href="#i-l1"/></svg>R1 Minor</span>
+          <span class="caption">New, received <time datetime="2026-09-29T17:58:00Z">17:58 UTC</time></span>
+        </div>
+        <h3>R1 level from GOES-18 X-ray flux 1.06e-5 W m<sup>&minus;2</sup> (class M1.0) at <time datetime="2026-09-29T17:52:00Z">17:52 UTC</time></h3>
+        <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
+        <div class="ack-actions">
+          <button class="btn btn-primary" type="button">Acknowledge</button>
+        </div>
+        <details class="disclosure">
+          <summary>Acknowledge with a note</summary>
+          <form class="ack-form" aria-label="Acknowledge the R1 level at 17:52 UTC with a note">
+            <label for="note-r1">Note, optional</label>
+            <textarea id="note-r1" maxlength="500" aria-describedby="note-r1-help" placeholder="What you checked"></textarea>
+            <span id="note-r1-help" class="caption">Up to 500 characters. Shown only to the signed in operator.</span>
+            <div class="ack-actions"><button class="btn btn-primary" type="submit">Acknowledge with note</button></div>
+          </form>
+        </details>
+      </li>
+
+      <li class="alert-item">
+        <div class="alert-top">
+          <span class="badge approach"><svg class="icon" aria-hidden="true"><use href="#i-approach"/></svg>Close approach</span>
+          <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
+        </div>
+        <h3>OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></h3>
+        <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">06:02 UTC</time> by operator</p>
+        <p class="ack-note">Reviewed; element ages 1.6 and 4.2 days.</p>
+        <div class="ack-actions">
+          <button class="btn btn-secondary" type="button">Unacknowledge</button>
+        </div>
+      </li>
+
+      <li class="alert-item">
+        <div class="alert-top">
+          <span class="badge outline l1"><svg class="icon" aria-hidden="true"><use href="#i-l1"/></svg>R1 Minor</span>
+          <span class="caption">Received <time datetime="2026-09-29T16:47:00Z">16:47 UTC</time></span>
+        </div>
+        <h3>R1 level from GOES-18 X-ray flux 1.21e-5 W m<sup>&minus;2</sup> (class M1.2) at <time datetime="2026-09-29T16:41:00Z">16:41 UTC</time></h3>
+        <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Unacknowledged <time datetime="2026-09-29T16:59:00Z">16:59 UTC</time> by operator</p>
+        <div class="ack-actions">
+          <button class="btn btn-primary" type="button">Acknowledge</button>
+        </div>
+      </li>
+
+    </ol>
+  </aside>
+
+</div>
+
+<section class="gallery" aria-labelledby="gallery-title">
+  <h2 id="gallery-title">Other states</h2>
+  <p class="secondary">The same components in states the main view does not show.</p>
+  <div class="gallery-grid" style="margin-top: var(--space-4);">
+
+    <figure>
+      <div class="panel">
+        <div class="badge-row">
+          <span class="badge outline none"><svg class="icon" aria-hidden="true"><use href="#i-none"/></svg>none</span>
+          <span class="badge solid l1"><svg class="icon" aria-hidden="true"><use href="#i-l1"/></svg>G1 Minor</span>
+          <span class="badge solid l2"><svg class="icon" aria-hidden="true"><use href="#i-l2"/></svg>G2 Moderate</span>
+          <span class="badge solid l3"><svg class="icon" aria-hidden="true"><use href="#i-l3"/></svg>G3 Strong</span>
+          <span class="badge solid l4"><svg class="icon" aria-hidden="true"><use href="#i-l4"/></svg>G4 Severe</span>
+          <span class="badge solid l5"><svg class="icon" aria-hidden="true"><use href="#i-l5"/></svg>G5 Extreme</span>
+        </div>
+        <div class="badge-row" style="margin-top: var(--space-3);">
+          <span class="badge outline l1"><svg class="icon" aria-hidden="true"><use href="#i-l1"/></svg>S1 Minor</span>
+          <span class="badge outline l2"><svg class="icon" aria-hidden="true"><use href="#i-l2"/></svg>S2 Moderate</span>
+          <span class="badge outline l3"><svg class="icon" aria-hidden="true"><use href="#i-l3"/></svg>S3 Strong</span>
+          <span class="badge outline l4"><svg class="icon" aria-hidden="true"><use href="#i-l4"/></svg>S4 Severe</span>
+          <span class="badge outline l5"><svg class="icon" aria-hidden="true"><use href="#i-l5"/></svg>S5 Extreme</span>
+        </div>
+        <div class="badge-row" style="margin-top: var(--space-3);">
+          <span class="badge nodata"><svg class="icon" aria-hidden="true"><use href="#i-nodata"/></svg>No data</span>
+          <span class="badge stale"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>Stale, 14 min</span>
+          <span class="badge approach"><svg class="icon" aria-hidden="true"><use href="#i-approach"/></svg>Close approach</span>
+        </div>
+      </div>
+      <figcaption>Badges, solid and outline. Every level carries its icon shape, its code and the NOAA name.</figcaption>
+    </figure>
+
+    <figure>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <div class="brand"><span class="view-name">Signed out header</span></div>
+        <div class="session">
+          <button class="btn btn-secondary" type="button">Sign in</button>
+        </div>
+      </header>
+      <form class="panel ack-form" aria-label="Operator sign in">
+        <h3>Operator sign in</h3>
+        <label for="user">Username</label>
+        <input id="user" type="text" autocomplete="username">
+        <label for="pass">Password</label>
+        <input id="pass" type="password" autocomplete="current-password">
+        <div class="ack-actions"><button class="btn btn-primary" type="submit">Sign in</button></div>
+        <p class="caption">Reading needs no sign in. Signing in only adds acknowledgement.</p>
+      </form>
+      <figcaption>Anonymous viewers see a Sign in button. The form opens in place of the button.</figcaption>
+    </figure>
+
+    <figure>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <p class="live is-paused">
+          <span class="live-dot" aria-hidden="true"></span>
+          <span>Paused</span>
+          <time datetime="2026-09-29T18:00:00Z">18:00:00 UTC</time>
+        </p>
+        <button class="btn btn-secondary" type="button">Resume updates</button>
+      </header>
+      <p class="visually-hidden" role="status">Updates are paused.</p>
+      <div class="banners">
+        <div class="banner">
+          <svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+          <p><strong class="stale-word">Paused.</strong> Updates are paused. The space weather levels below were received at <time datetime="2026-09-29T18:00:00Z">18:00:00 UTC</time>. Nothing below is checked against the age limits again until updates resume.</p>
+        </div>
+        <div class="banner">
+          <svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+          <p><strong class="stale-word">Stale, 55 min.</strong> GOES-18 &ge;10 MeV proton flux: newest record at <time datetime="2026-09-29T17:05:00Z">17:05 UTC</time>, age limit 40 min. The S scale reads no data from <time datetime="2026-09-29T17:45:00Z">17:45 UTC</time> until a current record arrives.</p>
+        </div>
+      </div>
+      <figcaption>Updates paused. Polling stops, the dot turns hollow, the label reads Paused next to the time of the last update, and the button reads Resume updates. The Paused banner comes first, above any stale banner kept from the last update; a "Not updating." banner is not shown while paused. If a refresh had failed when updates were paused, the Paused banner ends with that failure instead, for example "A refresh of the screening run failed at 18:01:00 UTC before the pause." The status line says "Updates are paused." once, and says "No stale notices remain." only after a refresh has succeeded. The dot pulses only on first load, never on later refreshes.</figcaption>
+    </figure>
+
+    <figure>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <p class="live is-paused">
+          <span class="live-dot" aria-hidden="true"></span>
+          <span>Paused</span>
+        </p>
+        <button class="btn btn-secondary" type="button">Resume updates</button>
+      </header>
+      <div class="banners">
+        <div class="banner">
+          <svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+          <p><strong class="stale-word">Paused.</strong> Updates are paused. Nothing has been received yet.</p>
+        </div>
+      </div>
+      <figcaption>Paused before the first answer arrived: no time next to Paused, and the banner says nothing has been received.</figcaption>
+    </figure>
+
+    <figure>
+      <p class="visually-hidden" role="status">A refresh of the screening run failed.</p>
+      <div class="banners">
+        <div class="banner">
+          <svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+          <p><strong class="stale-word">Not updating.</strong> A refresh of the screening run failed at <time datetime="2026-09-29T18:01:00Z">18:01:00 UTC</time>. What is shown for it is from the last refresh that succeeded.</p>
+        </div>
+      </div>
+      <figcaption>A refresh that failed for the screening run alone. The banner names every part that failed, in page order, with the newest failure time, for example "A refresh of the space weather levels and the screening run failed at ... What is shown for them is from the last refresh that succeeded." Only when the space weather levels failed does it add "The space weather levels were received at 18:00:00 UTC." The status line says "A refresh of the screening run failed."</figcaption>
+    </figure>
+
+    <figure>
+      <div class="panel">
+        <h3 class="section-title">Space weather, derived levels</h3>
+        <p role="status" class="secondary">Loading the current levels.</p>
+      </div>
+      <div class="panel">
+        <h3 class="section-title">Latest screening run</h3>
+        <p role="status" class="secondary">Loading the latest screening run.</p>
+      </div>
+      <div class="panel">
+        <h3 class="section-title">Recent alerts</h3>
+        <p role="status" class="secondary">Loading recent alerts.</p>
+      </div>
+      <figcaption>First load. Each section keeps one status region in the page from first render, visually hidden and empty once its data is shown, so its text changes in place from loading to loaded or failed and is announced without being inserted.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="panel">
+        <h3 class="section-title">Space weather, derived levels</h3>
+        <p role="status" class="secondary">The current levels could not be loaded. The page tries again at the next refresh.</p>
+      </div>
+      <div class="panel">
+        <h3 class="section-title">Latest screening run</h3>
+        <p role="status" class="secondary">The latest screening run could not be loaded. The page tries again at the next refresh.</p>
+      </div>
+      <div class="panel">
+        <h3 class="section-title">Recent alerts</h3>
+        <p role="status" class="secondary">Recent alerts could not be loaded. The page tries again at the next refresh.</p>
+      </div>
+      <figcaption>A first load that failed, in the same status regions. Nothing is shown in place of the data, and no value is guessed. While updates are paused the last sentence reads "The page tries again when updates resume."</figcaption>
+    </figure>
+
+    <figure>
+      <div class="alert-item">
+        <div class="alert-top">
+          <span class="badge nodata"><svg class="icon" aria-hidden="true"><use href="#i-nodata"/></svg>Ended</span>
+          <span class="caption">Received <time datetime="2026-09-28T23:08:00Z">2026-09-28 23:08 UTC</time></span>
+        </div>
+        <h3>GOES-19 X-ray flux is no longer SWPC's primary series; GOES-18 took over. Newest GOES-19 record at <time datetime="2026-09-28T23:02:00Z">2026-09-28 23:02</time> UTC, last level R1.</h3>
+      </div>
+      <figcaption>An ended series: the no data treatment and icon with the text Ended. The last clause is left out when the series was not at a level.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="alert-item">
+        <div class="alert-top">
+          <span class="badge approach"><svg class="icon" aria-hidden="true"><use href="#i-approach"/></svg>Close approach</span>
+          <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
+        </div>
+        <h3>OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></h3>
+        <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">06:02 UTC</time></p>
+      </div>
+      <figcaption>Anonymous view of an alert: the acknowledgement state and time only. No note, no name, no controls.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="panel">
+        <div class="subhead"><h3>Close approaches</h3><span class="caption">0 listed</span></div>
+        <div class="empty">
+          <strong>No searched pair came within 5 km in this window.</strong>
+          <p class="secondary">This covers the 6 searched pairs only. 7 suppressed pairs were not screened, and objects missing from the input are not covered. Element sets are accurate to about a kilometre at epoch and degrade from there, so a pair above 5 km may in reality pass closer.</p>
+        </div>
+      </div>
+      <figcaption>Empty approaches list. It says what was covered rather than reading as all clear.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="banner">
+        <svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+        <p><strong class="stale-word">Stale, 31 h.</strong> Screening run <span class="mono">2026-09-29T05:20:09Z/1</span> is more than 24 h past its window start or past its window end; its approaches come from that run's element sets, not the current catalog.</p>
+      </div>
+      <div class="panel">
+        <div class="subhead"><h3>Close approaches</h3><span class="badge stale"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>Stale, 31 h</span></div>
+        <p class="secondary">Rows keep their values and switch to the stale treatment.</p>
+      </div>
+      <figcaption>Stale screening run, from the run's <span class="mono">stale</span> flag. The banners are not a live region. One visually hidden status line speaks only when the set of banners changes: "The screening run is stale." for this one, "GOES-18 &ge;10 MeV proton flux is stale; the S scale reads no data." for the feed banner in the main view, "A refresh of {parts} failed." for a failed refresh, "Updates are paused." while paused, and "No stale notices remain." once the last banner clears after a successful refresh.</figcaption>
+    </figure>
+
+    <figure>
+      <article class="panel scale-panel" aria-label="S scale, no series stored">
+        <div class="scale-head">
+          <h3>S scale</h3>
+          <span class="badge nodata"><svg class="icon" aria-hidden="true"><use href="#i-nodata"/></svg>No data</span>
+        </div>
+        <p class="readout is-nodata">No data</p>
+        <p>No S series has been stored yet.</p>
+      </article>
+      <figcaption>A scale with no series at all (reason <span class="mono">no_series</span>).</figcaption>
+    </figure>
+
+    <figure>
+      <article class="panel scale-panel" aria-label="G scale, level example">
+        <div class="scale-head">
+          <h3>G scale</h3>
+          <span class="badge solid l4"><svg class="icon" aria-hidden="true"><use href="#i-l4"/></svg>G4 Severe</span>
+        </div>
+        <p class="readout">7.67<span class="unit">Kp index</span></p>
+        <p>G4 level from SWPC estimated planetary Kp 7.67, <time datetime="2024-05-10T15:00:00Z">2024-05-10 15:00</time> to <time datetime="2024-05-10T18:00:00Z">18:00 UTC</time>.</p>
+        <p class="caption">Kp is an estimate; SWPC can revise it, so this interval can change.</p>
+      </article>
+      <figcaption>A higher level, from the committed G4 example (archived data, shown here as if current).</figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<footer class="app-footer">
+  <p>SpaceFlux is a public data demonstration, not an operational space weather warning or collision avoidance service. Levels are derived from one published SWPC measurement each and are not NOAA's issued scale levels. Close approaches come from public element sets propagated with SGP4, with no covariance, and are not conjunction assessments or collision probabilities.</p>
+  <p>For official space weather alerts, watches, warnings and forecasts, see <a href="https://www.spaceweather.gov">spaceweather.gov</a>.</p>
+</footer>
+
+</body>
+</html>

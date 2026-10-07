@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <title>SpaceFlux</title>
+  <rect width="32" height="32" rx="8" fill="#0A0F17"/>
+  <circle cx="16" cy="16" r="4" fill="#E6EDF5"/>
+  <g transform="rotate(-30 16 16)">
+    <ellipse cx="16" cy="16" rx="12" ry="5.5" fill="none" stroke="#3CCFE6" stroke-width="2.5"/>
+    <circle cx="25.2" cy="12.5" r="3.6" fill="#3CCFE6" stroke="#0A0F17" stroke-width="1.5"/>
+  </g>
+</svg>

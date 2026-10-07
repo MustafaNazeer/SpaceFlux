@@ -51,13 +51,32 @@ Space weather alerts follow the NOAA Space Weather Scales, which rate geomagneti
 | Token | Hex | Level | NOAA name | Icon shape |
 |---|---|---|---|---|
 | `alert-none` | `#9AA8BA` | none | (no alert) | Hollow circle |
-| `alert-1` | `#E6D56A` | 1 | Minor | Circle with one bar |
-| `alert-2` | `#F2B84B` | 2 | Moderate | Triangle with one bar |
-| `alert-3` | `#F7923F` | 3 | Strong | Triangle with exclamation mark |
-| `alert-4` | `#FF6A55` | 4 | Severe | Octagon with exclamation mark |
-| `alert-5` | `#F46BC8` | 5 | Extreme | Filled octagon with double exclamation mark |
+| `alert-1` | `#F5EE4C` | 1 | Minor | Circle with one bar |
+| `alert-2` | `#FFD28C` | 2 | Moderate | Triangle with one bar |
+| `alert-3` | `#FDA44A` | 3 | Strong | Triangle with exclamation mark |
+| `alert-4` | `#FB7472` | 4 | Severe | Octagon with exclamation mark |
+| `alert-5` | `#D65BFF` | 5 | Extreme | Filled octagon with double exclamation mark |
 
-Level 5 is a hot magenta rather than a deeper red. That keeps level 4 and level 5 clearly separable at a glance and keeps the ramp from sliding into dark reds.
+Lightness falls steadily from level 1 to level 5, so the order of the levels survives in grayscale and under every common color vision deficiency. Level 5 is a violet rather than a deeper red: it keeps level 4 and level 5 apart in hue as well as lightness, and it keeps the ramp from sliding into dark reds.
+
+#### Color vision and grayscale check
+
+The ramp was chosen against simulated protanopia, deuteranopia, and tritanopia and against grayscale. The numbers below are printed by [`tools/alert_palette_check.py`](tools/alert_palette_check.py) (run `python3 docs/design/tools/alert_palette_check.py`), which reads the colors from this file. It simulates each deficiency with the severity 1.0 matrices of Machado, Oliveira and Fernandes (2009), compares colors with CIEDE2000 (Sharma, Wu and Dalal, 2005), and checks itself against the published CIEDE2000 test pairs before it reports anything. The review cutoffs it uses, a CIEDE2000 difference under 10 and a luminance ratio under 1.15, are working values I chose for review, not published standards.
+
+Smallest CIEDE2000 difference between any two of `alert-none`, `alert-1` to `alert-5`, and `stale`:
+
+| View | Smallest difference | Pair | Pairs under the cutoff of 10 |
+|---|---|---|---|
+| Normal vision | 12.81 | `alert-none` and `stale` | none |
+| Protanopia | 9.97 | `alert-none` and `stale` | `alert-none` and `stale` 9.97 |
+| Deuteranopia | 8.60 | `alert-none` and `stale` | `alert-none` and `stale` 8.60; `alert-1` and `alert-2` 9.04; `alert-2` and `alert-3` 9.06 |
+| Tritanopia | 10.02 | `alert-3` and `alert-4` | none |
+
+Grayscale, as WCAG relative luminance: `alert-1` 0.811, `alert-2` 0.692, `alert-3` 0.479, `alert-4` 0.342, `alert-5` 0.290. Luminance ratios between neighboring levels, rounded to two decimals, are 1.16 (1 and 2), 1.40 (2 and 3), 1.35 (3 and 4), and 1.15 (4 and 5); to three decimals they are 1.159, 1.403, 1.350, and 1.153. Unlike the contrast tables below, which truncate, these ratios are rounded. `alert-none` (0.384) and `stale` (0.371) sit near `alert-4` in grayscale (ratios 1.11, 1.03, and 1.07), which is one more reason every state also carries its own icon and text.
+
+The ramp used until 2026-10-06 (`#E6D56A`, `#F2B84B`, `#F7923F`, `#FF6A55`, and a magenta `#F46BC8` for level 5) measured 3.56 between level 5 and `alert-none` under deuteranopia, 4.26 to 5.78 between neighboring levels 1 to 4 under deuteranopia, and a grayscale ratio of 1.05 between levels 4 and 5. The script prints that ramp as a comparison.
+
+Still open: `stale` and `accent-active` measure 2.16 under deuteranopia. They never mark the same thing (a stale value always shows the clock icon and the word "Stale"), so this is recorded rather than fixed.
 
 ### Data freshness
 
@@ -65,7 +84,24 @@ Level 5 is a hot magenta rather than a deeper red. That keeps level 4 and level 
 |---|---|---|
 | `stale` | `#A99CD6` | Any readout or alert whose source feed has not updated within its expected interval. |
 
-A stale value keeps its last known number, switches its color to `stale`, gains a clock icon, and shows the text "Stale" with the age of the data (for example "Stale, 14 min"). A stale alert keeps its level icon and label so the last known severity stays readable, but its badge switches to the `stale` treatment so nobody mistakes an old storm reading for a current one.
+What a stale source looks like depends on what the API still serves:
+
+* **A value the API still returns, marked stale** (a screening run more than 24 hours past its window start, which `GET /api/screening/current` returns with `stale: true`). The value keeps its number, switches its color to `stale`, gains a clock icon, and shows the text "Stale" with the age of the data (for example "Stale, 14 min"). A stale alert keeps its level icon and label so the last known severity stays readable, but its badge switches to the `stale` treatment so nobody mistakes an old reading for a current one.
+* **A value the API replaces with no data** (a space weather scale past its age limit, which `GET /api/space-weather/current` returns as `no_data` with reason `age_limit` and no value). The panel shows the [no data treatment](#states-without-a-level) and the time of the newest record (`freshness_reference`), never the last level. The feed's stale banner carries the `stale` treatment.
+
+Each feed whose newest record is past its expected interval gets a [stale banner](#states-without-a-level) at the top of the page.
+
+### States without a level
+
+These treatments reuse the colors above; they add no new hex values.
+
+| Token | Built from | Icon | Text | Use |
+|---|---|---|---|---|
+| `badge-no-data` | `text-secondary` text and icon, 1 px dashed `border-strong` outline, no fill | Dashed circle with a diagonal slash | "No data", or "Ended" for a series in state `ended` | A space weather scale with no valid current value, for any reason (`rejected`, `zero_run_edge`, `age_limit`, `no_series`). The same treatment with the text "Ended" marks an R or S series that is no longer SWPC's primary series because another satellite took over; it reads as no data, never as the last level held. Never drawn like "none", which is a valid value below level 1. A panel in no data also shows its large readout as the words "No data" in `text-secondary` and states the reason and, when there is one, the newest record time. |
+| `badge-approach` | `text-primary` text and icon, 1 px solid `border-strong` outline, no fill | Two overlapping circles | "Close approach" | A close approach from a screening run. It never takes an alert ramp color: the screening has one report distance and no levels. |
+| `banner-stale` | `surface-1` fill, 1 px `border-subtle` border with a 4 px `stale` left border, `radius-md` | Clock, in `stale` | A lead in `stale`, then the body in `text-primary`. "Stale, <age>." is followed by the feed, the newest record time, and what the page shows meanwhile; "Not updating." by the parts whose refresh failed and when; "Paused." by what was received and that nothing is rechecked until updates resume | One banner per feed whose newest record is older than its expected interval, above the panels. The same treatment with the lead "Not updating." marks a failed refresh: "A refresh of {parts} failed at <time> UTC. What is shown for {it or them} is from the last refresh that succeeded.", where {parts} lists in page order whichever of "the space weather levels", "the screening run" and "recent alerts" failed, and, only when the space weather levels failed and an earlier answer for them exists, the banner adds "The space weather levels were received at <time> UTC." The same treatment with the lead "Paused." comes first while updates are paused. The banners are not a live region: one visually hidden status line speaks only when the set of banners changes, never as an alert. Its lines are "{measurement} is stale; the {scale} scale reads no data.", "The screening run is stale.", "A refresh of {parts} failed.", "Updates are paused.", and "No stale notices remain." once the last banner clears after a successful refresh. |
+
+Contrast: `text-secondary` and `text-primary` are cleared on every surface in the tables below, `border-strong` clears 3:1 as a control edge on every surface (the dashed outline is decorative there, since the word "No data" carries the state), and `stale` clears 4.5:1 as text on `surface-1` (7.01).
 
 ## Color usage rules
 
@@ -73,14 +109,28 @@ A stale value keeps its last known number, switches its color to `stale`, gains 
 2. **Alert badges come in two forms.** The solid form uses the alert color as the fill with `on-fill` text and icon. The outline form uses `border-strong` or the alert color as a 1 px outline on a surface, with the text and icon drawn in the alert color. Both forms are cleared in the contrast tables.
 3. **Accent means live, alerts mean severity.** Cyan never marks a warning, and alert colors never mark a link or button.
 4. **Alert colors are for alerts.** Charts do not borrow alert colors for ordinary series. When a chart plots an alert level over time, it uses the matching alert token for that level only.
-5. **Orbital alerts share the ramp but not the names.** The five levels and their colors are shared with orbital alerts so severity reads the same everywhere, but the NOAA names belong to space weather. Orbital alerts use their own labels, which are defined alongside the screening thresholds.
+5. **Close approaches stay out of the ramp.** The alert ramp and the NOAA names belong to the space weather scales. A close approach uses the neutral `badge-approach` treatment, because the screening has a single report distance and no severity levels to map onto the ramp.
 6. **Links in running text are always underlined.** Cyan against body text is too close in lightness to tell a link apart by color, so the underline carries that job. Links that stand alone as navigation or buttons are identified by their shape and position instead.
 7. **A selected row is more than a color change.** Hover and selected rows share the `surface-3` fill, so a selected row also gets a 2 px `accent-active` left border (at least 5.68:1 on every surface). Hover stays fill only, which keeps the two states distinct.
 8. **Nothing here claims operational authority.** Alert styling signals severity within a public data demonstration and is never presented as an official warning.
 
 ## Typography
 
-Both families are from the IBM Plex superfamily and are licensed under the SIL Open Font License.
+Both families are from the IBM Plex superfamily and are licensed under the SIL Open Font License 1.1, with the Reserved Font Name "Plex" (IBM's license text, copyright 2017 IBM Corp.).
+
+**The fonts are self hosted.** The dashboard serves the font files from its own origin; it never loads fonts from a font CDN or any other third party. The files come from IBM's own packages, checked on the npm registry and in the [IBM/plex](https://github.com/IBM/plex) repository on 2026-10-06:
+
+| Package | Version | License | Files used |
+|---|---|---|---|
+| `@ibm/plex-sans` | 1.1.0 | OFL-1.1 | `fonts/split/woff2/IBMPlexSans-{Regular,Medium,SemiBold}-{Latin1,Pi}.woff2` |
+| `@ibm/plex-mono` | 2.5.0 | OFL-1.1 | `fonts/split/woff2/IBMPlexMono-{Regular,Medium}-{Latin1,Pi}.woff2` |
+
+* Only the weights the type scale uses ship: Sans 400, 500, and 600; Mono 400 and 500.
+* The files are IBM's own Latin1 and Pi subsets, used unmodified, each declared with the `unicode-range` from IBM's CSS in the same package, so the Pi file (which holds characters such as the greater than or equal sign) downloads only when a page uses one of its characters. I do not cut subsets of my own: the license's Reserved Font Name terms govern modified versions, and IBM's subsets already cover the interface.
+* Together the ten files are 151,456 bytes (Latin1: Sans 65,204, Mono 35,412; Pi: Sans 23,092, Mono 27,748), measured from the package tarballs.
+* `LICENSE.txt` from each package ships next to the font files.
+* The files are added with the dashboard build, not committed ahead of it, and the versions are pinned there.
+* The fallbacks in the tokens below stay in place for any file that fails to load.
 
 | Token | Value | Use |
 |---|---|---|
@@ -168,9 +218,19 @@ Rules:
 
 1. **Live values do not animate their digits.** A readout swaps its value in place; counting or rolling animations misstate how fast the data really changed.
 2. **The live indicator always carries a label.** The dot sits next to a visible "Live" text label in `text-secondary`, so the state never depends on the dot alone.
-3. **The live indicator pulses briefly, then holds.** After each update the dot pulses on a 2 s opacity cycle between 100 and 50 percent for at most 5 s, then holds steady at full opacity until the next update. The 50 percent floor keeps the dot at 3:1 or better on every surface (see the contrast tables). When its feed goes stale, the dot stops pulsing, switches to `stale`, and the label changes to "Stale".
+3. **The live indicator pulses only on first load.** When the dashboard first loads, the dot pulses on a 2 s opacity cycle between 100 and 50 percent for at most 5 s, then holds steady at full opacity. Later refreshes never restart the pulse. The 50 percent floor keeps the dot at 3:1 or better on every surface (see the contrast tables). When its feed goes stale, the dot switches to `stale` and the label changes to "Stale".
+   * **Updates can be paused.** The header carries a toggle button labelled "Pause updates" that stops polling; while paused it reads "Resume updates". While paused, the dot is hollow (a 2 px `border-strong` ring, no fill) and the label reads "Paused" next to the time of the last update, so a paused page never reads as live. A "Paused." banner leads the banners: "Updates are paused. The space weather levels below were received at <time> UTC. Nothing below is checked against the age limits again until updates resume.", or "Updates are paused. Nothing has been received yet." before the first answer. When a refresh had failed at the moment of the pause, it ends with "A refresh of {parts} failed at <time> UTC before the pause."
 4. **New alerts are marked with a left border, not a tint.** A newly arrived alert row gets a 2 px left border in its alert color, which may fade in over `duration-slow`. The row background never takes a tint, because any tint over `surface-3` pulls `text-muted` below 4.5:1. Nothing flashes, and nothing flashes more than three times per second anywhere in the interface.
 5. **Reduced motion is honored.** Under `prefers-reduced-motion: reduce`, every duration becomes 0 ms, the live indicator never pulses and stays at full opacity, and the new alert border appears without fading in.
+
+## Favicon
+
+[`favicon.svg`](favicon.svg) is an orbit mark: a light body in `text-primary` circled by a tilted orbit and a satellite dot in `accent`, on a `bg-base` tile with corners of `radius-md` at 16 px. It uses only these tokens, with no text, so it reads at 16 px.
+
+* The tile gives the mark its own dark ground, so it reads the same on light and dark browser chrome. On a dark tab the tile's edge fades into the chrome and the cyan and light shapes carry the mark.
+* On the tile, `accent` measures 10.29:1 and `text-primary` 16.27:1 (the `bg-base` column of the tables below).
+* A thin `bg-base` ring around the satellite dot keeps it separate from the orbit line at small sizes.
+* The cyan here marks the product, not a live value; inside the interface the accent keeps its meaning of "live".
 
 ## Contrast ratios
 
@@ -187,11 +247,11 @@ Ratios use the WCAG 2.2 relative luminance formula and are truncated (never roun
 | `accent-hover` | 11.96 | 10.90 | 9.96 | 8.88 | 4.5 |
 | `accent-active` | 7.65 | 6.97 | 6.37 | 5.68 | 4.5 |
 | `alert-none` | 7.94 | 7.23 | 6.61 | 5.89 | 4.5 |
-| `alert-1` | 12.88 | 11.74 | 10.73 | 9.56 | 4.5 |
-| `alert-2` | 10.72 | 9.78 | 8.93 | 7.96 | 4.5 |
-| `alert-3` | 8.35 | 7.61 | 6.95 | 6.20 | 4.5 |
-| `alert-4` | 6.80 | 6.20 | 5.66 | 5.05 | 4.5 |
-| `alert-5` | 7.11 | 6.48 | 5.92 | 5.28 | 4.5 |
+| `alert-1` | 15.74 | 14.35 | 13.11 | 11.69 | 4.5 |
+| `alert-2` | 13.57 | 12.37 | 11.30 | 10.08 | 4.5 |
+| `alert-3` | 9.67 | 8.82 | 8.06 | 7.18 | 4.5 |
+| `alert-4` | 7.17 | 6.53 | 5.97 | 5.32 | 4.5 |
+| `alert-5` | 6.21 | 5.66 | 5.17 | 4.61 | 4.5 |
 | `stale` | 7.69 | 7.01 | 6.40 | 5.71 | 4.5 |
 | `focus-ring` | 13.53 | 12.34 | 11.27 | 10.05 | 3.0 |
 | `border-strong` | 4.37 | 3.98 | 3.63 | 3.24 | 3.0 |
@@ -207,11 +267,11 @@ Ratios use the WCAG 2.2 relative luminance formula and are truncated (never roun
 | `on-fill` on `accent-hover` | 11.86 | 4.5 |
 | `on-fill` on `accent-active` | 7.58 | 4.5 |
 | `on-fill` on `alert-none` | 7.87 | 4.5 |
-| `on-fill` on `alert-1` | 12.77 | 4.5 |
-| `on-fill` on `alert-2` | 10.63 | 4.5 |
-| `on-fill` on `alert-3` | 8.28 | 4.5 |
-| `on-fill` on `alert-4` | 6.75 | 4.5 |
-| `on-fill` on `alert-5` | 7.05 | 4.5 |
+| `on-fill` on `alert-1` | 15.61 | 4.5 |
+| `on-fill` on `alert-2` | 13.46 | 4.5 |
+| `on-fill` on `alert-3` | 9.59 | 4.5 |
+| `on-fill` on `alert-4` | 7.11 | 4.5 |
+| `on-fill` on `alert-5` | 6.16 | 4.5 |
 | `on-fill` on `stale` | 7.62 | 4.5 |
 
 ### Live indicator at its dimmest
@@ -254,8 +314,8 @@ BACKGROUNDS = {"bg-base": "#0A0F17", "surface-1": "#111A26", "surface-2": "#1722
 FOREGROUNDS = {
     "text-primary": "#E6EDF5", "text-secondary": "#A9B7C9", "text-muted": "#8595AB",
     "accent": "#3CCFE6", "accent-hover": "#6ADCEE", "accent-active": "#22B3CA",
-    "alert-none": "#9AA8BA", "alert-1": "#E6D56A", "alert-2": "#F2B84B", "alert-3": "#F7923F",
-    "alert-4": "#FF6A55", "alert-5": "#F46BC8", "stale": "#A99CD6",
+    "alert-none": "#9AA8BA", "alert-1": "#F5EE4C", "alert-2": "#FFD28C", "alert-3": "#FDA44A",
+    "alert-4": "#FB7472", "alert-5": "#D65BFF", "stale": "#A99CD6",
     "focus-ring": "#8FE6F5", "border-strong": "#647A98", "border-subtle": "#26364D",
 }
 ON_FILL = "#06111A"
