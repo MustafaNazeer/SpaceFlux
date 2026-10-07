@@ -1,0 +1,282 @@
+# The read API for the dashboard (docs/api/graphql.md). Field names and meanings are the ones docs/api/rest.md and
+# schemas/alerts/v1.schema.json use. Times are RFC 3339 UTC strings; a time kept as text in a contract is returned
+# exactly as received. Writes stay on REST: this schema has no mutations.
+
+type Query {
+  "G, R and S, always all three (REST section 1)."
+  space_weather_current: SpaceWeatherCurrent!
+  "The state of each interval or sample in a range of at most 7 days, oldest first (REST section 2)."
+  space_weather_history(scale: String!, satellite: Int, from: String!, to: String!, limit: Int, after: String): SpaceWeatherHistory!
+  "The current screening run, or null when no complete run is stored (REST section 3)."
+  screening_current: ScreeningCurrent
+  "One alert by its event_id, or null when it is not stored (REST section 4)."
+  alert(event_id: String!): Alert
+  "Close approaches, and space weather events that enter, change or leave a level, newest first."
+  alerts(limit: Int, after: String): AlertPage!
+  "One catalog object, or null when it is not in the catalog (REST section 5)."
+  catalog_object(norad_cat_id: Int!): CatalogObject
+  "Every watchlist object, ordered by catalog number (REST section 6)."
+  watchlist: [WatchlistObject!]!
+}
+
+type SpaceWeatherCurrent {
+  as_of: String!
+  scales: [ScaleState!]!
+}
+
+type ScaleState {
+  scale: String!
+  satellite: Int
+  state: String!
+  derived_level: Int
+  derived_label: String
+  value: Float
+  unit: String
+  xray_class: String
+  time_tag: String
+  interval_start: String
+  sample_time: String
+  freshness_reference: String
+  no_data_reason: String
+  no_data_since: String
+  age_limit_s: Int
+  rules_version: Int
+}
+
+type SpaceWeatherHistory {
+  scale: String!
+  satellite: Int
+  items: [SpaceWeatherHistoryItem!]!
+  next: String
+}
+
+type SpaceWeatherHistoryItem {
+  interval_start: String
+  interval_end: String
+  sample_time: String
+  time_tag: String
+  state: String!
+  derived_level: Int
+  derived_label: String
+  value: Float
+  unit: String
+  xray_class: String
+  no_data_reason: String
+  no_data_since: String
+  trigger: String!
+  event_id: String!
+}
+
+type ScreeningCurrent {
+  stale: Boolean!
+  summary: ScreeningRun!
+  approaches: [Approach!]!
+}
+
+type Approach {
+  event_id: String!
+  close_approach: CloseApproach!
+  acknowledgement: Acknowledgement
+}
+
+"The newest acknowledgement row of an alert. principal and note are returned only to the signed in operator."
+type Acknowledgement {
+  action: String!
+  acted_at: String!
+  principal: String
+  note: String
+}
+
+type AlertPage {
+  items: [Alert!]!
+  next: String
+}
+
+"One stored event with when it arrived and its acknowledgement. Exactly one of the three kind fields is set."
+type Alert {
+  schema_version: Int!
+  kind: String!
+  rules_version: Int!
+  event_id: String!
+  produced_at: String!
+  received_at: String!
+  space_weather_level: SpaceWeatherLevel
+  close_approach: CloseApproach
+  screening_run: ScreeningRun
+  acknowledgement: Acknowledgement
+}
+
+type SpaceWeatherLevel {
+  scale: String!
+  product: String!
+  state: String!
+  derived_level: Int
+  derived_label: String!
+  previous_state: String
+  previous_derived_level: Int
+  trigger: String!
+  derived_from: String!
+  estimated: Boolean!
+  satellite: Int
+  band: String
+  channel: String
+  value: Float
+  unit: String!
+  xray_class: String
+  time_tag: String
+  interval_start: String
+  interval_end: String
+  sample_time: String
+  averaging_period_s: Int
+  fetched_at: String
+  source_url: String
+  freshness_reference: String
+  no_data_since: String
+  no_data_reason: String
+  restated_by_time_tag: String
+  timer_refresh_at: String
+  ended_by_satellite: Int
+}
+
+type CloseApproach {
+  run_id: String!
+  window_start: String!
+  window_end: String!
+  watchlist_object: ScreenedObject!
+  other_object: ScreenedObject!
+  time_of_closest_approach: String!
+  miss_distance_m: Float!
+  relative_speed_m_per_s: Float!
+}
+
+type ScreenedObject {
+  catalog_number: Int!
+  name: String
+  element_age_days: Float!
+}
+
+type ScreeningRun {
+  run_id: String!
+  window_start: String!
+  window_end: String!
+  input_fetched_at: String!
+  report_distance_m: Float!
+  coverage: Coverage!
+  approach_count: Int!
+  approach_event_ids: [String!]!
+  suppressed: [SuppressedPair!]!
+  rejected: [RejectedObject!]!
+  not_screened: [NotScreenedObject!]!
+  epoch_after_start: [EpochAfterStart!]!
+  differing_copies: [DifferingCopy!]!
+  differing_copies_over_cap: [DifferingCopiesOverCap!]
+  omitted: Omitted
+}
+
+type Coverage {
+  watchlist_accepted: Int!
+  catalog_admitted: Int!
+  pairs: Int!
+  pairs_not_screenable: Int!
+  pairs_removed_by_prefilter: Int!
+  pairs_searched: Int!
+}
+
+type SuppressedPair {
+  watchlist_number: Int!
+  watchlist_name: String
+  other_number: Int!
+  other_name: String
+  mechanism: String!
+  detail: String!
+  min_separation_m: Float!
+  min_separation_at: String!
+  max_separation_m: Float!
+  stack_entry_may_be_stale: Boolean!
+  "The station stack, for mechanism static_stack in runs published since the field was added; null otherwise."
+  stack_name: String
+}
+
+type RejectedObject {
+  catalog_number: Int!
+  name: String
+  role: String!
+  code: String!
+  reason: String!
+}
+
+type NotScreenedObject {
+  catalog_number: Int!
+  name: String
+  role: String!
+  kind: String!
+  screened_until: String
+  reason: String!
+}
+
+type EpochAfterStart {
+  catalog_number: Int!
+  name: String
+  seconds_after_start: Float!
+}
+
+type DifferingCopy {
+  catalog_number: Int!
+  used_name: String
+  used_epoch: String!
+  dropped_name: String
+  dropped_epoch: String!
+  dropped_from: String!
+  elements_differ: Boolean!
+}
+
+type DifferingCopiesOverCap {
+  catalog_number: Int!
+  epoch: String!
+  records_not_listed: Int!
+}
+
+type Omitted {
+  approach_event_ids: Int!
+  suppressed: Int!
+  rejected: Int!
+  not_screened: Int!
+  epoch_after_start: Int!
+  differing_copies: Int!
+  differing_copies_over_cap: Int!
+}
+
+type CatalogObject {
+  norad_cat_id: Int!
+  object_name: String
+  object_name_cut: Boolean
+  object_id: String
+  epoch: String
+  epoch_text: String
+  mean_motion: Float
+  eccentricity: Float
+  inclination: Float
+  ra_of_asc_node: Float
+  arg_of_pericenter: Float
+  mean_anomaly: Float
+  bstar: Float
+  mean_motion_dot: Float
+  mean_motion_ddot: Float
+  ephemeris_type: Int
+  classification_type: String
+  element_set_no: Int
+  rev_at_epoch: Int
+  fetched_at: String
+  source_url: String
+  first_fetched_at: String
+  last_fetched_at: String
+  "The object's close approaches in either role, newest first."
+  close_approaches(limit: Int, after: String): AlertPage!
+}
+
+type WatchlistObject {
+  catalog_number: Int!
+  name: String
+  rules_version: Int!
+  catalog: CatalogObject
+}

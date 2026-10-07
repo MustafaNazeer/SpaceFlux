@@ -11,6 +11,15 @@ spring:
   jackson:
     property-naming-strategy: SNAKE_CASE
     default-property-inclusion: non_absent
+  # The dashboard's read API (docs/api/graphql.md, ADR 0012); its limits are set in code.
+  graphql:
+    http:
+      path: /api/graphql
+    schema:
+      introspection:
+        # Off unless GRAPHQL_INTROSPECTION=true, which only the local Compose stack sets. Turning it off is JVM
+        # wide and cannot be undone without a restart (ADR 0012, fact 1).
+        enabled: ${GRAPHQL_INTROSPECTION:false}
   web:
     resources:
       # No static content is served, so an unknown path reaches the API's 404 problem body.

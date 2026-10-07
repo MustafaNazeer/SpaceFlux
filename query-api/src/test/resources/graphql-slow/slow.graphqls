@@ -1,0 +1,4 @@
+extend type Query {
+  slow_blocking: String
+  slow_statement: Int
+}

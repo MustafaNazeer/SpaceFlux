@@ -33,6 +33,10 @@ public class ApiErrors extends ResponseEntityExceptionHandler {
             super(detail, null, false, false);
             this.status = status;
         }
+
+        public HttpStatus status() {
+            return status;
+        }
     }
 
     @ExceptionHandler(Refused.class)

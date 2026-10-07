@@ -9,6 +9,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.ConfigurableEnvironment;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.support.JdbcTransactionManager;
 
@@ -40,9 +41,14 @@ class MysqlPools {
         return JdbcClient.create(dataSource);
     }
 
+    /** No statement from the HTTP handlers holds a connection longer than this (ADR 0012, section 5). */
+    static final int API_QUERY_TIMEOUT_S = 3;
+
     @Bean
     JdbcClient apiJdbcClient(@Qualifier("apiDataSource") DataSource dataSource) {
-        return JdbcClient.create(dataSource);
+        JdbcTemplate template = new JdbcTemplate(dataSource);
+        template.setQueryTimeout(API_QUERY_TIMEOUT_S);
+        return JdbcClient.create(template);
     }
 
     @Bean

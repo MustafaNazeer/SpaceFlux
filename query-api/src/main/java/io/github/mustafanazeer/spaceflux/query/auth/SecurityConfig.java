@@ -40,6 +40,7 @@ public class SecurityConfig {
     static final String LOGIN = "/api/auth/login";
     static final String LOGOUT = "/api/auth/logout";
     public static final String ACKNOWLEDGEMENTS = "/api/alerts/acknowledgements";
+    static final String GRAPHQL = "/api/graphql";
     /**
      * Matched as form login and authorization match, on the decoded path: comparing getRequestURI() instead would
      * let a percent encoded path such as /api/auth/%6Cogin skip a filter that the login itself still reaches.
@@ -59,7 +60,7 @@ public class SecurityConfig {
         http.authorizeHttpRequests(a -> a
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.POST, ACKNOWLEDGEMENTS).hasAuthority(Operator.AUTHORITY)
-                        .requestMatchers(HttpMethod.POST, LOGIN, LOGOUT).permitAll()
+                        .requestMatchers(HttpMethod.POST, LOGIN, LOGOUT, GRAPHQL).permitAll()
                         .requestMatchers(HttpMethod.GET).permitAll()
                         .requestMatchers(HttpMethod.HEAD).permitAll()
                         .anyRequest().denyAll())

@@ -17,6 +17,11 @@ public final class OperatorApp implements AutoCloseable {
     public final String base;
 
     public OperatorApp(String... more) {
+        this(new Class<?>[0], more);
+    }
+
+    /** With extra configuration classes, such as a test's own controller, which component scanning leaves out. */
+    public OperatorApp(Class<?>[] sources, String... more) {
         TestMysql.start();
         String[] args = {"--server.port=0", "--spaceflux.alerts.enabled=false", "--spaceflux.catalog.enabled=false",
             "--ACK_OPERATOR_USERNAME=" + OPERATOR, "--ACK_OPERATOR_BCRYPT_COST=" + COST,
@@ -24,7 +29,10 @@ public final class OperatorApp implements AutoCloseable {
         String[] all = new String[args.length + more.length];
         System.arraycopy(args, 0, all, 0, args.length);
         System.arraycopy(more, 0, all, args.length, more.length);
-        context = new SpringApplicationBuilder(QueryApiApplication.class).web(WebApplicationType.SERVLET)
+        Class<?>[] classes = new Class<?>[sources.length + 1];
+        classes[0] = QueryApiApplication.class;
+        System.arraycopy(sources, 0, classes, 1, sources.length);
+        context = new SpringApplicationBuilder(classes).web(WebApplicationType.SERVLET)
                 .run(TestMysql.args(all));
         base = "http://127.0.0.1:" + ((WebServerApplicationContext) context).getWebServer().getPort();
     }

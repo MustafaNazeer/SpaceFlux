@@ -23,7 +23,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** POST and GET /api/alerts/acknowledgements and the operator's view of alerts (docs/api/rest.md, sections 8, 9). */
-class AcknowledgementIntegrationTest {
+public class AcknowledgementIntegrationTest {
 
     static final ObjectMapper JSON = new ObjectMapper();
     static final Path EXAMPLES = Path.of("..", "schemas", "alerts", "examples");
@@ -58,7 +58,7 @@ class AcknowledgementIntegrationTest {
     }
 
     /** Stores an example event under a fresh event_id, with only its alert_event row; returns the event_id. */
-    static String stored(String file) throws Exception {
+    public static String stored(String file) throws Exception {
         String text = Files.readString(EXAMPLES.resolve(file));
         String original = JSON.readTree(text).get("event_id").asString();
         String id = original + "/" + UUID.randomUUID();
@@ -83,7 +83,7 @@ class AcknowledgementIntegrationTest {
         return id;
     }
 
-    static HttpResponse<String> post(Browser b, String eventId, String body) throws Exception {
+    public static HttpResponse<String> post(Browser b, String eventId, String body) throws Exception {
         return b.postJson("/api/alerts/acknowledgements?event_id=" + q(eventId), body);
     }
 

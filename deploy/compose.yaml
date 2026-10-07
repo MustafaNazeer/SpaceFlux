@@ -203,6 +203,8 @@ services:
       ACK_OPERATOR_PASSWORD_HASH: ${ACK_OPERATOR_PASSWORD_HASH:-}
       # Never empty: an empty value would replace the service's default and fail to start it.
       ACK_OPERATOR_BCRYPT_COST: ${ACK_OPERATOR_BCRYPT_COST:-14}
+      # Local only: the demo environment leaves GraphQL introspection at its default, off (ADR 0012).
+      GRAPHQL_INTROSPECTION: "true"
       # As for risk-engine: snappy and zstd unpack a native library, so they get an exec tmpfs of their own
       # and /tmp stays noexec. query-api checks every codec at startup.
       JAVA_TOOL_OPTIONS: -Dorg.xerial.snappy.tempdir=/native -DZstdTempFolder=/native

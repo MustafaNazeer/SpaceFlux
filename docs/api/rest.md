@@ -3,7 +3,7 @@
 * **Status:** accepted, 2026-10-04.
 * **Served by:** `query-api`, under the `/api` prefix, read only for anonymous viewers ([ADR 0009](../adr/0009-alert-acknowledgement-auth.md), decision 6). Conventions are in [ADR 0010](../adr/0010-query-api-stack.md), decision 6 and its amendment: `snake_case` fields with the contract names, keyset paging, RFC 9457 problem details, and an `X-Correlation-Id` header on every response.
 
-This page covers six read endpoints, the operator's session, and acknowledgement. The newest alerts list, the paged catalog, and an object's full coverage come later.
+This page covers six read endpoints, the operator's session, and acknowledgement. The recent alerts list and an object's close approaches are served by the [GraphQL API](graphql.md) only; the paged catalog and an object's full coverage come later.
 
 ## Common rules
 
