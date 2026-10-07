@@ -129,6 +129,7 @@ unzip -p AIAA-2006-6753.zip sgp4/for/tforverf.out | sha256sum
 | Source URL | https://raw.githubusercontent.com/CS-SI/Orekit/13.1.8/src/test/resources/tle/extrapolationTest-data/SatCode-results |
 | Tag | `13.1.8` |
 | Fetched | 2026-09-27 |
+| Same at tag `13.1.9` | Checked 2026-10-07: `SatCode-results`, `LICENSE.txt` and `NOTICE.txt` at tag `13.1.9` have the SHA256 values below, so the extract and the license files are unchanged for the pinned Orekit 13.1.9 |
 | Source file SHA256 | `157b8035555adce15716baa99880d26dd8061ce7a70c0421428f857fc33ce19c` |
 | Extract SHA256 | `648ff8274f061b9817770f966756d798af39bef26370b03d6f83d41e28ec77d3` |
 | License | Apache License 2.0, copied from the same tag as `OREKIT-LICENSE.txt` (SHA256 `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`), with Orekit's `NOTICE.txt` as `OREKIT-NOTICE.txt` (SHA256 `dc8ea1d4aed11cba83d3f38de87518b274260fb529f01072af9d6c553ce8c440`) |
@@ -139,4 +140,5 @@ To check the extract:
 
 ```
 curl -sS https://raw.githubusercontent.com/CS-SI/Orekit/13.1.8/src/test/resources/tle/extrapolationTest-data/SatCode-results | sed -n '293,330p' | sha256sum
+curl -sS https://raw.githubusercontent.com/CS-SI/Orekit/13.1.9/src/test/resources/tle/extrapolationTest-data/SatCode-results | sed -n '293,330p' | sha256sum
 ```

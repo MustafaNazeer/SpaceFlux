@@ -25,7 +25,7 @@
 
   <properties>
     <java.version>21</java.version>
-    <orekit.version>13.1.8</orekit.version>
+    <orekit.version>13.1.9</orekit.version>
     <jackson-bom.version>3.1.7</jackson-bom.version>
     <kafka.version>4.2.2</kafka.version>
     <json-schema-validator.version>3.0.8</json-schema-validator.version>
