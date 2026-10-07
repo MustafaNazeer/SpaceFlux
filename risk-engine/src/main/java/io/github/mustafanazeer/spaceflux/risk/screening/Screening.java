@@ -131,7 +131,7 @@ public final class Screening {
                     continue;
                 }
                 if (ClosestApproachSearch.sameElements(a.object().tle(), b.object().tle())) {
-                    suppressed.add(new SuppressedPair(x, y, SuppressedPair.Mechanism.SAME_ELEMENTS,
+                    suppressed.add(new SuppressedPair(x, y, SuppressedPair.Mechanism.SAME_ELEMENTS, null,
                             "not screened for close approaches: identical element sets, so the propagated separation "
                                     + "is 0 km throughout; likely a duplicate record or a set shared by attached objects",
                             0, start, 0, false));
@@ -206,8 +206,8 @@ public final class Screening {
             detail += String.format(Locale.ROOT, "; that exceeds the %.0f km co-orbiting bound, so the list entry may "
                     + "be stale", coOrbitingBoundM / 1000);
         }
-        return new SuppressedPair(x, y, SuppressedPair.Mechanism.STATIC_STACK, detail, s.minM(), s.minAt(), s.maxM(),
-                mayBeStale);
+        return new SuppressedPair(x, y, SuppressedPair.Mechanism.STATIC_STACK, stack, detail, s.minM(), s.minAt(),
+                s.maxM(), mayBeStale);
     }
 
     /** ISO dates compare correctly as text. */
@@ -226,8 +226,8 @@ public final class Screening {
             detail += String.format(Locale.ROOT, "; the sampled minimum is within the %.0f km report distance, and "
                     + "approaches for this pair were not computed", ScreeningSettings.REPORT_DISTANCE_M / 1000);
         }
-        return new SuppressedPair(x, y, SuppressedPair.Mechanism.CO_ORBITING, detail, s.minM(), s.minAt(), s.maxM(),
-                false);
+        return new SuppressedPair(x, y, SuppressedPair.Mechanism.CO_ORBITING, null, detail, s.minM(), s.minAt(),
+                s.maxM(), false);
     }
 
     private static String utc(AbsoluteDate date) {

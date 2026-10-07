@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "kind": "screening_run",
+  "rules_version": 1,
+  "event_id": "screening_run/1/2026-10-01T23:40:11.638297494Z/1",
+  "produced_at": "2026-10-06T18:07:31.562785313Z",
+  "screening_run": {
+    "run_id": "2026-10-01T23:40:11.638297494Z/1",
+    "window_start": "2026-10-01T23:40:11.638297494Z",
+    "window_end": "2026-10-08T23:40:11.638297494Z",
+    "input_fetched_at": "2026-10-01T23:40:11.638297494Z",
+    "report_distance_m": 5000,
+    "coverage": {
+      "watchlist_accepted": 1,
+      "catalog_admitted": 22,
+      "pairs": 21,
+      "pairs_not_screenable": 0,
+      "pairs_removed_by_prefilter": 14,
+      "pairs_searched": 0
+    },
+    "approach_count": 0,
+    "approach_event_ids": [],
+    "suppressed": [
+      {
+        "watchlist_number": 25544,
+        "watchlist_name": "ISS (ZARYA)",
+        "other_number": 36086,
+        "other_name": "POISK",
+        "mechanism": "static_stack",
+        "stack_name": "International Space Station",
+        "detail": "not screened for close approaches: both are in the International Space Station stack (pair listed since 2026-09-27); separation between the members' propagated element sets, not a measured distance, 0.0 to 0.0 km at the 10 s samples from 2026-10-01T23:40:11.638297494Z to 2026-10-08T23:40:11.638297494Z",
+        "min_separation_m": 0.0,
+        "min_separation_at": "2026-10-01T23:40:11.638Z",
+        "max_separation_m": 0.0,
+        "stack_entry_may_be_stale": false
+      },
+      {
+        "watchlist_number": 25544,
+        "watchlist_name": "ISS (ZARYA)",
+        "other_number": 49044,
+        "other_name": "ISS (NAUKA)",
+        "mechanism": "static_stack",
+        "stack_name": "International Space Station",
+        "detail": "not screened for close approaches: both are in the International Space Station stack (pair listed since 2026-09-27); separation between the members' propagated element sets, not a measured distance, 0.0 to 0.0 km at the 10 s samples from 2026-10-01T23:40:11.638297494Z to 2026-10-08T23:40:11.638297494Z",
+        "min_separation_m": 0.0,
+        "min_separation_at": "2026-10-01T23:40:11.638Z",
+        "max_separation_m": 0.0,
+        "stack_entry_may_be_stale": false
+      },
+      {
+        "watchlist_number": 25544,
+        "watchlist_name": "ISS (ZARYA)",
+        "other_number": 67796,
+        "other_name": "CREW DRAGON 12",
+        "mechanism": "static_stack",
+        "stack_name": "International Space Station",
+        "detail": "not screened for close approaches: both are in the International Space Station stack (pair listed since 2026-09-27); separation between the members' propagated element sets, not a measured distance, 0.0 to 0.0 km at the 10 s samples from 2026-10-01T23:40:11.638297494Z to 2026-10-08T23:40:11.638297494Z",
+        "min_separation_m": 0.0,
+        "min_separation_at": "2026-10-01T23:40:11.638Z",
+        "max_separation_m": 0.0,
+        "stack_entry_may_be_stale": false
+      },
+      {
+        "watchlist_number": 25544,
+        "watchlist_name": "ISS (ZARYA)",
+        "other_number": 68689,
+        "other_name": "CYGNUS NG-24",
+        "mechanism": "static_stack",
+        "stack_name": "International Space Station",
+        "detail": "not screened for close approaches: both are in the International Space Station stack (pair listed since 2026-09-27); separation between the members' propagated element sets, not a measured distance, 0.0 to 0.0 km at the 10 s samples from 2026-10-01T23:40:11.638297494Z to 2026-10-08T23:40:11.638297494Z",
+        "min_separation_m": 0.0,
+        "min_separation_at": "2026-10-01T23:40:11.638Z",
+        "max_separation_m": 0.0,
+        "stack_entry_may_be_stale": false
+      },
+      {
+        "watchlist_number": 25544,
+        "watchlist_name": "ISS (ZARYA)",
+        "other_number": 68837,
+        "other_name": "PROGRESS-MS 34",
+        "mechanism": "static_stack",
+        "stack_name": "International Space Station",
+        "detail": "not screened for close approaches: both are in the International Space Station stack (pair listed since 2026-09-27); separation between the members' propagated element sets, not a measured distance, 0.0 to 0.0 km at the 10 s samples from 2026-10-01T23:40:11.638297494Z to 2026-10-08T23:40:11.638297494Z",
+        "min_separation_m": 0.0,
+        "min_separation_at": "2026-10-01T23:40:11.638Z",
+        "max_separation_m": 0.0,
+        "stack_entry_may_be_stale": false
+      },
+      {
+        "watchlist_number": 25544,
+        "watchlist_name": "ISS (ZARYA)",
+        "other_number": 100057,
+        "other_name": "SOYUZ-MS 29",
+        "mechanism": "static_stack",
+        "stack_name": "International Space Station",
+        "detail": "not screened for close approaches: both are in the International Space Station stack (pair listed since 2026-09-27); separation between the members' propagated element sets, not a measured distance, 0.0 to 0.0 km at the 10 s samples from 2026-10-01T23:40:11.638297494Z to 2026-10-08T23:40:11.638297494Z",
+        "min_separation_m": 0.0,
+        "min_separation_at": "2026-10-01T23:40:11.638Z",
+        "max_separation_m": 0.0,
+        "stack_entry_may_be_stale": false
+      },
+      {
+        "watchlist_number": 25544,
+        "watchlist_name": "ISS (ZARYA)",
+        "other_number": 100712,
+        "other_name": "PROGRESS-MS 35",
+        "mechanism": "static_stack",
+        "stack_name": "International Space Station",
+        "detail": "not screened for close approaches: both are in the International Space Station stack (pair listed since 2026-09-27); separation between the members' propagated element sets, not a measured distance, 0.0 to 0.0 km at the 10 s samples from 2026-10-01T23:40:11.638297494Z to 2026-10-08T23:40:11.638297494Z",
+        "min_separation_m": 0.0,
+        "min_separation_at": "2026-10-01T23:40:11.638Z",
+        "max_separation_m": 0.0,
+        "stack_entry_may_be_stale": false
+      }
+    ],
+    "rejected": [],
+    "not_screened": [],
+    "epoch_after_start": [],
+    "differing_copies": [],
+    "differing_copies_over_cap": [],
+    "omitted": {
+      "approach_event_ids": 0,
+      "suppressed": 0,
+      "rejected": 0,
+      "not_screened": 0,
+      "epoch_after_start": 0,
+      "differing_copies": 0,
+      "differing_copies_over_cap": 0
+    }
+  }
+}

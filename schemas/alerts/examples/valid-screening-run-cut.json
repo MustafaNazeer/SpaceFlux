@@ -26,6 +26,7 @@
         "watchlist_name": "ISS (ZARYA)",
         "other_number": 49044,
         "mechanism": "static_stack",
+        "stack_name": "International Space Station",
         "detail": "not screened for close approaches: both are in the International Space Station stack (pair listed since 2026-09-27); separation between the members' propagated element sets, not a measured distance, 0.0 to 0.1 km at the 10 s samples from 2026-09-29T07:30:00Z to 2026-10-06T07:30:00Z",
         "min_separation_m": 41.2,
         "min_separation_at": "2026-09-29T08:30:00.000Z",

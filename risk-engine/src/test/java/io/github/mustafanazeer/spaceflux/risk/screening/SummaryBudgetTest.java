@@ -27,8 +27,8 @@ class SummaryBudgetTest {
     private static ScreeningResult result(int suppressed, int rejected) {
         List<SuppressedPair> s = new ArrayList<>();
         for (int i = 0; i < suppressed; i++) {
-            s.add(new SuppressedPair(25544, 100_000 + i, SuppressedPair.Mechanism.CO_ORBITING, "d".repeat(300), 100.0,
-                    START, 400.0, false));
+            s.add(new SuppressedPair(25544, 100_000 + i, SuppressedPair.Mechanism.CO_ORBITING, null, "d".repeat(300),
+                    100.0, START, 400.0, false));
         }
         List<ScreeningResult.Rejected> r = new ArrayList<>();
         for (int i = 0; i < rejected; i++) {
@@ -159,8 +159,8 @@ class SummaryBudgetTest {
         List<ScreeningJson.OverCap> overCap = new ArrayList<>();
         for (int i = 0; i < 100; i++) {
             approaches.add(new CloseApproach(25544, 300_000 + i, START, 1000.0, 10.0, 1.0, 1.0));
-            suppressed.add(new SuppressedPair(25544, 310_000 + i, SuppressedPair.Mechanism.CO_ORBITING, "d", 100.0,
-                    START, 400.0, false));
+            suppressed.add(new SuppressedPair(25544, 310_000 + i, SuppressedPair.Mechanism.CO_ORBITING, null, "d",
+                    100.0, START, 400.0, false));
             rejected.add(new ScreeningResult.Rejected(320_000 + i, Role.CATALOG,
                     ScreeningResult.Rejected.Code.STALE_ELEMENT_SET, "r"));
             notScreened.add(new ScreeningResult.NotScreened(330_000 + i, Role.CATALOG,

@@ -69,6 +69,10 @@ class ScreeningJsonTest {
         assertThat(run.get("screening_run").get("suppressed")).allSatisfy(n -> {
             assertThat(n.get("watchlist_name").asString()).isEqualTo("ISS (ZARYA)");
             assertThat(n.get("other_name").asString()).isNotBlank();
+            assertThat(n.get("stack_name").asString()).isEqualTo("International Space Station");
+            List<String> fields = new java.util.ArrayList<>();
+            n.propertyNames().forEach(fields::add);
+            assertThat(fields.indexOf("stack_name")).isEqualTo(fields.indexOf("mechanism") + 1);
         });
         assertThat(run.get("screening_run").get("approach_count").asInt()).isEqualTo(events.size() - 1);
         TopicSchemas schemas = TopicSchemas.fromClasspath();

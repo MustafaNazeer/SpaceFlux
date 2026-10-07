@@ -596,15 +596,24 @@
             "properties": {
               "watchlist_number": {"$ref": "#/$defs/catalogNumber"},
               "other_number": {"$ref": "#/$defs/catalogNumber"},
-              "mechanism": {"description": "Why the pair was not screened; known values in docs/data/topics.md.", "$ref": "#/$defs/code"},
+              "mechanism": {"description": "Why the pair was not screened; known values in docs/data/topics.md. Only static_stack entries carry stack_name.", "$ref": "#/$defs/code"},
               "detail": {"description": "Readable explanation, as risk-engine wrote it. For static_stack it gives the separation between the members' propagated element sets, not a measured distance.", "type": "string", "minLength": 1},
               "watchlist_name": {"description": "OBJECT_NAME of the watchlist object's element set, when it has one.", "$ref": "#/$defs/objectName"},
               "other_name": {"description": "OBJECT_NAME of the other object's element set, when it has one.", "$ref": "#/$defs/objectName"},
               "min_separation_m": {"description": "Smallest sampled separation, in metres.", "type": "number", "minimum": 0},
               "min_separation_at": {"description": "UTC time of the smallest sampled separation.", "$ref": "#/$defs/utc"},
               "max_separation_m": {"description": "Largest sampled separation, in metres.", "type": "number", "minimum": 0},
-              "stack_entry_may_be_stale": {"description": "True when a pair listed in the same station stack separated beyond the co-orbiting bound.", "type": "boolean"}
+              "stack_entry_may_be_stale": {"description": "True when a pair listed in the same station stack separated beyond the co-orbiting bound.", "type": "boolean"},
+              "stack_name": {
+                "description": "Name of the station stack both objects are listed in, exactly as stacks.json names it (risk-engine/src/main/resources/screening/stacks.json), for example International Space Station. Written on every static_stack entry from this field's introduction on, and never on an entry with another mechanism. Absent on static_stack entries of summaries written before the field existed; a consumer then shows the pair as listed in the same station stack without a name, and never parses detail for one. Stack names are checked when the list is loaded, not cut: 1 to 64 Unicode code points, no control character (U+0000 to U+001F and U+007F to U+009F), and no space (U+0020) at either end; the loader applies exactly the limits stated here. A display label only; the catalog numbers identify the pair.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F ]([^\\u0000-\\u001F\\u007F-\\u009F]*[^\\u0000-\\u001F\\u007F-\\u009F ])?$"
+              }
             },
+            "if": {"required": ["stack_name"]},
+            "then": {"properties": {"mechanism": {"const": "static_stack"}}, "required": ["mechanism"]},
             "additionalProperties": true
           }
         },

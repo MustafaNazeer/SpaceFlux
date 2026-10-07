@@ -36,13 +36,15 @@ class ScreeningCutExampleTest {
             ? Double.compare(a.asDouble(), b.asDouble())
             : a.equals(b) ? 0 : 1;
 
+    private static final String STACK = "International Space Station";
+
     /** The wording Screening writes for a pair in a stack, so the example stays exact if the budget changes. */
     private static String stackDetail(double minM, double maxM, AbsoluteDate start, AbsoluteDate end) {
         return String.format(Locale.ROOT,
                 "not screened for close approaches: both are in the %s stack (pair listed since %s); separation "
                         + "between the members' propagated element sets, not a measured distance, %.1f to %.1f km "
                         + "at the %.0f s samples from %s to %s",
-                "International Space Station", "2026-09-27", minM / 1000, maxM / 1000, ScreeningSettings.SAMPLE_STEP_S,
+                STACK, "2026-09-27", minM / 1000, maxM / 1000, ScreeningSettings.SAMPLE_STEP_S,
                 utc(start), utc(end));
     }
 
@@ -68,11 +70,11 @@ class ScreeningCutExampleTest {
         CloseApproach approach = new CloseApproach(25544, 27958,
                 new AbsoluteDate("2026-09-30T03:34:37.588", OrekitData.utc()), 1973.3, 15727, 1.5585, 4.1985);
         List<SuppressedPair> suppressed = List.of(
-                new SuppressedPair(25544, 49044, SuppressedPair.Mechanism.STATIC_STACK,
+                new SuppressedPair(25544, 49044, SuppressedPair.Mechanism.STATIC_STACK, STACK,
                         stackDetail(41.2, 58.9, start, end), 41.2, start.shiftedBy(3600), 58.9, false),
-                new SuppressedPair(25544, 67796, SuppressedPair.Mechanism.STATIC_STACK,
+                new SuppressedPair(25544, 67796, SuppressedPair.Mechanism.STATIC_STACK, STACK,
                         stackDetail(37.5, 52.1, start, end), 37.5, start.shiftedBy(7200), 52.1, false),
-                new SuppressedPair(25544, 63129, SuppressedPair.Mechanism.CO_ORBITING,
+                new SuppressedPair(25544, 63129, SuppressedPair.Mechanism.CO_ORBITING, null,
                         coOrbitingDetail(812.4, start.shiftedBy(10800), 2410.7, start, end), 812.4, start.shiftedBy(10800), 2410.7, false));
         List<ScreeningResult.Rejected> rejected = List.of(
                 new ScreeningResult.Rejected(43205, Role.CATALOG, ScreeningResult.Rejected.Code.STALE_ELEMENT_SET,

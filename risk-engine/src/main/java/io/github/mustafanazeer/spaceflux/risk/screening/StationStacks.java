@@ -47,7 +47,7 @@ public final class StationStacks {
             Map<Integer, String> addedOn = new HashMap<>();
             Set<String> names = new HashSet<>();
             for (JsonNode stack : required(new ObjectMapper().readTree(in), "stacks", resource)) {
-                String name = required(stack, "name", resource).asString();
+                String name = stackName(required(stack, "name", resource).asString(), resource);
                 if (!names.add(name)) {
                     throw new IllegalStateException(name + " is listed twice in " + resource);
                 }
@@ -76,6 +76,21 @@ public final class StationStacks {
             throw new IllegalStateException("missing \"" + field + "\" in " + where);
         }
         return value;
+    }
+
+    /**
+     * A stack name travels as stack_name on the alerts topic, which takes 1 to 64 code points with no control
+     * character and no space at either end (ADR 0007). The list is a committed file, so a name the contract cannot
+     * carry stops the load instead of being cut.
+     */
+    private static String stackName(String name, String where) {
+        int length = name.codePointCount(0, name.length());
+        boolean control = name.codePoints().anyMatch(c -> c <= 0x1F || (c >= 0x7F && c <= 0x9F));
+        if (length < 1 || length > 64 || control || name.startsWith(" ") || name.endsWith(" ")) {
+            throw new IllegalStateException("stack name \"" + name + "\" in " + where + " must be 1 to 64 characters "
+                    + "with no control character and no space at either end");
+        }
+        return name;
     }
 
     /** Screening compares these dates as text, which orders ISO dates correctly and nothing else. */

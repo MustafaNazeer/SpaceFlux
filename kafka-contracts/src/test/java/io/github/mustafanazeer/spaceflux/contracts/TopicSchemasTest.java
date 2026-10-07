@@ -244,4 +244,39 @@ class TopicSchemasTest {
             node.forEach(n -> collectPatterns(n, out));
         }
     }
+
+    /** The stack_name rules of the alerts schema, as the Java validator applies them (ADR 0007, 2026-10-06). */
+    @Test
+    void stackNameLimitsHoldInTheJavaValidator() throws IOException {
+        ObjectMapper json = new ObjectMapper();
+        JsonNode example = json.readTree(Files.readAllBytes(
+                SCHEMAS.resolve("alerts/examples/valid-screening-run-stack.json")));
+        String fourByte = new String(Character.toChars(0x1F6F0));
+        Map<String, Boolean> accepted = new java.util.LinkedHashMap<>();
+        accepted.put("y".repeat(64), true);
+        accepted.put(fourByte.repeat(64), true);
+        accepted.put("A B", true);
+        accepted.put("y".repeat(65), false);
+        accepted.put(fourByte.repeat(65), false);
+        accepted.put("", false);
+        accepted.put(" A", false);
+        accepted.put("A ", false);
+        accepted.put("A\tB", false);
+        accepted.put("A\u007fB", false);
+        accepted.put("A\u0085B", false);
+
+        for (Map.Entry<String, Boolean> c : accepted.entrySet()) {
+            ObjectNode event = (ObjectNode) example.deepCopy();
+            ((ObjectNode) event.get("screening_run").get("suppressed").get(0)).put("stack_name", c.getKey());
+            TopicSchemas.Result r = SCHEMAS_ON_CLASSPATH.check("alerts", json.writeValueAsBytes(event));
+            assertThat(r.failure() == null).as(c.getKey().codePoints().count() + " code points: " + c.getKey())
+                    .isEqualTo(c.getValue());
+        }
+
+        ObjectNode coOrbiting = (ObjectNode) example.deepCopy();
+        ObjectNode pair = (ObjectNode) coOrbiting.get("screening_run").get("suppressed").get(0);
+        pair.put("mechanism", "co_orbiting");
+        assertThat(SCHEMAS_ON_CLASSPATH.check("alerts", json.writeValueAsBytes(coOrbiting)).failure())
+                .as("stack_name on a co_orbiting pair").isNotNull();
+    }
 }

@@ -46,6 +46,7 @@ class ScreeningTest {
             assertThat(s.detail()).contains("between the members' propagated element sets, not a measured distance");
             assertThat(s.detail()).contains("not screened for close approaches", "International Space Station",
                     "listed since 2026-09-27");
+            assertThat(s.stackName()).isEqualTo("International Space Station");
             assertThat(s.stackEntryMayBeStale()).isFalse();
             assertThat(s.maxSeparationM()).isLessThan(ScreeningSettings.CO_ORBITING_BOUND_M);
             assertThat(s.minSeparationM()).isLessThanOrEqualTo(s.maxSeparationM());
@@ -78,6 +79,7 @@ class ScreeningTest {
                 .containsExactlyInAnyOrderElementsOf(ISS_STACK_OTHERS);
         assertThat(result.suppressed()).allSatisfy(s -> {
             assertThat(s.detail()).contains("not screened for close approaches", "500 km", "not known to be attached");
+            assertThat(s.stackName()).isNull();
             assertThat(s.detail()).containsPattern(UTC_INSTANT);
             assertThat(s.minSeparationAt().durationFrom(Fixtures.STATIONS_START))
                     .isBetween(0.0, ScreeningSettings.WINDOW_S);

@@ -1,0 +1,20 @@
+{
+  "stacks": [
+    {
+      "name": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      "basis": "Test input.",
+      "members": [
+        {
+          "norad": 25544,
+          "name": "ISS (ZARYA)",
+          "added": "2026-09-27"
+        },
+        {
+          "norad": 36086,
+          "name": "POISK",
+          "added": "2026-09-27"
+        }
+      ]
+    }
+  ]
+}

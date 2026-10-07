@@ -68,4 +68,20 @@ class StationStacksTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("norad");
     }
+
+    @Test
+    void refusesAStackNameThatTheAlertsContractCannotCarry() {
+        for (String file : new String[] {"stacks-name-empty.json", "stacks-name-long.json", "stacks-name-control.json",
+            "stacks-name-space.json", "stacks-name-trailing-space.json"}) {
+            assertThatThrownBy(() -> StationStacks.load("/screening/" + file)).as(file)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("stack name");
+        }
+    }
+
+    @Test
+    void acceptsAStackNameOfSixtyFourCodePoints() {
+        assertThat(StationStacks.load("/screening/stacks-name-64.json").sharedStack(25544, 36086))
+                .contains("y".repeat(64));
+    }
 }

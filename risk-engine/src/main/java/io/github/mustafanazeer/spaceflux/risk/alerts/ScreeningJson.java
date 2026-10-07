@@ -112,6 +112,9 @@ public final class ScreeningJson {
             n.put("other_number", s.otherNumber());
             name(n, "other_name", s.otherNumber(), names);
             n.put("mechanism", code(s.mechanism()));
+            if (s.stackName() != null) {
+                n.put("stack_name", s.stackName());
+            }
             n.put("detail", s.detail());
             n.put("min_separation_m", s.minSeparationM());
             n.put("min_separation_at", time(s.minSeparationAt(), utc));
