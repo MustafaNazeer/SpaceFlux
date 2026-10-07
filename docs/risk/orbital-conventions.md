@@ -1,6 +1,6 @@
 # Orbital conventions: SGP4, frames, time scales, and close approach screening
 
-This note fixes the conventions the risk engine follows when it propagates CelesTrak GP element sets and screens a watchlist for close approaches. Every threshold, tolerance, and formula below cites the source it comes from, or is marked as a derivation with the reasoning shown. Sources were accessed on 2026-09-27 unless a row says otherwise.
+This note fixes the conventions the risk engine follows when it propagates CelesTrak GP element sets and screens a watchlist for close approaches, and those `query-api` follows when it computes passes of watchlist objects over a fixed observer (Section 6). Every threshold, tolerance, and formula below cites the source it comes from, or is marked as a derivation with the reasoning shown. Sources were accessed on 2026-09-27 unless a row says otherwise.
 
 SpaceFlux is a public data demonstration. Its close approach output is computed from public GP data with no covariance, and it is not an operational collision avoidance product. Section 5 explains what that means for how the numbers may be read.
 
@@ -28,6 +28,17 @@ SpaceFlux is a public data demonstration. Its close approach output is computed 
 | K1 | FAI, "Statement about the Karman Line", 30 Nov 2018 (fai.org returned HTTP 403 to a direct request on 2026-09-27; read through the Internet Archive snapshot of 2025-01-04, linked here) | https://www.fai.org/news/statement-about-karman-line (snapshot read: https://web.archive.org/web/20250104043504/https://www.fai.org/news/statement-about-karman-line) |
 | S1 | Space-Track.org documentation, "API Use Guidelines" table, row "GP (aka TLEs)" (public page, no login needed) | https://www.space-track.org/documentation#api-use-guidelines |
 | F2 | Hoots, Crawford, Roehrich, "An analytic method to determine future close approaches between satellites", Celestial Mechanics 33 (1984). Cited through F1; I have not read the original. | https://link.springer.com/article/10.1007/BF01234152 |
+| G1 | NOAA National Geodetic Survey, datasheet for PID AW6997, designation GEMINI 3 (datasheet95 version 8.12.5.20, retrieved 2026-10-07) | https://www.ngs.noaa.gov/cgi-bin/ds_mark.prl?PidBox=AW6997 |
+| G2 | NOAA National Geodetic Survey, datasheet for PID AW1029, designation J 1187 (retrieved 2026-10-07; an alternative point, 6.1) | https://www.ngs.noaa.gov/cgi-bin/ds_mark.prl?PidBox=AW1029 |
+| G3 | NOAA VDatum, "A tutorial on Datums" (accessed 2026-10-07) | https://vdatum.noaa.gov/docs/datums.html |
+| G4 | FAA NASR 28 day subscription, airport CSV extract effective 2026-10-01, `APT_BASE.csv`, record `72TX` (an alternative point, 6.1), and its `CSV_README.pdf` (accessed 2026-10-07) | https://nfdc.faa.gov/webContent/28DaySub/extra/01_Oct_2026_APT_CSV.zip |
+| T1 | NIST Time and Frequency Division, leap second page (accessed 2026-10-07) | https://tf.nist.gov/pubs/bulletin/leapsecond.htm |
+| T2 | IERS Bulletin A, Vol. XXXIX No. 040, 1 October 2026 (accessed 2026-10-07) | https://maia.usno.navy.mil/ser7/ser7.dat |
+| O13 | Orekit 13.1.9, `ElevationDetector`, `ElevationExtremumDetector`, `EventState`, `EventDetectionSettings` and `AbstractAnalyticalPropagator` sources (Apache License 2.0) (accessed 2026-10-07) | https://github.com/CS-SI/Orekit/tree/13.1.9/src/main/java/org/orekit/propagation |
+| O14 | Orekit 13.1.9, `TopocentricFrame`, `FramesFactory`, `AbstractFrames`, `TEMEProvider`, `LazyLoadedEop`, `EOPHistory`, and `bodies/OneAxisEllipsoid`, `bodies/GeodeticPoint`, `utils/Constants` sources (accessed 2026-10-07) | https://github.com/CS-SI/Orekit/tree/13.1.9/src/main/java/org/orekit |
+| O15 | Orekit release notes, `src/changes/changes.xml` at tag 13.1.9 (release dated 2026-10-03) (accessed 2026-10-07) | https://github.com/CS-SI/Orekit/blob/13.1.9/src/changes/changes.xml |
+| R1 | Skyfield 1.55 (PyPI release of 2026-08-07), source distribution, files `skyfield/sgp4lib.py`, `skyfield/toposlib.py`, `skyfield/positionlib.py`, `skyfield/searchlib.py`, `skyfield/iokit.py` (MIT License) (accessed 2026-10-07) | https://pypi.org/project/skyfield/1.55/ |
+| R2 | sgp4 2.27 for Python (PyPI release of 2026-07-03), source distribution, files `sgp4/omm.py` and `sgp4/model.py` (MIT License) (accessed 2026-10-07) | https://pypi.org/project/sgp4/2.27/ |
 
 The Orekit GitHub repository `CS-SI/Orekit` is the public mirror of the project's own GitLab (`gitlab.orekit.org/orekit/orekit`); tag `13.1.8` was read on 2026-09-27 and tag `13.1.9` on 2026-10-07.
 
@@ -363,3 +374,169 @@ O2 Appendix B: "In general, TLE data is accurate to about a kilometer or so at e
 * Miss distances are reported in kilometres with no more precision than the element accuracy supports.
 * An empty close approach list for a watchlist object means only that no searched pair's SGP4 propagation came within 5 km during the window. It covers only pairs that were searched. Outside it are objects that were not in the ingested input; element sets that were rejected (deep space or stale element set, 3.2 and 2.4); objects not screened, whether decayed or stopped at some time (2.4); and pairs suppressed by any of the three mechanisms: a shared named stack (3.7), the co-orbiting bound (3.7), or identical element sets (3.4). The run lists all of these with their reasons, unless the summary was cut to its size budget, in which case `omitted` counts the entries left out ([ADR 0007](../adr/0007-alerts-topic.md), decision 15), and except that of the objects missing from the input only watchlist objects can be listed (rejected as `not_in_input`); a catalog object that was never in the input cannot be listed at all. And because the elements are accurate to about a kilometre at epoch and degrade from there (Section 4), a pair whose propagated miss distance is above 5 km may in reality pass closer, so an empty list is not a statement that nothing comes within 5 km.
 * Nothing in SpaceFlux is an operational conjunction assessment or collision avoidance service.
+
+## 6. Passes over a fixed observer
+
+For each watchlist object, `query-api` computes when the object passes above a fixed observer at NASA's Lyndon B. Johnson Space Center during the next 24 hours, from the newest element set it holds for that object (the `catalog_object` row of the [MySQL schema](../data/mysql-schema.md#catalog_object)). The decisions are recorded in [ADR 0013](../adr/0013-satellite-passes.md); this section gives their sources and the reasoning. A pass here is purely geometric: the object is above an elevation of 10 degrees as seen from that point. It says nothing about whether the object could be seen (sunlight, darkness, weather) or whether a station could track it, and like every other number in SpaceFlux it comes from public GP data and is not an operational prediction.
+
+### 6.1 Observer
+
+The observer is the National Geodetic Survey control mark GEMINI 3 on the Johnson Space Center site. Its datasheet (G1) reads:
+
+| Datasheet line (quoted from G1) | Value used |
+|---|---|
+| `NAD 83(1993) POSITION- 29 33 28.71667(N) 095 05 28.94721(W)   ADJUSTED` | geodetic latitude 29.557976853 degrees, longitude minus 95.091374225 degrees (east positive) |
+| `NAD 83(1993) ELLIP HT-   -22.182 (meters)        (02/16/96)   ADJUSTED` | height above the ellipsoid minus 22.182 m |
+| `GEOID HEIGHT    -        -27.076 (meters)                     GEOID18` | not used (see "Height" below) |
+
+and describes the mark as "LOCATED ABOUT 38.6 KM (24.0 MI) SOUTHEAST OF HOUSTON, 3.2 KM (2.0 MI) SOUTHEAST OF CLEAR LAKE CITY AND AT THE NASA LYNDON B. JOHNSON SPACE CENTER", owned by NASA ("OWNERSHIP--NASA"), "A STANDARD NGS DISK STAMPED---GEMINI 3 1987---", last recovered "RECOVERED IN GOOD CONDITION" in a 2005 note by NASA. The decimal degrees are the datasheet's sexagesimal values converted (29 + 33/60 + 28.71667/3600, and likewise for longitude); NGS's own radial search service returns the same two values, 29.5579768528 and minus 95.0913742250.
+
+**Why a survey mark.** No source I found publishes "the" coordinates of the Johnson Space Center as a single point; the center is a campus. The USGS Geographic Names Information System Texas file (`DomesticNames_TX_Text.zip`, last modified 2026-09-29) holds no record for it. A survey mark on the campus is a point that a public, authoritative source publishes with its datum and with an ellipsoidal height, which is the height the computation needs, so nothing about it has to be estimated or converted. Two other citable points were considered:
+
+| Candidate | What the source gives | Why not chosen |
+|---|---|---|
+| NGS mark J 1187, PID AW1029 (G2) | `NAD 83(2011) POSITION- 29 33 06.67613(N) 095 05 22.75133(W)`, `NAD 83(2011) ELLIP HT-   -22.251 (meters)`, `NAD 83(2011) EPOCH   -  2010.00`, network accuracy 0.58 cm horizontal and 1.35 cm ellipsoidal (95 percent), described "AT THE LYNDON B. JOHNSON SPACECRAFT CENTER, AT THE JUNCTION OF STATE HIGHWAY NASA 1 AND ENTRANCE ROAD AT GATE 3" | The better surveyed point, in the current NAD 83 realization, but it sits at the site entrance on the highway rather than on the campus. About 0.70 km from GEMINI 3. |
+| FAA heliport 72TX, "JOHNSON SPACE CENTER" (G4) | airport reference point 29 33 44 N, 095 05 27 W, `SURVEY_METHOD_CODE` E ("ESTIMATED"), elevation 17 ft with `ELEV_METHOD_CODE` E, position source "OWNER" dated 1992/11/01 | Whole arcsecond, estimated position, and a height above mean sea level that would need a geoid conversion. About 0.47 km from GEMINI 3. |
+
+The three points lie within 0.7 km of each other. Moving the observer by that much changes a pass's angles by a few hundredths of a degree at most (0.7 km seen from about 1,500 km, the range of a 400 km orbit at 10 degrees elevation, is 0.03 degrees), so the choice matters for reproducibility, not for meaning. The three values are constants in code and in the reference run, and changing them is a change to the reference data.
+
+**Datum.** The coordinates are NAD 83, while the Earth fixed frame of the computation is the ITRF with the WGS 84 ellipsoid. They are used as they are, without a datum transformation. G3 says "Except for the largest map scales, the horizontal components of WGS 84 and NAD 83 may be considered equivalent", that "The GRS 80 ellipsoid's origin is approximately 2 meters away from WGS 84 ellipsoid's", and that the two ellipsoids differ by "0.1 millimeter in ellipsoidal height at the Earth's pole". An offset of about 2 m seen from 1,500 km is under 0.0001 degrees, well below anything a pass reports. The independent reference of 6.8 is given the same numbers, so the comparison does not depend on this choice.
+
+**Height.** Orekit places the observer from a geodetic latitude, longitude and height through `OneAxisEllipsoid.transform(GeodeticPoint)` (O14), which computes `(n + h) cos φ` in the equatorial plane and `((1 minus e²) n + h) sin φ` along the axis, with `n` the prime vertical radius of curvature: `h` is the height above the ellipsoid along its normal. That is the height G1 publishes, so it is used directly. A height above mean sea level would be wrong by the geoid height, which G1 gives as minus 27.076 m here (G3: geoid models "provide the parameter "N" ... from which the ellipsoid height from the NAD 83 three dimensional datum can be directly converted to the NAVD 88 orthometric height"). G1 also warns that "This station is in an area of suspected vertical motion", the subsidence of the Houston area; a height that is off by a metre or so changes nothing that a pass reports, for the same reason as the datum offset above.
+
+The ellipsoid is WGS 84, `Constants.WGS84_EARTH_EQUATORIAL_RADIUS` 6378137.0 m and `Constants.WGS84_EARTH_FLATTENING` 1 / 298.257223563 (O14), attached to the ITRF of 6.3. This is the observer's ellipsoid only. SGP4 itself keeps the WGS-72 constants of Section 1.6, and the decay floor keeps the WGS-72 radius of Section 2.4.
+
+### 6.2 What is computed
+
+* **Elevation** is the angle between the direction from the observer to the object and the observer's local horizontal plane, the plane normal to the ellipsoid normal at the observer (geodetic, not geocentric, vertical). Orekit's `TopocentricFrame` (O14) has "X axis in the local horizontal plane (normal to zenith direction) and following the local parallel towards East", "Y axis ... following the local meridian towards North", "Z axis towards Zenith direction", and its elevation is the angle of the topocentric position vector above the X Y plane.
+* **Azimuth** is measured in the horizontal plane from north, clockwise towards east, in [0, 360) degrees. O14: "Azimuth angles are counted clockwise, i.e positive towards the East"; the code computes `atan2(x, y)` and adds 2π to a negative result.
+* **Geometric only.** Positions are instantaneous: no light time, no aberration, no atmospheric refraction (Orekit's `ElevationDetector` applies refraction only when a model is set with `withRefraction`, and none is set), and no test of sunlight or darkness.
+* **Elevation mask:** a constant 10 degrees at every azimuth (`ElevationDetector.withConstantElevation`, in radians).
+* **A pass** is an interval during which the elevation is at or above 10 degrees, bounded by a **rise**, where the elevation crosses 10 degrees upwards, and a **set**, where it crosses downwards.
+* **The maximum** of a pass is the time inside it at which the elevation is largest, with that elevation and the azimuth at that time. It is found as a zero of the elevation rate that goes from positive to negative. A pass can have more than one local maximum (R1, `find_events`: "multiple culminations in a row are possible when, without setting, the satellite reaches a second peak altitude after descending partway down the sky from the first one"); each pass reports its highest peak and, when it has more than one, the number of peaks.
+* For each pass: rise time and azimuth, maximum time, elevation and azimuth, set time and azimuth, and the element age at the time of the maximum (that time minus the element set's `EPOCH`, in days), as close approaches report their element age at TCA (Section 3.1).
+
+### 6.3 Frames, time scales and Earth orientation
+
+* **Propagation.** The element set is built into an Orekit `TLE` exactly as in Section 2.2 and propagated with `TLEPropagator.selectExtrapolator`. The epoch is parsed from `epoch_text`, the `EPOCH` string as received, with the same parser the risk engine uses (`GpElementSets`, shared through the `orbit-core` module), so that the element set is the same object the risk engine would build (the `epoch` column is truncated to microseconds). SGP4 output is in TEME (Section 2.1); Orekit's propagator states are expressed in `FramesFactory.getTEME()`.
+* **Earth fixed frame.** `FramesFactory.getITRF(IERSConventions.IERS_2010, true)`. The transformation from TEME is Orekit's own frame tree. In Orekit 13.1.9 the TEME frame's parent is the true of date frame under the IERS 1996 conventions (`AbstractFrames.getTEME` reads `final Frame tod = getTOD(IERSConventions.IERS_1996, false, true);`, and `TEMEProvider` rotates by the equation of the equinoxes), and the ITRF is reached through the celestial and terrestrial intermediate frames of the IERS 2010 conventions (O14). The precession and nutation series these need ship inside the Orekit jar (`assets/org/orekit/IERS-conventions/1996` and `/2010`), so the only data the service loads is the leap second table.
+* **What AIAA 2006-6753 recommends.** O2 Section II, Equation (1): `rPEF = ROT3(θGMST82) rTEME`, "We recommend converting TEME to a truly standard coordinate frame before interfacing with other external programs. The preferred approach is to rotate to PEF using Greenwich Mean Sidereal Time (GMST)". Orekit's chain is a different route to the same Earth fixed frame; the independent reference of 6.8 follows O2's route, so a comparison between the two also checks the frame chain.
+* **Earth orientation parameters: none.** No EOP data is loaded, so UT1 equals UTC and there is no polar motion. The grounds are O2 itself: "The error associated with approximating UT1 with UTC is within the theoretical uncertainty of the SGP4 theory itself", and "Because polar motion has been historically neglected for General Perturbation (GP) applications, we assume that the pseudo Earth-fixed frame is the closest conventional frame." Bounds: UTC is kept "within ±0.9 s of the UT1 astronomical time scale" (T1), and on 2026-10-01 UT1 minus UTC was minus 0.022532 s with polar motion x 0.17460 and y 0.32534 arcseconds (T2). A UT1 error of 0.9 s turns the Earth by 0.9 × 7.292115e-5 rad, which moves a point at the observer's latitude by about 0.36 km along its parallel; at the values of 2026-10-01 the UT1 term is about 9 m and polar motion moves the observer by about 11 m. Orekit's own documentation gives the order of the error of leaving EOP out of the Earth frame: "order of magnitudes for errors might be above 250m in LEO and 1400m in GEO" (`FramesFactory.getGTOD(boolean)`, O14). Against element sets accurate to "about a kilometer or so at epoch" (O2 Appendix B, Section 4) this is not the dominant error. Shipping an IERS EOP file with the service was the alternative; it would need a refresh process and a check that it covers the window, for an effect below SGP4's own error.
+* **Orekit does not fail without EOP data.** With no EOP files found, `LazyLoadedEop.getEOPHistory` (O14) builds an empty history without an exception (a loader that finds no file reports nothing loaded, and the method throws only if a loader raised an error), and `EOPHistory` then uses "null correction": `getUT1MinusUTC` returns 0.0 with the comment "no EOP data available for this date, we use a default 0.0 offset". The same zero is used for any date outside the range of a loaded file. (`EOPHistory` is the one cited file that differs between Orekit 13.1.8 and 13.1.9, only in how a missing length of day is inferred from loaded data, O15.) So the absence of EOP data is silent, and a test pins it (6.9), so that loading EOP data later is a visible change.
+* **Time scale.** Element set epochs and every reported time are UTC (Section 2.1). The UTC time scale is built from the same leap second table as the risk engine (Section 2.3), loaded from the classpath at startup by the shared `OrekitData` in `orbit-core`, with a missing table failing the start.
+
+### 6.4 How passes are found
+
+One `TLEPropagator` per object propagates from the window start to the window end (6.6) with two detectors on the same `TopocentricFrame`:
+
+| Detector (O13) | Switching function | Events used |
+|---|---|---|
+| `ElevationExtremumDetector` | the elevation's first time derivative ("The value is the spacecraft elevation first time derivative") | decreasing events are maxima, increasing events are minima |
+| `ElevationDetector` with `withConstantElevation(10 degrees)` | elevation minus 10 degrees | increasing events are rises, decreasing events are sets |
+
+| Setting | Value | Reason |
+|---|---|---|
+| Maximum check interval, extremum detector | 60 s | Orekit's default is 600 s (`EventDetectionSettings.DEFAULT_MAX_CHECK`, O13), and the check interval "is therefore devoted to separate roots" (Section 3.4). Consecutive extrema of a near Earth object's elevation are a large part of an orbit apart, so 60 s is far inside that; it is the value Section 3.4 already uses, and the dense scan of 6.9 is what confirms it. |
+| Maximum check interval, elevation detector | 10 s | Not what guarantees detection (next paragraph); a second line of defence, at the cost of 8,640 evaluations a day. |
+| Convergence threshold | 1e-6 s | Orekit default `DEFAULT_THRESHOLD` (O13), as in Section 3.4. |
+| Maximum iterations | 100 | Orekit default `DEFAULT_MAX_ITER` (O13). |
+| Handlers | record the event and return `Action.CONTINUE`, for both detectors and both directions | Orekit's defaults stop the propagation: `ElevationDetector` is built with `new StopOnDecreasing()` (it would stop at the first set) and `ElevationExtremumDetector` with `new StopOnIncreasing()` (it would stop at the first minimum) (O13). |
+
+The extremum detector is not wrapped in an `EventSlopeFilter`, unlike the example in its Javadoc: the minima are needed even though they are not reported.
+
+**Why every crossing of a found extremum's segment is found.** Between two consecutive extrema the elevation is monotonic, so it crosses 10 degrees at most once there. When any detector's event is handled, Orekit 13.1.8 first asks every other detector whether its switching function changed sign up to that event's time: `AbstractAnalyticalPropagator.acceptStep` calls `state.tryAdvance(eventState, interpolator)` for every other detector before handling an event, and `EventState.tryAdvance` evaluates `g` at that time and, on a sign change, locates the root ("found a root we didn't expect -> find precise location") and has it handled first (O13). So a rise between a minimum and the next maximum is found when that maximum is handled, at the latest, and a set between a maximum and the next minimum when that minimum is handled, however short the pass and whatever the elevation detector's own check interval. Completeness therefore rests on finding every extremum, which is what the extremum detector's check interval is chosen for and what the dense scan of 6.9 tests. This relies on Orekit's event loop rather than on a documented contract, which is one more reason the dense scan is a required test.
+
+**Edges of the window.** Orekit reports only sign changes after the start, so a pass already in progress at the window start has no rise event, and one still in progress at the window end has no set event. The service evaluates the elevation at the window start and at the window end itself, and clips and flags such passes:
+
+* elevation at the window start at or above 10 degrees: the first pass is reported with no rise time, flagged as in progress at the window start, with the elevation and azimuth at the window start;
+* elevation at the window end at or above 10 degrees: the last pass is reported with no set time, flagged as in progress at the window end, with the elevation and azimuth at the window end;
+* the maximum of a clipped pass is reported only when a maximum event falls inside the window; otherwise the pass reports its largest elevation inside the window, which is at a window edge, flagged as not a true maximum.
+
+Clipped passes are not completed by propagating outside the window. That would give the full pass but would need a bound on how far to look (a near Earth object in an eccentric orbit, such as the 209 minute SL-12 DEB of Section 3.6, can stay above 10 degrees much longer than a low circular orbit), and it would report times outside the 24 hours the request asked about.
+
+### 6.5 Element sets accepted
+
+The rules of Section 2.4 apply, with the window start of 6.6 in place of the screening window start:
+
+* **Maximum element age: 10 days** at the window start, from the Space-Track guideline the screening uses (Section 2.4, S1). An older element set gives no passes and is reported as stale with its epoch and age.
+* **Decay.** Every sample of the 10 s grid from the element set's epoch (or the window start, if earlier) to the window end is checked against the 80 km floor and for propagation errors, and the first failing sample latches, exactly as in Section 2.4 ("Far past decay" and "The floor check is per date"). A failure before the window start gives no passes and is reported as decayed. A failure inside the window ends the pass search at the last good sample: passes are reported only up to it, a pass in progress there is reported as stopped, and the response says the search stopped and when. The latch is the screening's own `ObjectTrack`, shared through the `orbit-core` module, not a second implementation.
+* **Regime.** The same near Earth limit as the screening watchlist (Section 3.2, Orekit selecting `DeepSDP4` or not), so a deep space watchlist object gets no passes and a stated reason. The screening limit comes from H1's screening volumes, which do not apply to passes; the reasons to keep it here are that the detector settings above and the reference cases below are chosen for near Earth objects only, and that the Section 1.4 deviation applies to `DeepSDP4`. Lifting it needs deep space reference cases first.
+* **Epoch after the window start** is accepted and propagated backwards, as in Section 2.4; the catalog consumer already refuses an `EPOCH` more than 5 minutes after its `fetched_at` ([MySQL schema](../data/mysql-schema.md#catalog_object), "Update rule").
+* An object with no catalog row gives no passes and is reported as having no element set.
+
+The catalog row is the newest element set seen, not the one a screening run used (MySQL schema, "This is not the screening input"); passes always state the epoch of the element set they were computed from.
+
+### 6.6 Window
+
+* **Start:** the time of the request, in UTC, truncated to the whole second, so that a repeated request in the same second gives the same answer and every reported time is later than or equal to the start. The computation takes the start as a parameter, so tests fix it.
+* **End:** the start plus 86,400 SI seconds (`AbsoluteDate.shiftedBy`), so a leap second inside the window makes the end one second short of the same UTC clock time a day later, as in Section 3.2.
+* Times are written to milliseconds, like the times screening computes (Section 3.2). How many digits mean anything is in 6.10.
+
+### 6.7 What the comparison has to show
+
+Two independent implementations agree only if they agree on the same definitions: the observer of 6.1 given as the same three numbers, the 10 degree mask, geometric positions, the same element set, UT1 equal to UTC and no polar motion.
+
+### 6.8 Independent reference
+
+**Tool.** Skyfield 1.55 with sgp4 2.27 for Python (R1, R2; both checked as the newest release on PyPI on 2026-10-07). It is independent of Orekit at each step that matters:
+
+| Step | Orekit (the service) | Reference |
+|---|---|---|
+| SGP4 | Orekit's own Java implementation (Section 1) | the sgp4 package, the Vallado code of O9; `omm.initialize` calls `sat.sgp4init(gravconst, 'i', ...)` with `gravconst=WGS72` by default (R2), the same constants and improved mode as Orekit (Sections 1.4 and 1.6) |
+| TEME to Earth fixed | IERS 1996 true of date, then IERS 2010 (6.3) | a single rotation by GMST 1982: `TEME.rotation_at` uses `theta_GMST1982`, whose docstring reads "This angle defines the difference between the idiosyncratic True Equator Mean Equinox (TEME) frame of reference used by SGP4 and the more standard Pseudo Earth Fixed (PEF) frame of reference" and cites "AIAA 2006-6753 Appendix C" (R1), that is O2's Equation (1) |
+| Observer | `OneAxisEllipsoid` on WGS 84 | `wgs84.latlon(latitude, longitude, elevation_m)` with `Geoid('WGS84', 6378137.0, 298.257223563)` and its own geodetic formula (R1, `toposlib.py`) |
+| Angles | `TopocentricFrame` | `(satellite - observer).at(t).altaz()`; "By default, Skyfield does not adjust the altitude for atmospheric refraction" (R1, `positionlib.py`) |
+| Events | Orekit detectors (6.4) | `skyfield.searchlib.find_maxima` and `find_discrete` (below) |
+
+**Settings that make the comparison like for like.**
+
+* UT1 equal to UTC: `load.timescale(builtin=True, delta_t=69.184)`. `delta_t` "Lets you override the standard ∆T tables by providing your own ∆T offset in seconds" (R1, `iokit.py`); ΔT is TT minus UT1, and TT minus UTC is 32.184 s plus TAI minus UTC, 37 s since 2017 (T2: "TT = TAI + 32.184 seconds", "TAI-UTC = 37.000 000 seconds"), so ΔT = 69.184 s makes UT1 equal to UTC. The builtin leap second table is still used.
+* No polar motion: Skyfield applies it only when a polar motion table is attached to the time scale (`polar_motion_table = None` by default, R1 `timelib.py`), and none is.
+* Event precision: Skyfield's own `EarthSatellite.find_events` searches to half a second (`half_second = 0.5 / DAY_S`, R1), too coarse for this comparison, so the reference script does not use it. It finds maxima with `find_maxima(t0, t1, f, epsilon=0.001 / 86400)` on the elevation, keeps those at or above 10 degrees, and finds rises and sets with `find_discrete` (default epsilon "0.001 / DAY_S", one millisecond) on "elevation at or above 10 degrees", the same two step method as `find_events` but at 1 ms. The search step is set on the function's `step_days` attribute, which both functions require.
+
+**Element sets.** Real CelesTrak GP records already committed with provenance (Section 3.6 and the fixture provenance files), chosen for different geometry:
+
+| Object | Record | Why | Window start (UTC) |
+|---|---|---|---|
+| ISS (ZARYA), 25544 | `gp-catnr-25544.json`, epoch 2026-09-27T04:10:50.460096 | the watchlist object; inclination 51.6 degrees | 2026-09-27T05:00:00 |
+| CSS (TIANHE), 48274 | `gp-stations.json`, epoch 2026-09-26T21:00:21.314016 | inclination 41.5 degrees, so passes reach the observer at 29.6 degrees north at other geometries | 2026-09-27T05:00:00 |
+| OBJECT AJ, 57036 | `gp-catnr-57036.json`, epoch 2026-09-28T14:10:20.740512 | inclination 97.5 degrees, passes from the north and south | 2026-09-28T15:00:00 |
+| SL-12 DEB, 27958 | `gp-catnr-27958.json`, epoch 2026-09-25T22:48:49.415616 | eccentricity 0.42, period 209 minutes, still near Earth; long, uneven passes | 2026-09-28T15:00:00 |
+
+Each window is 24 hours. The two start times are those Section 3.6 already uses for the same fixtures. Two more windows per object are cut from the reference output once it exists: one that starts inside a pass and one that ends inside a pass, to test 6.4's edge rules against reference values.
+
+**Provenance of the expected values.** The reference script is committed with its exact inputs (fixture paths and SHA256, observer, windows), the pinned versions of every Python package it used (with hashes), and its output, a file of expected rises, maxima and sets with their times to the millisecond and angles to 1e-6 degrees. The Java tests read the committed output; the build does not run Python. Rerunning the script must reproduce the output byte for byte. As with `tforverf.out` (Section 1.1), the expected values are produced once and committed.
+
+**Not used as a reference:** a published pass prediction would serve only if it stated the exact element set and observer it used. I have not identified one that does, so none is used.
+
+### 6.9 Tests
+
+**Against the reference** (independent). For each window of 6.8, passes are paired by their maximum (the reference maximum within 60 s of the service's), and every pass must pair: none missing, none extra. A pass whose maximum is within 0.001 degrees of 10 degrees is ambiguous by definition and is listed rather than asserted. For each pair:
+
+| Check | Tolerance | Why |
+|---|---|---|
+| Service elevation at the reference rise and set times | within 0.001 degrees of 10 | checks geometry without depending on how fast the elevation changes; see the basis below |
+| Service elevation and azimuth at the reference maximum time | within 0.001 degrees of the reference values (azimuth only when the maximum is below 85 degrees) | as above; near the zenith azimuth changes too fast to compare |
+| Rise and set azimuth | within 0.002 degrees | azimuth error at 10 degrees elevation is the position error over the horizontal distance, which is the range times cos 10 degrees, so the angular bound is about 1 / cos 10 degrees times the elevation bound, rounded up |
+| Rise and set times | within 0.05 s, for passes whose maximum is at least 11 degrees | at the crossing, a time error is an elevation error divided by the elevation rate, which falls to zero for a pass that only grazes 10 degrees; the bound is confirmed on the first reference run, as below |
+| Maximum elevation value | within 0.001 degrees | |
+| Maximum time | within 1 s | the elevation is flat at a maximum, so its time is poorly conditioned; the elevation check above is the meaningful one |
+| Pass in progress at a window edge | the flag, the elevation at the edge within 0.001 degrees, and the set (or rise) time as above | 6.4 |
+
+**Basis for 0.001 degrees (to be confirmed).** The two implementations agree on SGP4 to 2 mm (Section 1.3 for Orekit; the sgp4 package is the reference code itself). The rest of the difference is the frame chain (6.3 against O2's GMST 1982 rotation), with the same UT1 and no polar motion on both sides. 0.001 degrees is 1.7e-5 rad, which at the roughly 1,500 km range of a 10 degree crossing for a 400 km orbit is about 26 m of position. The frame difference is expected to be metres, but I have not measured it, so the bound is provisional: the first reference run must show every difference at or below one tenth of its tolerance, and the measured largest values are recorded here and printed by a committed test, as Section 1 does for SGP4. If they are not, the cause is found before any tolerance is widened.
+
+**Without the reference** (Orekit only, these guard the method):
+
+1. **Dense scan:** for each fixture window, elevation sampled every 1 s; every sample at or above 10 degrees lies inside a reported pass, every reported pass that lasts 2 s or more contains at least one sample at or above 10 degrees, and every sampled local maximum of elevation lies within 1 s of a reported maximum or below 10 degrees. This is what tests the extremum detector's check interval and the event loop behaviour of 6.4.
+2. **The propagation does not stop:** a window holding several passes reports all of them (guards the default handlers of 6.4).
+3. **Window edges:** the edge cases of 6.4, on the cut windows of 6.8.
+4. **Earth orientation pinned:** with the production data context, UT1 minus UTC is 0 and the pole correction is zero at a date in each window, so a change in what EOP data is loaded fails a test.
+5. **Element sets:** an element set exactly 10 days old at the window start is accepted and one 1 s older is rejected; a decayed element set (for example 28872 or 29141 from `SGP4-VER.TLE`, Section 1.2) is reported as decayed; an element set that fails the floor inside the window stops the search at the last good sample; a deep space element set (23599) is rejected with its reason.
+6. **Observer:** the observer's geodetic coordinates and height are asserted against the 6.1 values, and its Earth fixed position against `OneAxisEllipsoid.transform` of them, so a units or sign slip (degrees for radians, west longitude positive) fails.
+
+### 6.10 How these numbers may be read
+
+* A pass means "this public element set, propagated with SGP4, puts the object at or above 10 degrees of geometric elevation from this point". It does not mean the object is visible.
+* Element sets are accurate to "about a kilometer or so at epoch" and the accuracy "quickly degrades" (O2 Appendix B, Section 4). One kilometre along the track of a low orbit is about a tenth of a second of time, and seen from 400 to 1,500 km it is 0.04 to 0.14 degrees. So rise and set times are shown to the second and angles to a tenth of a degree, and every pass carries its element age; the extra digits in the API are for testing, not meaning.
+* An empty pass list means only that no pass was found for that element set in that window. Whether the element set was too old, decayed, out of regime or missing is reported, never an empty list in its place.
+* Nothing in SpaceFlux is an operational prediction service.
