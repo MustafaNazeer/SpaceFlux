@@ -15,6 +15,10 @@ public final class PlanQueries {
     public static final String RUN_SUMMARY = ScreeningController.SUMMARY;
     public static final String RUN_LISTED_APPROACHES = ScreeningController.LISTED_APPROACHES;
     public static final String RUN_CUT_APPROACHES = ScreeningController.CUT_APPROACHES;
+    public static final String ALERTS_RECENT = AlertLists.RECENT;
+    public static final String ALERTS_RECENT_AFTER = AlertLists.RECENT_AFTER;
+    public static final String OBJECT_APPROACHES = AlertLists.OBJECT_APPROACHES;
+    public static final String OBJECT_APPROACHES_AFTER = AlertLists.OBJECT_APPROACHES_AFTER;
 
     private PlanQueries() {
     }

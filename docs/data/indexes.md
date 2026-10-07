@@ -1,6 +1,6 @@
 # MySQL indexes
 
-* **Status:** decided on 2026-10-02; the queries of Q1, Q2, Q4, Q7 and Q8, the single alert and catalog lookups, the acknowledgement write path, and the consumers' lookups were checked with `EXPLAIN` (see [Results](#results)). Q3, Q5, Q6 and Q9 have no query in the code yet, so their indexes are not proven; each is checked when its query is written.
+* **Status:** decided on 2026-10-02; the queries of Q1, Q2, Q4, Q7 and Q8, the single alert and catalog lookups, the acknowledgement write path, and the consumers' lookups were checked with `EXPLAIN` (see [Results](#results)). The two alert lists, Q3 and the approaches of Q6, were designed and checked on 2026-10-06, with the index on (`listed`, `alert_seq`) added for Q3 ([Results for the alert lists](#results-for-the-alert-lists)). Q5, the rest of Q6, and Q9 have no query in the code yet, so their indexes are not proven; each is checked when its query is written.
 * **Applies to:** the schema in [mysql-schema.md](mysql-schema.md), on MySQL 8.4 LTS with InnoDB. The query numbers (Q1 to Q9) are the rows of its [Queries the API needs](mysql-schema.md#queries-the-api-needs) table.
 
 ## Rules I follow
@@ -17,9 +17,9 @@
 
 | Index | Columns | Used by | Why |
 | --- | --- | --- | --- |
-| Primary key | `alert_seq` | Q3, the kind tables' joins | Newest first by a backward scan of the clustered index; every kind table joins on it |
+| Primary key | `alert_seq` | Q3 and Q6, joining each listed row; the kind tables' joins | Every kind table joins on it. Q3 no longer scans it: its rows come from the kind tables' own indexes (see [`space_weather_event`](#space_weather_event)) |
 | Unique | `event_id` | Idempotent insert; Q3 and Q8 joins from `alert_acknowledgement`; Q4 completeness and approaches; one alert | The duplicate key on this index is what turns a redelivered event into a no op. It is also the parent key of the acknowledgement foreign key |
-| Secondary | (`kind`, `alert_seq`) | Q3 when filtered by kind | Newest events of one kind without reading the others |
+| Secondary | (`kind`, `alert_seq`) | No query today | Planned for Q3 filtered by kind, but the alert list has no kind filter and reads each kind from its own table. Under rule 1 it is a candidate to drop |
 
 ### `space_weather_event`
 
@@ -28,9 +28,10 @@
 | Primary key | `alert_seq` | Join to `alert_event` | Also the foreign key to `alert_event` |
 | Secondary | (`scale`, `satellite`, `interval_start`, `alert_seq`) | Q2 for G | Range on `interval_start` within a scale, with the latest `alert_seq` per interval read from the same index. G rows have a null `satellite`; the condition is `satellite IS NULL`, which an index can serve ([IS NULL optimization](https://dev.mysql.com/doc/refman/8.4/en/is-null-optimization.html)) |
 | Secondary | (`scale`, `satellite`, `sample_time`, `alert_seq`) | Q2 for R and S | The same for GOES samples, per satellite |
-| Secondary | (`scale`, `alert_seq`) | Newest events of a scale | Recent history of one scale regardless of key |
+| Secondary | (`scale`, `alert_seq`) | Newest events of a scale | Recent history of one scale regardless of key. No query in the code reads it yet |
+| Secondary | (`listed`, `alert_seq`) | Q3 | `listed` is a virtual generated column, true for the events the alert list shows; the list reads the true range backward from the cursor and stops at the page size |
 
-**A candidate, not yet proposed:** (`state`, `alert_seq`). Q3 asks for the newest alerts, and only events in state `level` count as space weather alerts, while the schema page expects about twelve events an hour for each R and S series whatever their state. If the list is read newest first from `alert_event` and joined to this table, the scan passes every event in another state on the way to each `level` event. Whether that matters depends on the exact definition of the alert list in the REST contract and on the row counts, so it is decided by the `EXPLAIN ANALYZE` check below, not here.
+**Why the list has its own index.** Q3 shows every close approach and every space weather event that enters, changes or leaves a level, never a refresh, while each R and S series stores about twelve events an hour, nearly all refreshes or "none". Read newest first from `alert_event` and joined to this table, the list passed every one of those rows on its way to each listed one, and a page it could not fill read the whole table. The candidate noted here before, (`state`, `alert_seq`), would miss every event leaving a level (its `state` is not `level`) and keep every refresh during a storm. So `listed` marks exactly the rows the rule selects, and Q3 is a `UNION ALL` of the close approaches backward on their primary key and the listed events backward on this index; the rule, the grants and the alternatives are in [mysql-schema.md](mysql-schema.md#q3-the-recent-alerts).
 
 ### `space_weather_series`
 
@@ -44,10 +45,10 @@
 | --- | --- | --- | --- |
 | Primary key | `alert_seq` | Join to `alert_event` | |
 | Secondary | `run_id` | Q4 when a run's approach ids were cut | Counting the distinct approaches of one run |
-| Secondary | (`watchlist_number`, `time_of_closest_approach`) | Q6 | An object's approaches as the watchlist side, in time order |
-| Secondary | (`other_number`, `time_of_closest_approach`) | Q6 | The same as the other side |
+| Secondary | (`watchlist_number`, `time_of_closest_approach`, `alert_seq`) | Q6 | An object's approaches as the watchlist side, newest first, ties on the time broken by `alert_seq` |
+| Secondary | (`other_number`, `time_of_closest_approach`, `alert_seq`) | Q6 | The same as the other side |
 
-Q6 asks for an object's approaches in either role. I write it as a `UNION` of two queries, one per index, rather than one `WHERE watchlist_number = ? OR other_number = ?`, so each half has a plain index range to use. `UNION` rather than `UNION ALL`, so a row that matched both halves would still be returned once; whether `UNION ALL` is safe depends on the screening never pairing an object with itself, which this page does not rely on.
+Q6 asks for an object's approaches in either role. I write it as a `UNION` of two queries, one per index, rather than one `WHERE watchlist_number = ? OR other_number = ?`, so each half has a plain index range to use. `UNION` rather than `UNION ALL`, so a row that matched both halves would still be returned once; whether `UNION ALL` is safe depends on the screening never pairing an object with itself, which this page does not rely on. Each half reads its range backward from the cursor and stops at the page size, so the merge sorts at most twice that many rows. `alert_seq` was always the last part of both indexes, because InnoDB appends the primary key (rule 2); since 2026-10-06 the definitions name it, because the page order and the cursor rely on it.
 
 ### `screening_run`
 
@@ -113,12 +114,12 @@ The bar is that every hot query has an index justified by an `EXPLAIN` plan. Onc
 1. **A test database at a realistic size.** Plans depend on row counts: on a table of a few rows the optimizer can rightly prefer a full scan, which would prove nothing. A generator with a fixed seed fills an empty schema, applied by the same migrations, through the same insert code the consumers use, at volumes stated beside the results: for example a year of space weather events at the rates in the schema page's expected volume, some thousands of screening runs, and a catalog of the size of the polled groups. The generator, its seed and its volumes are committed with the results.
 2. **Statistics first.** `ANALYZE TABLE` on every table before any plan is taken, so the plans do not depend on when statistics were last sampled.
 3. **One plan per query, taken as the user that runs it.** For each of Q1 to Q9, and for the consumers' write path lookups, the exact SQL from the repository code is run with `EXPLAIN FORMAT=TREE` ([EXPLAIN](https://dev.mysql.com/doc/refman/8.4/en/explain.html)) as the database user that issues it in production. `EXPLAIN` needs the same privileges as the statement it explains, so this also checks the grants.
-4. **What a plan must show.** The index named on this page is the one chosen, and no table that grows with time is read by a full table scan. Where the timing matters (Q3 and the candidate index on `space_weather_event`), `EXPLAIN ANALYZE` adds actual rows read and time; those timings are reported with the machine, the data volume and the script that produced them, and are not general claims.
+4. **What a plan must show.** The index named on this page is the one chosen, and no table that grows with time is read by a full table scan. Where the timing matters (Q3 and its index on `space_weather_event`), `EXPLAIN ANALYZE` adds actual rows read and time; those timings are reported with the machine, the data volume and the script that produced them, and are not general claims.
 5. **Committed evidence.** The plans are committed as text next to this page, and a test asserts the chosen index for each query, so a later change to a query or an index that loses its plan fails the build instead of going unnoticed.
 
 ### Results
 
-The plans are in [plans/](plans/), one file per query the service runs today: the read endpoints, split into each statement they issue, the acknowledgement write path and history (Q8), and the consumers' two lookups before a write. Q3, Q5, Q6 and Q9 have no query in the code yet; each gets its plan and assertion when its endpoint is built. The data is a year from 2025-01-01 at the rates under "Expected volume" on the schema page (12 events an hour for each R and S series, 3 an hour for G, 4 screening runs a day), built by `query-api/src/test/java/io/github/mustafanazeer/spaceflux/query/plans/PlanData.java` with a fixed seed and stored through the consumers' own processors and stores; each file's header gives the exact counts.
+The plans are in [plans/](plans/), one file per query the service runs today: the read endpoints, split into each statement they issue, the acknowledgement write path and history (Q8), and the consumers' two lookups before a write. The two alert lists are covered separately below. Q5 and Q9 have no query in the code yet; each gets its plan and assertion when its endpoint is built. The data is a year from 2025-01-01 at the rates under "Expected volume" on the schema page (12 events an hour for each R and S series, 3 an hour for G, 4 screening runs a day), built by `query-api/src/test/java/io/github/mustafanazeer/spaceflux/query/plans/PlanData.java` with a fixed seed and stored through the consumers' own processors and stores; each file's header gives the exact counts.
 
 * Every query reads each table through the index the tables above name for it, every history and run query reads its range in index order with no sort, and no table that grows with time is read whole.
 * A history page after the first reads (`event_id`, `ack_id`) from the cursor down. The plan is taken with a cursor in the middle of the table; for a cursor near the start of the table the optimizer rightly reads the primary key instead, since only the few rows below that `ack_id` are in range.
@@ -127,3 +128,14 @@ The plans are in [plans/](plans/), one file per query the service runs today: th
 * `QueryPlansIntegrationTest` in the normal build seeds a week of space weather and a year of screening runs, then asserts for every query each table's access type and index, the column each range is on, both bounds of each history range, and that only Q1 sorts. With too few runs the optimizer rightly sorts the whole run table instead, which would prove nothing, so the build keeps a year of them.
 
 Seeding is bound by the consumers' write path, not by these queries: each event is stored in its own transaction, which waits on the commit's log flush, so a long replay of a topic takes as long as the disk needs for one flush per event. The plan test relaxes that flush on the test server while seeding and restores it before taking any plan; the setting changes no plan.
+
+### Results for the alert lists
+
+The plans of Q3 and of the approaches of Q6 are in [plans/](plans/) as `alerts-recent`, `alerts-recent-after`, `object-approaches`, `object-approaches-other` and `object-approaches-after`, with `alerts-recent-by-scan` beside them for comparison. Their data is not PlanData's: there a GOES series changes level on one poll in ten, which would make listed events common and prove nothing about a rare range. `query-api/src/test/java/io/github/mustafanazeer/spaceflux/query/plans/AlertListPlanData.java`, seed 20261006, builds a year from 2025-01-01 of quiet space weather at the same polling rates, with level episodes at the rates its comment states (assumptions chosen to make listed events rare, not measurements), four screening runs a day for the one watchlist object, and repeated approaches whose times of closest approach tie. Each file's header gives the exact counts.
+
+* Q3 reads close approaches backward on `close_approach`'s primary key and listed space weather events backward on (`listed`, `alert_seq`), each part stopping at its limit; a later page is a range below the cursor on each. The first page read 51 index entries from each part, sorted the 102 rows, and looked up 51 events by primary key. Of 236,720 space weather events, 458 are listed, about one in 517.
+* The same page as one backward scan of `alert_event` (`alerts-recent-by-scan`) read 4,603 rows of `alert_event` and looked up 4,575 rows of `space_weather_event` to return the same 51, while close approaches are about one row in 92 of `alert_event` (2,631 of 240,811). With no close approaches arriving, it would pass about 517 space weather events for each one it returns, and read the whole table for a page it cannot fill. One run of each took 10.1 ms and 53.4 ms of server time on the machine in the file headers; those two numbers describe that run only.
+* Q6 reads each half by equality on the catalog number and, after the first page, a range on `time_of_closest_approach` below the cursor, backward, stopping at its limit; the tie on `alert_seq` is checked on the index entries. Removing duplicates adds a temporary table of at most twice the page size, and the plan sorts once, the merge of the halves.
+* The only reads that are not through an index are of the derived table `p`, at most twice the page size in rows, and of `UNION`'s own temporary table in Q6.
+
+`AlertListPlansIntegrationTest` in the normal build seeds 30 days of the same mix and asserts for each list each table's access type and index, the column each range is on, that each part is read backward and stops at its limit, and that the plan sorts once, the merge of the parts. It also walks every page of Q3 and of Q6 for two objects, through tied times, and checks they return exactly the rows of the plain query each replaces. To write the plans again: `./mvnw -pl query-api -am test -Dtest=AlertListPlansIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false -Dspaceflux.plans.alertListDays=365 -Dspaceflux.plans.write=true`.

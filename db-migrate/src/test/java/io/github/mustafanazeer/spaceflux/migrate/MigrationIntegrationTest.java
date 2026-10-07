@@ -137,8 +137,8 @@ class MigrationIntegrationTest {
         MigrateResult second = Migrate.run(settings());
 
         assertThat(first.success).isTrue();
-        assertThat(first.migrationsExecuted).isEqualTo(14);
-        assertThat(first.targetSchemaVersion).isEqualTo("14");
+        assertThat(first.migrationsExecuted).isEqualTo(15);
+        assertThat(first.targetSchemaVersion).isEqualTo("15");
         assertThat(second.migrationsExecuted).isZero();
     }
 
@@ -316,6 +316,62 @@ class MigrationIntegrationTest {
             assertRefused(s, "DELETE FROM alert_event", 1142);
             assertRefused(s, "UPDATE alert_event SET payload = '{}'", 1142);
             assertRefused(s, "SELECT * FROM watchlist_object", 1142);
+        }
+    }
+
+    @Test
+    @Order(3)
+    void theDatabaseMarksTheSpaceWeatherEventsTheAlertListShowsAndTheConsumerCannotSetTheMark() throws Exception {
+        // state, previous_state, trigger, listed: entering, changing and leaving a level, restatements and revisions
+        // included; never a refresh, and never a change between none and no data alone.
+        String[][] cases = {
+            {"level", "none", "level_change", "1"},
+            {"level", "level", "level_change", "1"},
+            {"none", "level", "level_change", "1"},
+            {"no_data", "level", "level_change", "1"},
+            {"ended", "level", "level_change", "1"},
+            {"level", null, "level_change", "1"},
+            {"none", "level", "revision", "1"},
+            {"level", "none", "revision", "1"},
+            {"no_data", "level", "restatement", "1"},
+            {"level", null, "refresh", "0"},
+            {"none", null, "refresh", "0"},
+            {"no_data", "none", "level_change", "0"},
+            {"none", "no_data", "level_change", "0"},
+            {"none", null, "level_change", "0"},
+            {"none", "none", "revision", "0"},
+            {"no_data", "none", "restatement", "0"},
+        };
+        for (int i = 0; i < cases.length; i++) {
+            String id = "space_weather_level/1/listed-" + i;
+            insertAlert(id);
+            try (Connection c = connect(CONSUMER, CONSUMER_PASSWORD); PreparedStatement p = c.prepareStatement(
+                    "INSERT INTO space_weather_event (alert_seq, rules_version, scale, product, state, derived_label, "
+                            + "previous_state, trigger_kind, derived_from, estimated, unit) SELECT alert_seq, 1, 'G', "
+                            + "'swpc.kp', ?, 'x', ?, ?, 'test', TRUE, 'Kp index' FROM alert_event WHERE event_id = ?")) {
+                p.setString(1, cases[i][0]);
+                p.setString(2, cases[i][1]);
+                p.setString(3, cases[i][2]);
+                p.setString(4, id);
+                assertThat(p.executeUpdate()).isEqualTo(1);
+            }
+            try (Connection c = connect(API, API_PASSWORD); PreparedStatement p = c.prepareStatement(
+                    "SELECT w.listed FROM space_weather_event w JOIN alert_event e ON e.alert_seq = w.alert_seq "
+                            + "WHERE e.event_id = ?")) {
+                p.setString(1, id);
+                try (ResultSet r = p.executeQuery()) {
+                    r.next();
+                    assertThat(r.getString(1)).as(String.join(" ", Stream.of(cases[i]).map(String::valueOf)
+                            .toList())).isEqualTo(cases[i][3]);
+                }
+            }
+        }
+        insertAlert("space_weather_level/1/listed-set");
+        try (Connection c = connect(CONSUMER, CONSUMER_PASSWORD); Statement s = c.createStatement()) {
+            assertRefused(s, "INSERT INTO space_weather_event (alert_seq, rules_version, scale, product, state, "
+                    + "derived_label, trigger_kind, derived_from, estimated, unit, listed) SELECT alert_seq, 1, 'G', "
+                    + "'swpc.kp', 'none', 'none', 'refresh', 'test', TRUE, 'Kp index', 1 FROM alert_event "
+                    + "WHERE event_id = 'space_weather_level/1/listed-set'", 3105);
         }
     }
 

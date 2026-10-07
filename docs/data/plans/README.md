@@ -17,3 +17,9 @@ To take them again (Docker must be running):
 ```
 
 The normal build runs the same test over a smaller data set and asserts each query's index, without writing these files.
+
+The alert list files (`alerts-recent*` and `object-approaches*`) come from their own test over their own data, quiet space weather in which listed events are rare ([indexes.md](../indexes.md#results-for-the-alert-lists)):
+
+```
+./mvnw -pl query-api -am test -Dtest=AlertListPlansIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false -Dspaceflux.plans.alertListDays=365 -Dspaceflux.plans.write=true
+```

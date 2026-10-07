@@ -1,0 +1,53 @@
+Query: object-approaches
+Account: spaceflux_api
+Parameters: [25544, 51, 25544, 51, 51]
+Data from 2025-01-01T00:00:00Z, seed 20261006 (AlertListPlanData): 365 days; 236720 space weather events of which 458 listed, 1460 screening runs, 2631 close approaches, 793 acknowledgement rows
+MySQL: 8.4.11, statistics from ANALYZE TABLE after seeding
+
+SQL:
+SELECT e.alert_seq, e.event_id, p.time_of_closest_approach, e.payload, e.received_at, k.action, k.acted_at, k.principal, k.note FROM ((SELECT c.alert_seq, c.time_of_closest_approach FROM close_approach c WHERE c.watchlist_number = ? ORDER BY c.time_of_closest_approach DESC, c.alert_seq DESC LIMIT ?) UNION (SELECT c.alert_seq, c.time_of_closest_approach FROM close_approach c WHERE c.other_number = ? ORDER BY c.time_of_closest_approach DESC, c.alert_seq DESC LIMIT ?)) p JOIN alert_event e ON e.alert_seq = p.alert_seq LEFT JOIN alert_acknowledgement k ON k.ack_id = (SELECT MAX(x.ack_id) FROM alert_acknowledgement x WHERE x.event_id = e.event_id) ORDER BY p.time_of_closest_approach DESC, p.alert_seq DESC LIMIT ?
+
+EXPLAIN FORMAT=TREE:
+-> Limit: 51 row(s)  (cost=370 rows=51)
+    -> Nested loop left join  (cost=370 rows=52)
+        -> Nested loop inner join  (cost=351 rows=52)
+            -> Sort: p.time_of_closest_approach DESC, p.alert_seq DESC  (cost=309..309 rows=52)
+                -> Table scan on p  (cost=271..274 rows=52)
+                    -> Union materialize with deduplication  (cost=271..271 rows=52)
+                        -> Limit: 51 row(s)  (cost=266 rows=51)
+                            -> Covering index lookup on c using ix_close_approach_watchlist (watchlist_number=25544) (reverse)  (cost=266 rows=2631)
+                        -> Limit: 51 row(s)  (cost=0.35 rows=1)
+                            -> Covering index lookup on c using ix_close_approach_other (other_number=25544) (reverse)  (cost=0.35 rows=1)
+            -> Single-row index lookup on e using PRIMARY (alert_seq=p.alert_seq)  (cost=0.702 rows=1)
+        -> Filter: (k.ack_id = (select #5))  (cost=0.252 rows=1)
+            -> Single-row index lookup on k using PRIMARY (ack_id=(select #5))  (cost=0.252 rows=1)
+            -> Select #5 (subquery in condition; dependent)
+                -> Aggregate: max(x.ack_id)  (cost=0.519 rows=1)
+                    -> Covering index lookup on x using ix_alert_acknowledgement_event (event_id=e.event_id)  (cost=0.393 rows=1.26)
+
+Tables read, from EXPLAIN FORMAT=JSON (table, access type, index, index columns used):
+p, ALL, none, none
+<union2,3>, ALL, none, none
+c, ref, ix_close_approach_watchlist, watchlist_number
+c, ref, ix_close_approach_other, other_number
+e, eq_ref, PRIMARY, alert_seq
+k, eq_ref, PRIMARY, ack_id
+x, ref, ix_alert_acknowledgement_event, event_id
+
+EXPLAIN ANALYZE, one run on Linux amd64 with 8 processors; the times describe this run only:
+-> Limit: 51 row(s)  (cost=370 rows=51) (actual time=0.189..0.58 rows=51 loops=1)
+    -> Nested loop left join  (cost=370 rows=52) (actual time=0.188..0.575 rows=51 loops=1)
+        -> Nested loop inner join  (cost=351 rows=52) (actual time=0.171..0.302 rows=51 loops=1)
+            -> Sort: p.time_of_closest_approach DESC, p.alert_seq DESC  (cost=309..309 rows=52) (actual time=0.161..0.165 rows=51 loops=1)
+                -> Table scan on p  (cost=271..274 rows=52) (actual time=0.141..0.145 rows=51 loops=1)
+                    -> Union materialize with deduplication  (cost=271..271 rows=52) (actual time=0.14..0.14 rows=51 loops=1)
+                        -> Limit: 51 row(s)  (cost=266 rows=51) (actual time=0.0631..0.0784 rows=51 loops=1)
+                            -> Covering index lookup on c using ix_close_approach_watchlist (watchlist_number=25544) (reverse)  (cost=266 rows=2631) (actual time=0.0624..0.0747 rows=51 loops=1)
+                        -> Limit: 51 row(s)  (cost=0.35 rows=1) (actual time=0.00999..0.00999 rows=0 loops=1)
+                            -> Covering index lookup on c using ix_close_approach_other (other_number=25544) (reverse)  (cost=0.35 rows=1) (actual time=0.00978..0.00978 rows=0 loops=1)
+            -> Single-row index lookup on e using PRIMARY (alert_seq=p.alert_seq)  (cost=0.702 rows=1) (actual time=0.00252..0.00254 rows=1 loops=51)
+        -> Filter: (k.ack_id = (select #5))  (cost=0.252 rows=1) (actual time=0.00514..0.00516 rows=0.235 loops=51)
+            -> Single-row index lookup on k using PRIMARY (ack_id=(select #5))  (cost=0.252 rows=1) (actual time=0.00433..0.00433 rows=0.235 loops=51)
+            -> Select #5 (subquery in condition; dependent)
+                -> Aggregate: max(x.ack_id)  (cost=0.519 rows=1) (actual time=0.00259..0.00263 rows=1 loops=75)
+                    -> Covering index lookup on x using ix_alert_acknowledgement_event (event_id=e.event_id)  (cost=0.393 rows=1.26) (actual time=0.00213..0.00231 rows=0.56 loops=75)

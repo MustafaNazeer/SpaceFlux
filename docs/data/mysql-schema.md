@@ -12,7 +12,7 @@ This page describes the relational store behind `query-api`: the satellite catal
 2. [Conventions](#conventions)
 3. [Idempotent consumption](#idempotent-consumption)
 4. [Tables](#tables): [`alert_event`](#alert_event), [`space_weather_event`](#space_weather_event), [`space_weather_series`](#space_weather_series), [`close_approach`](#close_approach), [`screening_run` and its lists](#screening_run), [`catalog_object`](#catalog_object), [`watchlist_object`](#watchlist_object), [`alert_acknowledgement`](#alert_acknowledgement)
-5. [Queries the API needs](#queries-the-api-needs)
+5. [Queries the API needs](#queries-the-api-needs), with [the two alert lists](#the-two-alert-lists)
 6. [Database users](#database-users)
 7. [Decisions](#decisions)
 8. [MySQL 8.4 facts relied on, and test obligations](#mysql-84-facts-relied-on-and-test-obligations)
@@ -131,8 +131,9 @@ One row per `space_weather_level` event, the full history, never updated. Each c
 | `no_data_since` | `DATETIME(6)` | yes | `no_data` and `ended` |
 | `restated_by_time_tag` | `DATETIME(6)` | yes | Restatements only |
 | `ended_by_satellite` | `INT` | yes | `ended` only |
+| `listed` | `BOOLEAN`, virtual generated, not null | no | Set by the database, never written: true when the event is in the recent alerts list (Q3), that is when `trigger_kind` is not `refresh` and `state` or `previous_state` is `level`. See [The two alert lists](#the-two-alert-lists) |
 
-Indexes: (`scale`, `satellite`, `interval_start`, `alert_seq`) and (`scale`, `satellite`, `sample_time`, `alert_seq`) for the state of each Kp interval and each GOES sample; (`scale`, `alert_seq`) for the newest events of a scale.
+Indexes: (`scale`, `satellite`, `interval_start`, `alert_seq`) and (`scale`, `satellite`, `sample_time`, `alert_seq`) for the state of each Kp interval and each GOES sample; (`scale`, `alert_seq`) for the newest events of a scale; (`listed`, `alert_seq`) for the space weather half of Q3.
 
 The schema already enforces which fields go with which state and scale, and the consumer validates every event before storing it, so the table does not repeat those rules as constraints beyond simple value lists. `time_tag` is bounded at 64 characters because it is compared for equality; every format SWPC uses today is 19 or 20 characters ([topics.md](topics.md#value-1)).
 
@@ -188,7 +189,7 @@ One row per `close_approach` event, never updated ([topics.md](topics.md#close_a
 | `miss_distance_m` | `DOUBLE` | no | At the precision computed; surfaces round it as the contract says |
 | `relative_speed_m_per_s` | `DOUBLE` | no | |
 
-Indexes: (`run_id`); (`watchlist_number`, `time_of_closest_approach`); (`other_number`, `time_of_closest_approach`). An object's approaches in either role are read as a `UNION` of one query per index ([indexes.md](indexes.md#close_approach)).
+Indexes: (`run_id`); (`watchlist_number`, `time_of_closest_approach`, `alert_seq`); (`other_number`, `time_of_closest_approach`, `alert_seq`). An object's approaches in either role are read as a `UNION` of one query per index ([The two alert lists](#the-two-alert-lists), [indexes.md](indexes.md#close_approach)).
 
 There is deliberately no foreign key from `run_id` to `screening_run`. A run's approaches are published before its summary (ADR 0007, decision 9), so they are stored first. An approach whose `run_id` matches a run but whose `event_id` the run's kept summary does not list belongs to a rebuilt run (ADR 0007, decision 12); it is stored like any other and simply not shown as part of that run (see the current run query).
 
@@ -223,6 +224,8 @@ The list tables, all keyed by (`run_alert_seq`, `position`), where `run_alert_se
 | `screening_run_not_screened` | `catalog_number` `INT UNSIGNED`; `name` `VARCHAR(64)` null; `role` `VARCHAR(16)` `utf8mb4_0900_bin`; `kind` `VARCHAR(64)` `utf8mb4_0900_bin`; `reason` `TEXT`; `screened_until` `DATETIME(6)` null | (`catalog_number`, `run_alert_seq`) |
 
 `mechanism`, `code` and `kind` are open lists in the contract (ADR 0007, decision 14), so they are plain strings with no check constraint, and a surface shows an unknown value with its `detail` or `reason`. A list that the summary cut has fewer rows than its count; the `omitted_` column says how many entries are not listed, and a surface showing the list says so.
+
+`stack_name` (on `static_stack` entries of runs published since 2026-10-06) has no column: nothing filters or joins on it, so the API reads it from the stored summary in `alert_event.payload`, which REST and GraphQL return as received ([ADR 0007](../adr/0007-alerts-topic.md), amendment of 2026-10-06).
 
 **Completeness and the current run** follow the contract's rule ([topics.md](topics.md#screening_run), `approach_count` row):
 
@@ -314,13 +317,92 @@ Each table above exists for at least one of these. The SQL is written by hand in
 | --- | --- | --- |
 | 1 | Current state of G, R and S, with staleness | `space_weather_series`, newest non ended series per scale, age limit applied at read time |
 | 2 | History of one scale over a time range | `space_weather_event` by (`scale`, `satellite`, `interval_start` or `sample_time`), latest `alert_seq` per interval or sample |
-| 3 | Newest alerts, newest first, with their acknowledgement state | `alert_event` by `alert_seq`, joined to its kind table and to the latest `alert_acknowledgement` row per `event_id`. For anonymous viewers only `action` and `acted_at` of that row are returned, never `note` or `principal` |
+| 3 | Newest alerts, newest first, with their acknowledgement state: every close approach, and every space weather event that enters, changes or leaves a level | The `UNION ALL` of `close_approach` by its primary key and `space_weather_event` by (`listed`, `alert_seq`), joined to `alert_event` and to the latest `alert_acknowledgement` row per `event_id` ([SQL below](#q3-the-recent-alerts)). For anonymous viewers only `action` and `acted_at` of that row are returned, never `note` or `principal` |
 | 4 | The current screening run, its approaches, and whether it is stale | `screening_run` by (`window_start`, `rules_version`), completeness through `screening_run_approach` and `close_approach` |
 | 5 | Everything a run did not screen, with the counts of what is not listed | `screening_run_suppressed`, `screening_run_rejected`, `screening_run_not_screened`, the `omitted_` columns, and the bookkeeping lists from `alert_event.payload` |
-| 6 | One object: its catalog row, its approaches in either role, and its coverage in the current run | `catalog_object`; `close_approach` as a `UNION` of the lookup by `watchlist_number` and the lookup by `other_number`; the run list tables by (catalog number, run) |
+| 6 | One object: its catalog row, its approaches in either role newest first, and its coverage in the current run | `catalog_object`; `close_approach` as a `UNION` of the lookup by `watchlist_number` and the lookup by `other_number`, each by its index on (catalog number, `time_of_closest_approach`, `alert_seq`) ([SQL below](#q6-one-objects-approaches)); the run list tables by (catalog number, run) |
 | 7 | The watchlist with each object's catalog row | `watchlist_object` joined to `catalog_object` |
 | 8 | Acknowledgement history of one alert | `alert_acknowledgement` by (`event_id`, `ack_id`). For anonymous viewers each row shows only `action` and `acted_at`; `note` and `principal` are returned only to the signed in operator |
 | 9 | The catalog, paged | `catalog_object` by `norad_cat_id`, keyset paging (`WHERE norad_cat_id > ? ORDER BY norad_cat_id LIMIT n`) |
+
+### The two alert lists
+
+Q3 and Q6 are served through GraphQL only. Both are paged by key on an opaque cursor, as every list is ([ADR 0010](../adr/0010-query-api-stack.md), decision 6): Q3, a top level list, takes 50 rows by default and at most 200; Q6, nested under a catalog object, takes 20 by default and at most 50 ([ADR 0012](../adr/0012-graphql-introspection-and-limits.md), section 4). Each query binds `fetch`, the page size plus one, in every `LIMIT`. When `fetch` rows come back, the page is the first `fetch` minus one of them and the cursor is encoded from the last row of the page; fewer rows means this is the last page. The SQL below is laid out for reading; the [plan files](plans/) give each statement on one line exactly as the plan test runs it.
+
+Both return the event as stored (`payload`, the text received) with `received_at`, as `GET /api/alerts/by-id` does, and the latest acknowledgement row through the same join as Q4. `principal` and `note` of that row are returned to the signed in operator only; for anyone else they are left out of the response.
+
+#### Q3, the recent alerts
+
+**Which events, decided on 2026-10-06.** Every `close_approach` event, and every `space_weather_level` event whose `trigger_kind` is not `refresh` and whose `state` is `level` or whose `previous_state` is `level`: entering a level, changing level, and leaving a level, revisions and restatements included. Screening run summaries, refreshes, and changes between none, no data and ended that never touch a level are left out.
+
+**Why it is not one scan of `alert_event`.** Each R and S series stores about twelve events an hour and G a few, nearly all of them refreshes or "none", while a listed space weather event is rare. A backward scan of `alert_event` joined to `space_weather_event` passes every one of those rows on its way to each listed one, and when no close approaches arrive (for example while ingest polls only SWPC and screening is stale) a page it cannot fill reads the whole table. So Q3 is a `UNION ALL` of two parts, each of which reads only rows it returns:
+
+* close approaches, all of them listed, read backward on `close_approach`'s primary key, `alert_seq`;
+* listed space weather events, read backward on (`listed`, `alert_seq`) of `space_weather_event`.
+
+Each part stops at `fetch` rows, so the outer `ORDER BY` sorts at most twice `fetch` rows (402 for a page of 200), whatever the size of the tables. [`alerts-recent-by-scan.txt`](plans/alerts-recent-by-scan.txt) shows the single scan over the same data for comparison.
+
+**The `listed` column.** A virtual generated column, `trigger_kind <> 'refresh' AND (state = 'level' OR previous_state <=> 'level')`, declared `NOT NULL`; `<=>` makes an absent `previous_state` compare as false rather than null. Being virtual, its value is not stored in the row; "when a secondary index is created on a virtual generated column, generated column values are materialized in the records of the index" ([secondary indexes and generated columns](https://dev.mysql.com/doc/refman/8.4/en/create-table-secondary-indexes.html)), so the value is computed at insert into the index only and the consumer writes nothing new. The consumer's grant on `space_weather_event` is a table level `INSERT`, and its insert names its columns and not `listed`; a statement that names `listed` is refused with error 3105 (`ER_NON_DEFAULT_VALUE_FOR_GENERATED_COLUMN`, [server error reference](https://dev.mysql.com/doc/mysql-errors/8.4/en/server-error-reference.html)). The column limited `INSERT` is on `alert_event`, which is not changed. The API user's table level `SELECT` covers the new column. `MigrationIntegrationTest` proves each of these and checks the value for 16 representative combinations of state, previous state and trigger.
+
+Considered:
+
+* An index on (`state`, `alert_seq`). It misses every event that leaves a level, whose `state` is `none`, `no_data` or `ended`, and it keeps every refresh at a level, which is every poll of a storm. A second index on (`previous_state`, `alert_seq`) and a three way merge would still pass the refreshes.
+* A stored generated column. The same index, but the value is also written into every row, and adding a stored column rebuilds the table, while adding a virtual one changes only metadata ([online DDL, generated column operations](https://dev.mysql.com/doc/refman/8.4/en/innodb-online-ddl-operations.html)).
+* A functional index on the expression. "Functional indexes are implemented as hidden virtual generated columns", so it costs the same, but a query uses it only when its `WHERE` clause repeats the expression with the same arguments ([functional key parts](https://dev.mysql.com/doc/refman/8.4/en/create-index.html)); the named column states the rule once.
+* A flag on `alert_event` written by the consumer. It needs a grants change to the consumer's column limited `INSERT` on that table and puts a space weather rule on the table every kind shares.
+
+First page, parameters `fetch`, `fetch`, `fetch`:
+
+```sql
+SELECT e.alert_seq, e.event_id, e.kind, e.payload, e.received_at,
+       k.action, k.acted_at, k.principal, k.note
+FROM ((SELECT c.alert_seq FROM close_approach c
+       ORDER BY c.alert_seq DESC LIMIT ?)
+      UNION ALL
+      (SELECT w.alert_seq FROM space_weather_event w
+       WHERE w.listed = 1
+       ORDER BY w.alert_seq DESC LIMIT ?)) p
+JOIN alert_event e ON e.alert_seq = p.alert_seq
+LEFT JOIN alert_acknowledgement k ON k.ack_id =
+    (SELECT MAX(x.ack_id) FROM alert_acknowledgement x WHERE x.event_id = e.event_id)
+ORDER BY p.alert_seq DESC
+LIMIT ?
+```
+
+Later pages, parameters `before`, `fetch`, `before`, `fetch`, `fetch`, where `before` is the `alert_seq` of the last row of the previous page: the same statement with `WHERE c.alert_seq < ?` in the first part and `AND w.alert_seq < ?` after `w.listed = 1` in the second.
+
+The cursor carries `alert_seq`, which is internal to this database and would change if it were rebuilt from a replay; a cursor is only good for the pages that follow it, so that does no harm.
+
+#### Q6, one object's approaches
+
+An object's close approaches in either role, newest `time_of_closest_approach` first. Two approaches can share a time: a later run that finds the same approach again stores a new event with the same pair and time. So the order, and the cursor, is (`time_of_closest_approach`, `alert_seq`), and both indexes name `alert_seq` as their last column. InnoDB already appends the primary key to every secondary index (rule 2 in [indexes.md](indexes.md)), so naming it changes no index entry; it states what the query relies on.
+
+First page, parameters `object`, `fetch`, `object`, `fetch`, `fetch`:
+
+```sql
+SELECT e.alert_seq, e.event_id, p.time_of_closest_approach, e.payload, e.received_at,
+       k.action, k.acted_at, k.principal, k.note
+FROM ((SELECT c.alert_seq, c.time_of_closest_approach FROM close_approach c
+       WHERE c.watchlist_number = ?
+       ORDER BY c.time_of_closest_approach DESC, c.alert_seq DESC LIMIT ?)
+      UNION
+      (SELECT c.alert_seq, c.time_of_closest_approach FROM close_approach c
+       WHERE c.other_number = ?
+       ORDER BY c.time_of_closest_approach DESC, c.alert_seq DESC LIMIT ?)) p
+JOIN alert_event e ON e.alert_seq = p.alert_seq
+LEFT JOIN alert_acknowledgement k ON k.ack_id =
+    (SELECT MAX(x.ack_id) FROM alert_acknowledgement x WHERE x.event_id = e.event_id)
+ORDER BY p.time_of_closest_approach DESC, p.alert_seq DESC
+LIMIT ?
+```
+
+Later pages add, after the catalog number condition in each part,
+
+```sql
+AND c.time_of_closest_approach <= ? AND (c.time_of_closest_approach < ? OR c.alert_seq < ?)
+```
+
+with parameters `object`, `tca`, `tca`, `seq`, `fetch` for each part and `fetch` for the outer `LIMIT`, where `tca` and `seq` are the last row's `time_of_closest_approach` and `alert_seq`. Written this way, each part is a plain range on `time_of_closest_approach` within its catalog number, read backward, with the tie on `alert_seq` checked on the index entries; the row comparison form, `(c.time_of_closest_approach, c.alert_seq) < (?, ?)`, was not tested. `UNION` rather than `UNION ALL`, as the [indexes page](indexes.md#close_approach) explains; removing duplicates costs a temporary table of at most twice `fetch` rows. The plan test walks every page of both lists, with ties, and checks they return exactly the rows of the plain query each replaces.
 
 ## Database users
 
@@ -389,4 +471,4 @@ Decided on 2026-10-02. Each row links back to where the choice is explained, wit
 1. `DOUBLE` round trips the values the producers write through the driver, checked with the committed examples, for instance `1.0624149581417441e-05` in `valid-r-level.json`.
 2. The API user, with `INSERT` granted only on `event_id`, `action`, `principal` and `note`, can insert an acknowledgement, the foreign key to `alert_event` is checked for that insert, and an insert naming `ack_id` or `acted_at` is refused.
 3. A session opened with `connectionTimeZone=+00:00` and `forceConnectionTimeZoneToSession=true` really runs at offset `+00:00` on the `mysql:8.4.11` image, and a row inserted with the `acted_at` default reads back in UTC. The offset is used rather than the name `UTC` because a numeric offset does not depend on the server having its time zone tables loaded.
-4. The migrations, including the grant migration and Flyway's history table, apply as the migration user holding exactly the reviewed privilege set, which the test pins with `SHOW GRANTS`. This shows the set is enough, not that every privilege in it is used: no migration today alters, drops or adds an index to an existing table. Proven by `MigrationIntegrationTest` in `db-migrate`, which also proves obligations 1 to 3; for obligation 3 it sets the server default to another offset first, so the session zone can only come from the driver.
+4. The migrations, including the grant migration and Flyway's history table, apply as the migration user holding exactly the reviewed privilege set, which the test pins with `SHOW GRANTS`. This shows the set is enough, not that every privilege in it is used: `V15__alert_list_indexes.sql` is the first migration that alters existing tables (a generated column, and indexes dropped and added), and it applies under the same pinned set. Proven by `MigrationIntegrationTest` in `db-migrate`, which also proves obligations 1 to 3; for obligation 3 it sets the server default to another offset first, so the session zone can only come from the driver.
