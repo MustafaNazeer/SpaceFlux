@@ -20,7 +20,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.orekit.time.AbsoluteDate;
 
-import io.github.mustafanazeer.spaceflux.risk.orbit.OrekitData;
+import io.github.mustafanazeer.spaceflux.orbit.Fixtures;
+import io.github.mustafanazeer.spaceflux.orbit.ObjectTrack;
+import io.github.mustafanazeer.spaceflux.orbit.OrekitData;
+import io.github.mustafanazeer.spaceflux.orbit.TrackedObject;
 
 /**
  * Measures how long screening takes on the recorded stations fixture, for docs/perf/screening-cost.md. It is not
@@ -56,7 +59,7 @@ class ScreeningCostBenchmark {
         Screening screening = new Screening(StationStacks.load(), ScreeningSettings.CO_ORBITING_BOUND_M);
         TrackedObject iss = Fixtures.station(ISS);
 
-        out.printf("screening cost on risk-engine/src/test/resources/celestrak/gp-stations.json (%d objects)%n",
+        out.printf("screening cost on orbit-core/src/test/resources/celestrak/gp-stations.json (%d objects)%n",
                 stations.size());
         out.printf("started %s; window start %s, %.0f s window, %.0f s samples%n", Instant.now(),
                 start.toStringRfc3339(OrekitData.utc()),

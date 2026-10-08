@@ -14,7 +14,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.orekit.time.AbsoluteDate;
 
-import io.github.mustafanazeer.spaceflux.risk.orbit.OrekitData;
+import io.github.mustafanazeer.spaceflux.orbit.OrekitData;
 import io.github.mustafanazeer.spaceflux.risk.screening.CloseApproach;
 import io.github.mustafanazeer.spaceflux.risk.screening.Role;
 import io.github.mustafanazeer.spaceflux.risk.screening.ScreeningResult;

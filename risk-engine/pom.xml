@@ -38,6 +38,16 @@
       <artifactId>kafka-contracts</artifactId>
     </dependency>
     <dependency>
+      <groupId>io.github.mustafanazeer.spaceflux</groupId>
+      <artifactId>orbit-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.github.mustafanazeer.spaceflux</groupId>
+      <artifactId>orbit-core</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>

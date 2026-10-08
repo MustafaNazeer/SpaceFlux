@@ -4,6 +4,8 @@ import java.util.List;
 
 import org.orekit.time.AbsoluteDate;
 
+import io.github.mustafanazeer.spaceflux.orbit.ObjectTrack.StopKind;
+
 public record ScreeningResult(AbsoluteDate start, AbsoluteDate end, Coverage coverage, List<CloseApproach> approaches,
         List<SuppressedPair> suppressed, List<Rejected> rejected, List<NotScreened> notScreened,
         List<EpochAfterStart> epochAfterStart, List<DifferingCopy> differingCopies) {
@@ -36,18 +38,12 @@ public record ScreeningResult(AbsoluteDate start, AbsoluteDate end, Coverage cov
     }
 
     /**
-     * {@code screenedUntil} is set only for {@link Kind#STOPPED_IN_WINDOW}; the other kinds cover none of the window.
+     * {@code screenedUntil} is set only for {@link StopKind#STOPPED_IN_WINDOW}; the other kinds cover none of the window.
      * An accepted watchlist object is reported in its watchlist role, which is the stronger statement; the catalog side
      * effect shows in {@link Coverage#pairsNotScreenable()}. A watchlist object that was rejected on the watchlist side
      * and admitted as a catalog object is reported in its catalog role.
      */
-    public record NotScreened(int catalogNumber, Role role, Kind kind, AbsoluteDate screenedUntil, String reason) {
-
-        public enum Kind {
-            CANNOT_PROPAGATE,
-            STOPPED_BEFORE_WINDOW,
-            STOPPED_IN_WINDOW
-        }
+    public record NotScreened(int catalogNumber, Role role, StopKind kind, AbsoluteDate screenedUntil, String reason) {
     }
 
     /** Screened by propagating backward from an element set newer than the window start. */

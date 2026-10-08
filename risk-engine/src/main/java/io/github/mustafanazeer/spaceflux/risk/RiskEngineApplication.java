@@ -8,7 +8,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-import io.github.mustafanazeer.spaceflux.risk.orbit.OrekitData;
+import io.github.mustafanazeer.spaceflux.orbit.OrekitData;
 
 @SpringBootApplication
 @EnableScheduling

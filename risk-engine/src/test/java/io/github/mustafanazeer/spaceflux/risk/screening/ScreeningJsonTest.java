@@ -13,8 +13,11 @@ import org.junit.jupiter.api.Test;
 import org.orekit.time.AbsoluteDate;
 
 import io.github.mustafanazeer.spaceflux.contracts.TopicSchemas;
+import io.github.mustafanazeer.spaceflux.orbit.Fixtures;
+import io.github.mustafanazeer.spaceflux.orbit.ObjectTrack.StopKind;
+import io.github.mustafanazeer.spaceflux.orbit.OrekitData;
+import io.github.mustafanazeer.spaceflux.orbit.TrackedObject;
 import io.github.mustafanazeer.spaceflux.risk.alerts.ScreeningJson;
-import io.github.mustafanazeer.spaceflux.risk.orbit.OrekitData;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -79,5 +82,28 @@ class ScreeningJsonTest {
         for (JsonNode e : events) {
             assertThat(schemas.check("alerts", e).failure()).as(e.toString()).isNull();
         }
+    }
+
+    @Test
+    void writesEachStopKindAsItsSchemaCodeAndPassesTheAlertsSchema() throws IOException {
+        AbsoluteDate start = new AbsoluteDate("2026-09-27T05:00:00", OrekitData.utc());
+        List<ScreeningResult.NotScreened> notScreened = List.of(
+                new ScreeningResult.NotScreened(28872, Role.WATCHLIST, StopKind.STOPPED_IN_WINDOW,
+                        start.shiftedBy(2640), "stopped"),
+                new ScreeningResult.NotScreened(28350, Role.CATALOG, StopKind.STOPPED_BEFORE_WINDOW, null, "stopped"),
+                new ScreeningResult.NotScreened(33334, Role.CATALOG, StopKind.CANNOT_PROPAGATE, null, "cannot"));
+        ScreeningResult result = new ScreeningResult(start, start.shiftedBy(ScreeningSettings.WINDOW_S),
+                new ScreeningResult.Coverage(1, 2, 2, 2, 0, 0), List.of(), List.of(), List.of(), notScreened,
+                List.of(), List.of());
+
+        List<JsonNode> events = ScreeningJson.write(result, Map.of(28872, "A", 28350, "B", 33334, "C"),
+                Instant.parse("2026-09-27T05:00:00Z"), 1, Instant.parse("2026-09-27T06:00:00Z"), OrekitData.utc());
+
+        JsonNode run = events.get(events.size() - 1);
+        List<String> kinds = new java.util.ArrayList<>();
+        run.get("screening_run").get("not_screened").forEach(n -> kinds.add(n.get("kind").asString()));
+        assertThat(kinds).containsExactly("stopped_in_window", "stopped_before_window", "cannot_propagate");
+        assertThat(run.get("screening_run").get("not_screened").get(0).has("screened_until")).isTrue();
+        assertThat(TopicSchemas.fromClasspath().check("alerts", run).failure()).as(run.toString()).isNull();
     }
 }

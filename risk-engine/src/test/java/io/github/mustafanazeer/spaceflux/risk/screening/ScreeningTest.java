@@ -13,6 +13,9 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.orekit.time.AbsoluteDate;
 
+import io.github.mustafanazeer.spaceflux.orbit.Fixtures;
+import io.github.mustafanazeer.spaceflux.orbit.ObjectTrack.StopKind;
+import io.github.mustafanazeer.spaceflux.orbit.TrackedObject;
 import io.github.mustafanazeer.spaceflux.risk.screening.ScreeningResult.NotScreened;
 import io.github.mustafanazeer.spaceflux.risk.screening.ScreeningResult.Rejected;
 
@@ -263,7 +266,7 @@ class ScreeningTest {
         assertThat(result.notScreened()).singleElement().satisfies(n -> {
             assertThat(n.catalogNumber()).isEqualTo(28872);
             assertThat(n.role()).isEqualTo(Role.WATCHLIST);
-            assertThat(n.kind()).isEqualTo(NotScreened.Kind.STOPPED_IN_WINDOW);
+            assertThat(n.kind()).isEqualTo(StopKind.STOPPED_IN_WINDOW);
             assertThat(n.screenedUntil().durationFrom(decaying.tle().getDate())).isEqualTo(2640.0);
             assertThat(n.reason()).contains("SGP4 altitude", "80 km screening floor", "not a reentry prediction")
                     .containsPattern(UTC_INSTANT);
@@ -278,7 +281,7 @@ class ScreeningTest {
                 decaying.tle().getDate().shiftedBy(86400));
 
         assertThat(result.notScreened()).singleElement().satisfies(n -> {
-            assertThat(n.kind()).isEqualTo(NotScreened.Kind.STOPPED_BEFORE_WINDOW);
+            assertThat(n.kind()).isEqualTo(StopKind.STOPPED_BEFORE_WINDOW);
             assertThat(n.screenedUntil()).isNull();
         });
     }
@@ -292,7 +295,7 @@ class ScreeningTest {
 
         assertThat(result.notScreened()).filteredOn(n -> n.catalogNumber() == 33334).singleElement().satisfies(n -> {
             assertThat(n.role()).isEqualTo(Role.CATALOG);
-            assertThat(n.kind()).isEqualTo(NotScreened.Kind.CANNOT_PROPAGATE);
+            assertThat(n.kind()).isEqualTo(StopKind.CANNOT_PROPAGATE);
             assertThat(n.screenedUntil()).isNull();
         });
     }
@@ -405,6 +408,6 @@ class ScreeningTest {
                 decaying.tle().getDate().shiftedBy(2650));
 
         assertThat(result.notScreened()).singleElement()
-                .satisfies(n -> assertThat(n.kind()).isEqualTo(NotScreened.Kind.STOPPED_BEFORE_WINDOW));
+                .satisfies(n -> assertThat(n.kind()).isEqualTo(StopKind.STOPPED_BEFORE_WINDOW));
     }
 }

@@ -1,4 +1,4 @@
-package io.github.mustafanazeer.spaceflux.risk.screening;
+package io.github.mustafanazeer.spaceflux.orbit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

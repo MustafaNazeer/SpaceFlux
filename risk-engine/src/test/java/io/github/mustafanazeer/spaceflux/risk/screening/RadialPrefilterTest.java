@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
+import io.github.mustafanazeer.spaceflux.orbit.ObjectTrack;
+
 /** docs/risk/orbital-conventions.md 3.3 rule 3. */
 class RadialPrefilterTest {
 

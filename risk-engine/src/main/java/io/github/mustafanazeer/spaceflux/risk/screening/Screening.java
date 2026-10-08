@@ -15,7 +15,11 @@ import org.orekit.time.AbsoluteDate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.github.mustafanazeer.spaceflux.risk.orbit.OrekitData;
+import io.github.mustafanazeer.spaceflux.orbit.ElementSetLimits;
+import io.github.mustafanazeer.spaceflux.orbit.ObjectTrack;
+import io.github.mustafanazeer.spaceflux.orbit.ObjectTrack.StopKind;
+import io.github.mustafanazeer.spaceflux.orbit.OrekitData;
+import io.github.mustafanazeer.spaceflux.orbit.TrackedObject;
 import io.github.mustafanazeer.spaceflux.risk.screening.ScreeningResult.Coverage;
 import io.github.mustafanazeer.spaceflux.risk.screening.ScreeningResult.DifferingCopy;
 import io.github.mustafanazeer.spaceflux.risk.screening.ScreeningResult.EpochAfterStart;
@@ -100,7 +104,7 @@ public final class Screening {
             if (t.stopReason() != null) {
                 int n = t.object().catalogNumber();
                 notScreened.add(new NotScreened(n, acceptedNumbers.contains(n) ? Role.WATCHLIST : Role.CATALOG,
-                        t.stopKind(), t.stopKind() == NotScreened.Kind.STOPPED_IN_WINDOW ? t.screenableUntil() : null,
+                        t.stopKind(), t.stopKind() == StopKind.STOPPED_IN_WINDOW ? t.screenableUntil() : null,
                         t.stopReason()));
             }
         }
@@ -182,10 +186,10 @@ public final class Screening {
     /** Stale element sets are rejected; an epoch after the window start is accepted, since SGP4 runs backward too. */
     private static boolean fresh(TrackedObject o, Role role, AbsoluteDate start, List<Rejected> rejected) {
         double ageS = start.durationFrom(o.tle().getDate());
-        if (ageS > ScreeningSettings.MAX_ELEMENT_AGE_S) {
+        if (ageS > ElementSetLimits.MAX_AGE_S) {
             rejected.add(new Rejected(o.catalogNumber(), role, Rejected.Code.STALE_ELEMENT_SET, String.format(Locale.ROOT,
                     "element set is %.1f days old at the window start, over the %.0f day limit; not screened as %s",
-                    ageS / 86400, ScreeningSettings.MAX_ELEMENT_AGE_S / 86400,
+                    ageS / 86400, ElementSetLimits.MAX_AGE_S / 86400,
                     role == Role.WATCHLIST ? "a watchlist object" : "a catalog object")));
             return false;
         }

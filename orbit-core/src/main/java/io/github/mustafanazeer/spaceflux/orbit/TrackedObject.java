@@ -1,10 +1,8 @@
-package io.github.mustafanazeer.spaceflux.risk.screening;
+package io.github.mustafanazeer.spaceflux.orbit;
 
 import org.orekit.propagation.analytical.tle.DeepSDP4;
 import org.orekit.propagation.analytical.tle.TLE;
 import org.orekit.propagation.analytical.tle.TLEPropagator;
-
-import io.github.mustafanazeer.spaceflux.risk.orbit.OrekitData;
 
 public record TrackedObject(String name, TLE tle) {
 

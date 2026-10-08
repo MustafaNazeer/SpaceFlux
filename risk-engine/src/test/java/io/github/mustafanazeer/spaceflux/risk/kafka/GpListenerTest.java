@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 
-import io.github.mustafanazeer.spaceflux.risk.orbit.OrekitData;
+import io.github.mustafanazeer.spaceflux.orbit.OrekitData;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;

@@ -1,4 +1,4 @@
-package io.github.mustafanazeer.spaceflux.risk.orbit;
+package io.github.mustafanazeer.spaceflux.orbit;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

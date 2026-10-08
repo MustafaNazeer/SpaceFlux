@@ -15,7 +15,10 @@ import org.orekit.propagation.analytical.tle.TLEPropagator;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.utils.PVCoordinates;
 
-import io.github.mustafanazeer.spaceflux.risk.orbit.OrekitData;
+import io.github.mustafanazeer.spaceflux.orbit.Fixtures;
+import io.github.mustafanazeer.spaceflux.orbit.ObjectTrack;
+import io.github.mustafanazeer.spaceflux.orbit.OrekitData;
+import io.github.mustafanazeer.spaceflux.orbit.TrackedObject;
 
 /** docs/risk/orbital-conventions.md 3.4 and 3.6. */
 class ClosestApproachSearchTest {

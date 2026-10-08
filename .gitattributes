@@ -1,5 +1,5 @@
-risk-engine/src/test/resources/sgp4/* -text
-risk-engine/src/main/resources/orekit-data/tai-utc.dat -text
-risk-engine/src/test/resources/celestrak/*.json -text
+orbit-core/src/test/resources/sgp4/* -text
+orbit-core/src/main/resources/orekit-data/tai-utc.dat -text
+orbit-core/src/test/resources/celestrak/*.json -text
 risk-engine/src/test/resources/swpc-storms/** -text
 risk-engine/src/test/resources/swpc-kp-labels/* -text

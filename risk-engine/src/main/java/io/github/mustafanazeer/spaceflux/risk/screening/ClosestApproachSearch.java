@@ -13,6 +13,8 @@ import org.orekit.propagation.events.FilterType;
 import org.orekit.time.AbsoluteDate;
 import org.orekit.utils.PVCoordinates;
 
+import io.github.mustafanazeer.spaceflux.orbit.ObjectTrack;
+
 /**
  * Times of closest approach where g = Δr · Δv crosses zero from negative to positive
  * (docs/risk/orbital-conventions.md 3.4). Each object gets its own propagator, as Orekit requires for the

@@ -1,4 +1,4 @@
-package io.github.mustafanazeer.spaceflux.risk.orbit;
+package io.github.mustafanazeer.spaceflux.orbit;
 
 public class InvalidElementSetException extends RuntimeException {
 

@@ -5,7 +5,7 @@ How to build and test the ingest service, the risk engine, the database migratio
 ## Prerequisites
 
 * **Go 1.27.1** or later, the version declared in `ingest/go.mod`. Needed only to run the `ingest` tests or build it outside Docker.
-* **A JDK 21.** Needed only to run the Java tests (`kafka-contracts`, `risk-engine`, `db-migrate`, and `query-api`) or build those modules outside Docker. Maven itself does not need to be installed: the Maven wrapper (`./mvnw`) downloads the version the repository pins.
+* **A JDK 21.** Needed only to run the Java tests (`kafka-contracts`, `orbit-core`, `risk-engine`, `db-migrate`, and `query-api`) or build those modules outside Docker. Maven itself does not need to be installed: the Maven wrapper (`./mvnw`) downloads the version the repository pins.
 * **Docker Engine with the Compose plugin** (the `docker compose` command). The local stack runs in Docker, and the integration tests start Kafka and MySQL containers through Testcontainers, so the Docker daemon has to be running and reachable by your user.
 * **curl**, or any HTTP client, to read the `ingest` health endpoints and call `query-api`.
 
@@ -37,7 +37,7 @@ The integration tests start a single node `apache/kafka:4.3.1` container through
 
 ### Java modules
 
-The root `pom.xml` has four modules: `kafka-contracts` (the topic schema checks and dead letter building that the Java services share), `risk-engine`, `db-migrate` (the database migrations and the program the `migrate` container runs), and `query-api`. Run Maven from the repository root, so the reactor also builds `kafka-contracts`, which `risk-engine` and `query-api` depend on and which is not published anywhere. The tests also read files outside their own module: the schema files in `schemas/`, the MySQL settings and account script in `deploy/mysql/`, and the migrations in `db-migrate/`.
+The root `pom.xml` has five modules: `kafka-contracts` (the topic schema checks and dead letter building that the Java services share), `orbit-core` (the element set conversion, Orekit data setup and SGP4 propagation, verified against the published SGP4 test cases), `risk-engine`, `db-migrate` (the database migrations and the program the `migrate` container runs), and `query-api`. Run Maven from the repository root, so the reactor also builds `kafka-contracts` and `orbit-core`, which the services depend on and which are not published anywhere. The tests also read files outside their own module: the schema files in `schemas/`, the MySQL settings and account script in `deploy/mysql/`, and the migrations in `db-migrate/`.
 
 Every module:
 
@@ -53,7 +53,7 @@ One module, with the modules it depends on:
 ./mvnw -B -pl query-api -am verify
 ```
 
-This compiles each module and runs its tests. The `risk-engine` tests include the SGP4 verification cases, the screening cross check against a brute force scan, the storm rules against recorded storm periods, and integration tests against an `apache/kafka:4.3.1` container. The `db-migrate` tests apply the migrations to a `mysql:8.4.11` container started with the committed `spaceflux.cnf` and account script, then check the accounts, their grants, and the server settings. The `query-api` database tests run against the same MySQL setup, migrated with the same migrations, and its two consumer integration tests also start a Kafka container. All of these containers are started through Testcontainers, so the Docker daemon has to be running; only the `kafka-contracts` suite runs entirely without Docker. The first run downloads Maven, the dependencies, and the images, so it takes longer.
+This compiles each module and runs its tests. The `orbit-core` tests include the SGP4 verification cases. The `risk-engine` tests include the screening cross check against a brute force scan, the storm rules against recorded storm periods, and integration tests against an `apache/kafka:4.3.1` container. The `db-migrate` tests apply the migrations to a `mysql:8.4.11` container started with the committed `spaceflux.cnf` and account script, then check the accounts, their grants, and the server settings. The `query-api` database tests run against the same MySQL setup, migrated with the same migrations, and its two consumer integration tests also start a Kafka container. All of these containers are started through Testcontainers, so the Docker daemon has to be running; only the `kafka-contracts` suite runs entirely without Docker. The first run downloads Maven, the dependencies, and the images, so it takes longer.
 
 The query plans in [docs/data/plans](data/plans/README.md) are taken by a separate, much longer run of the `plans` profile, described there; the normal build runs the same test over less data and writes nothing.
 

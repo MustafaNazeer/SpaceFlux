@@ -11,7 +11,6 @@ public final class ScreeningSettings {
     public static final double CONVERGENCE_THRESHOLD_S = 1e-6;
     public static final int MAX_ITERATIONS = 100;
     public static final double CO_ORBITING_BOUND_M = 500_000;
-    public static final double MAX_ELEMENT_AGE_S = 10 * 86_400;
 
     private ScreeningSettings() {
     }

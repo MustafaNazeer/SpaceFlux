@@ -2,7 +2,7 @@
 
 These two files are the SGP4 verification element sets and a published set of expected results from the source code archive that accompanies Vallado, Crawford, Hujsak, and Kelso, "Revisiting Spacetrack Report #3", AIAA 2006-6753. I downloaded the archive once, extracted the two files, and copied them here byte for byte, unmodified (line endings included). The archive itself is not committed. The response headers from the download sit next to them in `AIAA-2006-6753.zip.headers.txt`.
 
-How the risk engine uses these cases (which cases, tolerance, constants, time handling) is set out in [docs/risk/orbital-conventions.md](../../../../../docs/risk/orbital-conventions.md), Section 1.
+How the orbit code uses these cases (which cases, tolerance, constants, time handling) is set out in [docs/risk/orbital-conventions.md](../../../../../docs/risk/orbital-conventions.md), Section 1.
 
 Capture tool: `curl -sS -D AIAA-2006-6753.zip.headers.txt -o AIAA-2006-6753.zip` with the User-Agent `SpaceFlux-fixture-capture (https://github.com/MustafaNazeer/SpaceFlux)`, then `unzip`.
 

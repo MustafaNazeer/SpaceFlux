@@ -26,7 +26,7 @@ for run in 1 2; do
   python3 - <<'EOF'
 import glob, xml.etree.ElementTree as ET
 classes = tests = failures = errors = skipped = 0
-for path in glob.glob("risk-engine/target/surefire-reports/TEST-*.xml"):
+for path in glob.glob("orbit-core/target/surefire-reports/TEST-*.xml") + glob.glob("risk-engine/target/surefire-reports/TEST-*.xml"):
     r = ET.parse(path).getroot()
     classes += 1
     tests += int(r.get("tests")); failures += int(r.get("failures"))
@@ -36,7 +36,7 @@ EOF
 done
 ```
 
-Passes when both runs print `build exit 0` and the same counts with no failure, error, or skipped test. On 2026-10-02, at commit 59885e7, each run printed 33 test classes and 370 tests, all passing; each build took about 2 minutes 10 seconds. Later on 2026-10-02, on a second machine, two clean builds of the changes that follow 59885e7 each ran 36 test classes and 397 tests, all passing; each build took about 4 minutes 30 seconds. A difference between the two runs is a flaky test and fails this check.
+Passes when both runs print `build exit 0` and the same counts with no failure, error, or skipped test. On 2026-10-02, at commit 59885e7, each run printed 33 test classes and 370 tests, all passing; each build took about 2 minutes 10 seconds. Later on 2026-10-02, on a second machine, two clean builds of the changes that follow 59885e7 each ran 36 test classes and 397 tests, all passing; each build took about 4 minutes 30 seconds. The orbit code and its SGP4 verification tests now live in `orbit-core`, so the count covers both modules; on 2026-10-07, one clean build ran 104 `orbit-core` tests and 262 `risk-engine` tests, 366 in all, the same as before the move. A difference between the two runs is a flaky test and fails this check.
 
 ### A3. Every schema example against its schema, independently of the Java validator
 

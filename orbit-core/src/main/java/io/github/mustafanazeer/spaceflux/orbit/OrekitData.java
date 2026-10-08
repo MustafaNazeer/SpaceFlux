@@ -1,4 +1,4 @@
-package io.github.mustafanazeer.spaceflux.risk.orbit;
+package io.github.mustafanazeer.spaceflux.orbit;
 
 import org.orekit.data.ClasspathCrawler;
 import org.orekit.data.DataContext;

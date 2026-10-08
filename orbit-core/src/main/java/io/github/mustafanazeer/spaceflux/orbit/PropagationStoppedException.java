@@ -1,4 +1,4 @@
-package io.github.mustafanazeer.spaceflux.risk.orbit;
+package io.github.mustafanazeer.spaceflux.orbit;
 
 /** The element set cannot be screened at or after the requested date. */
 public class PropagationStoppedException extends RuntimeException {

@@ -11,8 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.orekit.time.AbsoluteDate;
 
 import io.github.mustafanazeer.spaceflux.contracts.TopicSchemas;
+import io.github.mustafanazeer.spaceflux.orbit.ObjectTrack.StopKind;
+import io.github.mustafanazeer.spaceflux.orbit.OrekitData;
 import io.github.mustafanazeer.spaceflux.risk.alerts.ScreeningJson;
-import io.github.mustafanazeer.spaceflux.risk.orbit.OrekitData;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -164,7 +165,7 @@ class SummaryBudgetTest {
             rejected.add(new ScreeningResult.Rejected(320_000 + i, Role.CATALOG,
                     ScreeningResult.Rejected.Code.STALE_ELEMENT_SET, "r"));
             notScreened.add(new ScreeningResult.NotScreened(330_000 + i, Role.CATALOG,
-                    ScreeningResult.NotScreened.Kind.CANNOT_PROPAGATE, null, "n"));
+                    StopKind.CANNOT_PROPAGATE, null, "n"));
             after.add(new ScreeningResult.EpochAfterStart(340_000 + i, 12.5));
             copies.add(new ScreeningResult.DifferingCopy(350_000 + i, "a", START, "b", START, Role.CATALOG, true));
             overCap.add(new ScreeningJson.OverCap(360_000 + i, START, 2));

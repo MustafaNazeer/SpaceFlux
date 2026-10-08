@@ -1,6 +1,6 @@
 # Leap second table, provenance
 
-`tai-utc.dat` is the TAI minus UTC table published by the US Naval Observatory, saved byte for byte. Orekit reads it to build its UTC time scale; it is the only physical data the risk engine loads.
+`tai-utc.dat` is the TAI minus UTC table published by the US Naval Observatory, saved byte for byte. Orekit reads it to build its UTC time scale; it is the only physical data the orbit code loads.
 
 | Field | Value |
 | --- | --- |
