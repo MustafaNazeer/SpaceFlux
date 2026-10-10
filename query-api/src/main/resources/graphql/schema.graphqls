@@ -279,4 +279,55 @@ type WatchlistObject {
   name: String
   rules_version: Int!
   catalog: CatalogObject
+  "Geometric passes over the fixed observer for 24 hours from the request, computed on request (REST section 10). Every object in one request shares the same window_start. Null, with an INTERNAL_ERROR entry in errors at this path, when the computation fails for this object; null never means no passes."
+  passes: Passes
+}
+
+"Passes of one watchlist object. passes, search_end and stop_reason are set only when status is computed."
+type Passes {
+  catalog_number: Int!
+  name: String
+  observer: Observer!
+  elevation_mask_deg: Float!
+  note: String!
+  window_start: String!
+  window_end: String!
+  "computed, no_element_set, invalid_element_set, stale_element_set, deep_space, cannot_propagate or decayed."
+  status: String!
+  reason: String
+  "Epoch of the element set used, UTC, exactly as received with no zone suffix."
+  epoch_text: String
+  search_end: String
+  stop_reason: String
+  passes: [Pass!]
+}
+
+type Observer {
+  name: String!
+  ngs_pid: String!
+  latitude_deg: Float!
+  longitude_deg: Float!
+  height_m: Float!
+}
+
+"One pass. A pass in progress at the start of the window has no rise and has a start_edge; one in progress at search_end has no set and has an end_edge. A clipped pass can be higher at its edge than at its peak."
+type Pass {
+  rise: PassPoint
+  rise_clipped: Boolean!
+  start_edge: PassPoint
+  set: PassPoint
+  set_clipped: Boolean!
+  end_edge: PassPoint
+  peak: PassPoint!
+  "True when the pass has no maximum inside the window and peak is its higher edge."
+  peak_at_edge: Boolean!
+  peak_count: Int!
+  "Element set age at the time of peak, in days; accuracy falls as it grows."
+  element_age_days: Float!
+}
+
+type PassPoint {
+  time: String!
+  elevation_deg: Float!
+  azimuth_deg: Float!
 }

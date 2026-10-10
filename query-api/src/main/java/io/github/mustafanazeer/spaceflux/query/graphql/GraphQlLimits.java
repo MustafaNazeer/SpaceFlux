@@ -23,8 +23,10 @@ import graphql.execution.instrumentation.SimplePerformantInstrumentation;
 import graphql.execution.instrumentation.parameters.InstrumentationExecuteOperationParameters;
 import graphql.language.Field;
 import graphql.language.Selection;
+import graphql.normalized.ExecutableNormalizedOperation;
 import graphql.normalized.ExecutableNormalizedOperationFactory;
 import graphql.parser.ParserOptions;
+import graphql.schema.FieldCoordinates;
 import graphql.schema.GraphQLTypeUtil;
 
 /** The limits ADR 0012 decides, each checked by GraphQlLimitsIntegrationTest. */
@@ -38,6 +40,10 @@ class GraphQlLimits {
     static final int TOP_LEVEL_PAGE = 50;
     static final int NESTED_PAGE = 20;
     static final int WATCHLIST_MAX = 10;
+    /** What one pass computation costs on top of what it selects: about 100 rows' worth (docs/api/graphql.md). */
+    static final int PASSES_WEIGHT = 100;
+    static final int MAX_PASSES_FIELDS = 1;
+    static final FieldCoordinates PASSES = FieldCoordinates.coordinates("WatchlistObject", "passes");
 
     static final ParserOptions PARSER = ParserOptions.newParserOptions().maxCharacters(16_384).maxTokens(2_000)
             .maxWhitespaceTokens(10_000).maxRuleDepth(100).build();
@@ -94,8 +100,9 @@ class GraphQlLimits {
             public InstrumentationContext<ExecutionResult> beginExecuteOperation(
                     InstrumentationExecuteOperationParameters parameters, InstrumentationState state) {
                 ExecutionContext context = parameters.getExecutionContext();
+                ExecutableNormalizedOperation operation;
                 try {
-                    ExecutableNormalizedOperationFactory.createExecutableNormalizedOperation(
+                    operation = ExecutableNormalizedOperationFactory.createExecutableNormalizedOperation(
                             context.getGraphQLSchema(), context.getOperationDefinition(), context.getFragmentsByName(),
                             context.getCoercedVariables(), ExecutableNormalizedOperationFactory.Options.defaultOptions()
                                     .maxFieldsCount(MAX_FIELDS));
@@ -103,6 +110,10 @@ class GraphQlLimits {
                     throw e;
                 } catch (RuntimeException e) {
                     throw new AbortExecutionException("The query could not be measured.");
+                }
+                // Counted here because the cost calculator undercounts a reused named fragment (ADR 0012, fact 8).
+                if (operation.getCoordinatesToNormalizedFields().get(PASSES).size() > MAX_PASSES_FIELDS) {
+                    throw new AbortExecutionException("A request may ask for passes at most once.");
                 }
                 return SimpleInstrumentationContext.noOp();
             }
@@ -117,8 +128,9 @@ class GraphQlLimits {
 
     /**
      * A field that takes a limit costs that limit, or its default page, times one plus what it selects; the watchlist
-     * costs its size bound times one plus what it selects; every other field costs one plus what it selects. Other
-     * lists without a limit are ones the contract bounds (a run's lists), so they are counted once. A limit below 1
+     * costs its size bound times one plus what it selects; a watchlist object's passes cost PASSES_WEIGHT plus one
+     * plus what they select; every other field costs one plus what it selects. Other lists without a limit are ones
+     * the contract bounds (a run's lists, a day's passes), so they are counted once. A limit below 1
      * is costed as 1, so no field can cost less than nothing and cancel the rest of the query; the data fetcher
      * refuses it anyway. Costs are worked out in long and each field's cost stops at COST_CEILING: the
      * parser admits at most 2,000 tokens, so at most 2,000 fields, and 2,000 times the ceiling stays far inside the
@@ -132,6 +144,9 @@ class GraphQlLimits {
             rows = limit instanceof Integer n ? Math.max(n, 1) : topLevel ? TOP_LEVEL_PAGE : NESTED_PAGE;
         } else if (topLevel && "watchlist".equals(env.getField().getName())) {
             rows = WATCHLIST_MAX;
+        } else if ("WatchlistObject".equals(GraphQLTypeUtil.simplePrint(env.getParentType()))
+                && "passes".equals(env.getField().getName())) {
+            return (int) Math.min(PASSES_WEIGHT + 1L + children, COST_CEILING);
         } else {
             rows = 1;
         }

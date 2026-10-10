@@ -3,7 +3,7 @@
 * **Status:** accepted, 2026-10-04.
 * **Served by:** `query-api`, under the `/api` prefix, read only for anonymous viewers ([ADR 0009](../adr/0009-alert-acknowledgement-auth.md), decision 6). Conventions are in [ADR 0010](../adr/0010-query-api-stack.md), decision 6 and its amendment: `snake_case` fields with the contract names, keyset paging, RFC 9457 problem details, and an `X-Correlation-Id` header on every response.
 
-This page covers six read endpoints, the operator's session, and acknowledgement. The recent alerts list and an object's close approaches are served by the [GraphQL API](graphql.md) only; the paged catalog and an object's full coverage come later.
+This page covers seven read endpoints, the operator's session, and acknowledgement. The recent alerts list and an object's close approaches are served by the [GraphQL API](graphql.md) only; the paged catalog and an object's full coverage come later.
 
 ## Common rules
 
@@ -202,6 +202,60 @@ Every acknowledgement row of one alert, newest first, each `{"action": ..., "act
 { "event_id": "...", "items": [ { "action": "unacknowledge", "acted_at": "..." }, { "action": "acknowledge", "acted_at": "..." } ], "next": "..." }
 ```
 
+## 10. Passes of a watchlist object
+
+`GET /api/watchlist/{catalog_number}/passes`
+
+When the object is above 10 degrees of elevation as seen from a fixed point at NASA Johnson Space Center, over the 24 hours from the request, computed on request from the newest element set the catalog holds for it ([ADR 0013](../adr/0013-satellite-passes.md), [orbital conventions](../risk/orbital-conventions.md#6-passes-over-a-fixed-observer), Section 6). Nothing is stored. The passes are geometric: they say nothing about whether the object could be seen, apply no atmospheric refraction, and are not an operational prediction; every answer carries that `note`.
+
+* **Window:** `window_start` is the request time truncated to the whole second, and `window_end` is 86,400 seconds later. Both, and every time the computation produces, are written to milliseconds, `2026-09-27T16:40:18.338Z`.
+* **Observer:** `observer` is the NGS survey mark GEMINI 3: `name`, `ngs_pid` (`AW6997`), `latitude_deg`, `longitude_deg` (east positive) and `height_m` above the WGS84 ellipsoid. `elevation_mask_deg` is 10.
+* **Status:** `status` is `computed`, or the reason no passes were computed, with `reason` in words: `no_element_set` (no catalog row), `invalid_element_set` (the stored row cannot be built into an SGP4 element set), `stale_element_set` (more than 10 days old at `window_start`), `deep_space` (an orbital period of about 225 minutes or more, which Orekit propagates with SGP4's deep space model; passes are computed for near Earth objects only), `cannot_propagate` (SGP4 cannot start from the element set, or fails at the first date checked), or `decayed` (propagated, the element set falls below the 80 km floor or fails before the window, the convention of Section 2.4 of the orbital conventions; not a reentry prediction). An empty `passes` list means only that no pass was found; a reason is never replaced by an empty list.
+* **Element set:** `epoch_text`, the epoch of the element set used, in UTC, exactly as received (CelesTrak writes it with no zone suffix), whenever there is one.
+* **Search end:** with `status` `computed`, `search_end` is where the search ended: `window_end`, or the last time the element set passed the decay checks when it failed them inside the window, with `stop_reason` saying why. A pass in progress there is reported with `set_clipped` true and its position at `search_end`; the object did not set there, the search stopped.
+* **Passes:** with `status` `computed`, `passes` in time order, each with:
+
+| Field | Meaning |
+|---|---|
+| `rise`, `set` | `{"time", "elevation_deg", "azimuth_deg"}` where the elevation crosses 10 degrees, up and down. Left out when the pass is clipped at that edge |
+| `rise_clipped`, `start_edge` | `true` and the position at `window_start` when the pass was already in progress then |
+| `set_clipped`, `end_edge` | `true` and the position at `search_end` when the pass was still in progress then |
+| `peak` | The highest maximum of elevation inside the pass, or, for a clipped pass with no maximum inside the window, its higher edge. A clipped pass can be higher at its edge than at its peak; `start_edge` or `end_edge` gives the elevation there |
+| `peak_at_edge` | `true` when `peak` is an edge, not a true maximum |
+| `peak_count` | How many maxima the pass has inside the window |
+| `element_age_days` | The element set's age at the time of `peak`, in days |
+
+Azimuth is from north, clockwise towards east, in degrees from 0 up to 360. Times and angles are written as computed, but no more than a second and a tenth of a degree mean anything, and that only near the element set's epoch: element sets are accurate to about a kilometre at epoch and degrade from there, so each pass carries `element_age_days` and the error grows with it ([orbital conventions](../risk/orbital-conventions.md#610-how-these-numbers-may-be-read), 6.10).
+
+```json
+{
+  "catalog_number": 25544,
+  "name": "ISS (ZARYA)",
+  "observer": { "name": "GEMINI 3", "ngs_pid": "AW6997", "latitude_deg": 29.557976853, "longitude_deg": -95.091374225, "height_m": -22.182 },
+  "elevation_mask_deg": 10.0,
+  "note": "Geometric passes: ...",
+  "window_start": "2026-09-27T05:00:00.000Z",
+  "window_end": "2026-09-28T05:00:00.000Z",
+  "status": "computed",
+  "epoch_text": "2026-09-27T04:10:50.460096",
+  "search_end": "2026-09-28T05:00:00.000Z",
+  "passes": [
+    {
+      "rise": { "time": "2026-09-27T16:40:18.338Z", "elevation_deg": 9.99999999, "azimuth_deg": 150.6257 },
+      "rise_clipped": false,
+      "set": { "time": "2026-09-27T16:43:13.255Z", "elevation_deg": 10.00000000, "azimuth_deg": 99.3423 },
+      "set_clipped": false,
+      "peak": { "time": "2026-09-27T16:41:45.748Z", "elevation_deg": 12.2646, "azimuth_deg": 124.9694 },
+      "peak_at_edge": false,
+      "peak_count": 1,
+      "element_age_days": 0.5215
+    }
+  ]
+}
+```
+
+The example is the first pass of the recorded ISS element set from a request at 2026-09-27T05:00:00Z, with its angles shortened; the API writes every digit it computes. `404` when the number is not on the watchlist, since passes are computed for watchlist objects only; `400` for a `catalog_number` that is not a whole number from 0 to 999999999. Each request costs a fraction of a second of computation; like the rest of the API, the endpoint is not exposed beyond loopback until a per client rate limit is in place.
+
 ## Tests
 
-Each endpoint has a contract test against the migrated database that checks the response shape, the status codes above, and that no field outside this page appears, and each query's index is proven with `EXPLAIN` as [indexes.md](../data/indexes.md#how-each-index-is-proven) describes.
+Each endpoint has a contract test against the migrated database that checks the response shape, the status codes above, and that no field outside this page appears, and each query's index is proven with `EXPLAIN` as [indexes.md](../data/indexes.md#how-each-index-is-proven) describes. The passes endpoint's test fixes the service clock inside the recorded ISS element set's age limit and checks that the answer equals the computation from that recorded element set; the computation itself is tested against an independent reference as Section 6.9 of the [orbital conventions](../risk/orbital-conventions.md#69-tests) describes, and a failure inside it reaches the client only as the generic `500`.

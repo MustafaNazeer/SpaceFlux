@@ -213,6 +213,38 @@ class GraphQlLimitsIntegrationTest {
     }
 
     @Test
+    void passesForTheWholeWatchlistRunOnceAndAreRefusedTwice() throws Exception {
+        String once = "{ watchlist { passes { status } } }";
+        String twice = "{ a: watchlist { passes { status } } b: watchlist { passes { status } } }";
+
+        assertThat(messages(query(once))).isEmpty();
+        JsonNode refused = query(twice);
+        assertThat(messages(refused)).contains("A request may ask for passes at most once.");
+        assertThat(refused.has("data") && !refused.get("data").isNull()).isFalse();
+    }
+
+    /** The cost calculator undercounts a reused named fragment (ADR 0012, fact 8), so passes are also counted. */
+    @Test
+    void passesAskedForTwiceThroughANamedFragmentAreRefusedBeforeAnyRuns() throws Exception {
+        String query = "{ a: watchlist { ...p } b: watchlist { ...p } } fragment p on WatchlistObject { passes { "
+                + "status } }";
+
+        JsonNode refused = query(query);
+
+        assertThat(messages(refused)).contains("A request may ask for passes at most once.")
+                .doesNotContain("complexity");
+        assertThat(refused.has("data") && !refused.get("data").isNull()).isFalse();
+    }
+
+    @Test
+    void passesAskedForTwiceUnderOneWatchlistAreRefused() throws Exception {
+        String query = "{ watchlist { ...p } } fragment p on WatchlistObject { a: passes { ...s } b: passes { "
+                + "...s } } fragment s on Passes { status }";
+
+        assertThat(messages(query(query))).contains("A request may ask for passes at most once.");
+    }
+
+    @Test
     void theSeededWatchlistStaysWithinTheBoundTheCostAssumes() throws Exception {
         int size = Integer.parseInt(io.github.mustafanazeer.spaceflux.query.TestMysql.rootQuery(
                 "SELECT COUNT(*) FROM spaceflux.watchlist_object"));

@@ -24,6 +24,7 @@ import io.github.mustafanazeer.spaceflux.query.TestMysql;
 import io.github.mustafanazeer.spaceflux.query.ack.AckPlanQueries;
 import io.github.mustafanazeer.spaceflux.query.alerts.AlertsPlanFeed;
 import io.github.mustafanazeer.spaceflux.query.catalog.CatalogPlanFeed;
+import io.github.mustafanazeer.spaceflux.query.passes.PassesPlanQueries;
 import io.github.mustafanazeer.spaceflux.query.read.PlanQueries;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -166,6 +167,8 @@ class QueryPlansIntegrationTest {
                         "c const PRIMARY"),
                 new Plan("watchlist", "api", PlanQueries.WATCHLIST, List.of(), false, null, "w index PRIMARY",
                         "c eq_ref PRIMARY"),
+                new Plan("watchlist-object-passes", "api", PassesPlanQueries.WATCHLIST_OBJECT, List.of(25544), false,
+                        null, "w const PRIMARY", "c const PRIMARY"),
                 new Plan("consumer-series-for-update", "consumer", AlertsPlanFeed.SERIES_FOR_UPDATE,
                         List.of("R", 19), false, null, "space_weather_series const PRIMARY"),
                 new Plan("consumer-catalog-for-update", "consumer", CatalogPlanFeed.HELD_FOR_UPDATE, List.of(25544),

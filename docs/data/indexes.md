@@ -1,7 +1,7 @@
 # MySQL indexes
 
-* **Status:** decided on 2026-10-02; the queries of Q1, Q2, Q4, Q7 and Q8, the single alert and catalog lookups, the acknowledgement write path, and the consumers' lookups were checked with `EXPLAIN` (see [Results](#results)). The two alert lists, Q3 and the approaches of Q6, were designed and checked on 2026-10-06, with the index on (`listed`, `alert_seq`) added for Q3 ([Results for the alert lists](#results-for-the-alert-lists)). Q5, the rest of Q6, and Q9 have no query in the code yet, so their indexes are not proven; each is checked when its query is written.
-* **Applies to:** the schema in [mysql-schema.md](mysql-schema.md), on MySQL 8.4 LTS with InnoDB. The query numbers (Q1 to Q9) are the rows of its [Queries the API needs](mysql-schema.md#queries-the-api-needs) table.
+* **Status:** decided on 2026-10-02; the queries of Q1, Q2, Q4, Q7 and Q8, the single alert and catalog lookups, the acknowledgement write path, and the consumers' lookups were checked with `EXPLAIN` (see [Results](#results)). The two alert lists, Q3 and the approaches of Q6, were designed and checked on 2026-10-06, with the index on (`listed`, `alert_seq`) added for Q3 ([Results for the alert lists](#results-for-the-alert-lists)). The passes lookup, Q10, was checked on 2026-10-08 ([Results](#results)). Q5, the rest of Q6, and Q9 have no query in the code yet, so their indexes are not proven; each is checked when its query is written.
+* **Applies to:** the schema in [mysql-schema.md](mysql-schema.md), on MySQL 8.4 LTS with InnoDB. The query numbers (Q1 to Q10) are the rows of its [Queries the API needs](mysql-schema.md#queries-the-api-needs) table.
 
 ## Rules I follow
 
@@ -75,7 +75,7 @@ Q6 asks about one object in one run, so both values are known and the lookup is 
 
 | Index | Columns | Used by | Why |
 | --- | --- | --- | --- |
-| Primary key | `norad_cat_id` | Q6, Q7, Q9; every consumer update | Q9 pages the catalog by this key |
+| Primary key | `norad_cat_id` | Q6, Q7, Q9, Q10; every consumer update | Q9 pages the catalog by this key |
 
 No index on `object_name`. None of the queries searches by name. If a search is added, the index comes with it.
 
@@ -83,7 +83,7 @@ No index on `object_name`. None of the queries searches by name. If a search is 
 
 | Index | Columns | Used by | Why |
 | --- | --- | --- | --- |
-| Primary key | `catalog_number` | Q7 | Joined to `catalog_object` by primary key on both sides |
+| Primary key | `catalog_number` | Q7, Q10 | Q7 reads it whole, joined to `catalog_object` by primary key on both sides; Q10 reads one row by this key and its `catalog_object` row by that table's |
 
 ### `alert_acknowledgement`
 
@@ -113,7 +113,7 @@ The bar is that every hot query has an index justified by an `EXPLAIN` plan. Onc
 
 1. **A test database at a realistic size.** Plans depend on row counts: on a table of a few rows the optimizer can rightly prefer a full scan, which would prove nothing. A generator with a fixed seed fills an empty schema, applied by the same migrations, through the same insert code the consumers use, at volumes stated beside the results: for example a year of space weather events at the rates in the schema page's expected volume, some thousands of screening runs, and a catalog of the size of the polled groups. The generator, its seed and its volumes are committed with the results.
 2. **Statistics first.** `ANALYZE TABLE` on every table before any plan is taken, so the plans do not depend on when statistics were last sampled.
-3. **One plan per query, taken as the user that runs it.** For each of Q1 to Q9, and for the consumers' write path lookups, the exact SQL from the repository code is run with `EXPLAIN FORMAT=TREE` ([EXPLAIN](https://dev.mysql.com/doc/refman/8.4/en/explain.html)) as the database user that issues it in production. `EXPLAIN` needs the same privileges as the statement it explains, so this also checks the grants.
+3. **One plan per query, taken as the user that runs it.** For each of Q1 to Q10, and for the consumers' write path lookups, the exact SQL from the repository code is run with `EXPLAIN FORMAT=TREE` ([EXPLAIN](https://dev.mysql.com/doc/refman/8.4/en/explain.html)) as the database user that issues it in production. `EXPLAIN` needs the same privileges as the statement it explains, so this also checks the grants.
 4. **What a plan must show.** The index named on this page is the one chosen, and no table that grows with time is read by a full table scan. Where the timing matters (Q3 and its index on `space_weather_event`), `EXPLAIN ANALYZE` adds actual rows read and time; those timings are reported with the machine, the data volume and the script that produced them, and are not general claims.
 5. **Committed evidence.** The plans are committed as text next to this page, and a test asserts the chosen index for each query, so a later change to a query or an index that loses its plan fails the build instead of going unnoticed.
 
@@ -124,6 +124,7 @@ The plans are in [plans/](plans/), one file per query the service runs today: th
 * Every query reads each table through the index the tables above name for it, every history and run query reads its range in index order with no sort, and no table that grows with time is read whole.
 * A history page after the first reads (`event_id`, `ack_id`) from the cursor down. The plan is taken with a cursor in the middle of the table; for a cursor near the start of the table the optimizer rightly reads the primary key instead, since only the few rows below that `ack_id` are in range.
 * The only table scan is of `space_weather_series` (Q1, a few rows, one per series); `watchlist_object` (Q7, a handful of configured objects) is read whole through its primary key.
+* Q10 reads one `watchlist_object` row and its `catalog_object` row, each a `const` lookup on its primary key (`watchlist-object-passes`). Through GraphQL, `watchlist { passes }` runs Q7 and then Q10 once for each watchlist object, one pair of primary key lookups each, and a request may hold only one `passes` selection ([GraphQL API](../api/graphql.md)).
 * The newest run is read backward from the end of (`window_start`, `rules_version`), as the plan note "(reverse)" shows, and the next batch is a range on the same index.
 * `QueryPlansIntegrationTest` in the normal build seeds a week of space weather and a year of screening runs, then asserts for every query each table's access type and index, the column each range is on, both bounds of each history range, and that only Q1 sorts. With too few runs the optimizer rightly sorts the whole run table instead, which would prove nothing, so the build keeps a year of them.
 
