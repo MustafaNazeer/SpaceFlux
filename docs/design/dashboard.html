@@ -18,6 +18,15 @@
   composed for this page, and are not taken from one real run.
   Page clock (as_of): 2026-09-29T18:00:00Z.
 
+  The passes panel does not follow the page clock. Its main view is the docs/api/rest.md section 10
+  example: the recorded ISS element set (epoch 2026-09-27T04:10:50.460096) and a request at
+  2026-09-27T05:00:00Z. The first row is the REST example; the other three rows and the clipped
+  gallery example come from query-api/src/test/resources/passes/reference-passes.json (the
+  independent reference run for the same element set), whose times can differ from the API's by
+  a millisecond. The main view lists the ISS only, since the reference run has no other watchlist
+  object for that request. The no passes, stale element set and failed examples in the gallery
+  are sample states with illustrative values, not results of a run.
+
   Fonts are named by family only. The dashboard build self hosts IBM Plex Sans and IBM Plex Mono
   as tokens.md describes; this file falls back to system fonts where Plex is not installed.
 -->
@@ -177,6 +186,12 @@ a:hover { color: var(--accent-hover); }
 .btn-secondary { background: transparent; color: var(--text-primary); border: 1px solid var(--border-strong); }
 .btn-secondary:hover { background: var(--surface-3); }
 .btn-secondary:active { background: var(--surface-2); }
+.btn:disabled,
+.btn:disabled:hover,
+.btn:disabled:active,
+.btn[aria-disabled="true"],
+.btn[aria-disabled="true"]:hover,
+.btn[aria-disabled="true"]:active { background: transparent; color: var(--text-muted); border-color: var(--border-subtle); cursor: not-allowed; }
 
 /* Layout */
 .page {
@@ -262,6 +277,7 @@ p { margin: 0; }
 .badge.nodata { color: var(--text-secondary); border: 1px dashed var(--border-strong); }
 .badge.stale { color: var(--stale); border: 1px solid var(--stale); }
 .badge.approach { color: var(--text-primary); border: 1px solid var(--border-strong); }
+.badge.clipped { color: var(--text-secondary); border: 1px solid var(--border-strong); }
 
 .icon { width: 16px; height: 16px; display: inline-block; vertical-align: middle; flex: none; }
 
@@ -314,6 +330,14 @@ td .sub { display: block; color: var(--text-muted); font-size: 12px; line-height
   margin-bottom: var(--space-4);
 }
 .empty strong { font-weight: 600; }
+
+/* Passes */
+.pass-object { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+.pass-object + .pass-object { border-top: 1px solid var(--border-subtle); padding-top: var(--space-4); }
+.pass-object .subhead { margin: 0; }
+.pass-object .table-wrap, .pass-object .empty { margin-bottom: var(--space-2); }
+.pass-object h3 .mono { color: var(--text-muted); font-size: 12px; line-height: 16px; font-weight: 400; margin-left: var(--space-2); }
+td .badge + .sub { margin-top: var(--space-1); }
 
 details.disclosure { border-top: 1px solid var(--border-subtle); padding-top: var(--space-3); }
 details.disclosure > summary {
@@ -425,6 +449,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
   <symbol id="i-clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.5V8l2.5 1.75" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
   <symbol id="i-approach" viewBox="0 0 16 16"><circle cx="6" cy="8" r="4.25" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="8" r="4.25" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
   <symbol id="i-check" viewBox="0 0 16 16"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-clipped" viewBox="0 0 16 16"><path d="M5 1.75v12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 3.5a4.5 4.5 0 0 1 0 9" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
   <symbol id="i-open" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
 </svg>
 
@@ -596,6 +621,71 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
         <summary>Rejected and not screened, 0 <span class="caption">objects outside this run</span></summary>
         <p class="secondary">Every input object was screened. An object that never reached the input cannot be listed here, so an empty list does not mean nothing comes within 5 km.</p>
       </details>
+    </section>
+
+    <section class="panel" aria-labelledby="passes-title">
+      <div class="run-head">
+        <h2 id="passes-title" class="section-title">Watchlist passes</h2>
+        <button class="btn btn-secondary" type="button">Refresh passes</button>
+      </div>
+
+      <p class="visually-hidden" role="status"></p>
+      <dl class="run-meta">
+        <div><dt class="label">Window</dt><dd>24 hours from <time datetime="2026-09-27T05:00:00.000Z">2026-09-27 05:00:00 UTC</time></dd></div>
+        <div><dt class="label">Observer</dt><dd>GEMINI 3 survey mark, NASA Johnson Space Center (NGS AW6997), 10 degree mask</dd></div>
+      </dl>
+      <p id="passes-note" class="caption" style="margin-bottom: var(--space-4);">Geometric passes: times when this public element set, propagated with SGP4, puts the object at or above 10 degrees of elevation from this point, with no atmospheric refraction. They do not say whether the object can be seen (sunlight, darkness, weather), they grow less accurate as the element set ages, and they are not an operational prediction.</p>
+
+      <div class="pass-object">
+        <div class="subhead">
+          <h3 id="passes-25544">ISS (ZARYA) <span class="mono">25544</span></h3>
+          <span class="caption">4 passes</span>
+        </div>
+        <p class="caption">Element set epoch <time datetime="2026-09-27T04:10:50.460Z">2026-09-27 04:10:50 UTC</time>, 0.5 to 0.9 d old at the peaks.</p>
+        <div class="table-wrap" role="region" aria-labelledby="passes-25544" tabindex="0">
+          <table aria-labelledby="passes-25544" aria-describedby="passes-note">
+            <thead>
+              <tr>
+                <th scope="col">Date (UTC)</th>
+                <th scope="col">Rise (UTC)</th>
+                <th scope="col">Peak (UTC)</th>
+                <th scope="col" class="num">Peak elevation</th>
+                <th scope="col">Set (UTC)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><time datetime="2026-09-27">2026-09-27</time></td>
+                <td><time datetime="2026-09-27T16:40:18.338Z">16:40:18</time><span class="sub">from SE</span></td>
+                <td><time datetime="2026-09-27T16:41:45.748Z">16:41:45</time></td>
+                <td class="num"><span class="num">12.3&deg;</span></td>
+                <td><time datetime="2026-09-27T16:43:13.255Z">16:43:13</time><span class="sub">to E</span></td>
+              </tr>
+              <tr>
+                <td><time datetime="2026-09-27">2026-09-27</time></td>
+                <td><time datetime="2026-09-27T18:15:04.136Z">18:15:04</time><span class="sub">from SW</span></td>
+                <td><time datetime="2026-09-27T18:18:16.837Z">18:18:16</time></td>
+                <td class="num"><span class="num">39.5&deg;</span></td>
+                <td><time datetime="2026-09-27T18:21:30.137Z">18:21:30</time><span class="sub">to NE</span></td>
+              </tr>
+              <tr>
+                <td><time datetime="2026-09-28">2026-09-28</time></td>
+                <td><time datetime="2026-09-28T00:50:11.182Z">00:50:11</time><span class="sub">from N</span></td>
+                <td><time datetime="2026-09-28T00:51:51.541Z">00:51:51</time></td>
+                <td class="num"><span class="num">13.0&deg;</span></td>
+                <td><time datetime="2026-09-28T00:53:31.550Z">00:53:31</time><span class="sub">to NE</span></td>
+              </tr>
+              <tr>
+                <td><time datetime="2026-09-28">2026-09-28</time></td>
+                <td><time datetime="2026-09-28T02:25:37.669Z">02:25:37</time><span class="sub">from NW</span></td>
+                <td><time datetime="2026-09-28T02:28:53.113Z">02:28:53</time></td>
+                <td class="num"><span class="num">49.2&deg;</span></td>
+                <td><time datetime="2026-09-28T02:32:07.037Z">02:32:07</time><span class="sub">to SE</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
   </main>
@@ -858,6 +948,133 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
         <p class="caption">Kp is an estimate; SWPC can revise it, so this interval can change.</p>
       </article>
       <figcaption>A higher level, from the committed G4 example (archived data, shown here as if current).</figcaption>
+    </figure>
+
+    <figure>
+      <div class="panel">
+        <dl class="run-meta">
+          <div><dt class="label">Window</dt><dd>24 hours from <time datetime="2026-09-27T16:42:29.000Z">2026-09-27 16:42:29 UTC</time></dd></div>
+        </dl>
+        <div class="pass-object">
+          <div class="subhead">
+            <h3 id="g-passes-clipped">ISS (ZARYA) <span class="mono">25544</span></h3>
+            <span class="caption">4 passes</span>
+          </div>
+          <p class="caption">Element set epoch <time datetime="2026-09-27T04:10:50.460Z">2026-09-27 04:10:50 UTC</time>, 0.5 to 0.9 d old at the peaks.</p>
+          <div class="table-wrap" role="region" aria-label="ISS (ZARYA) 25544, clipped pass example" tabindex="0">
+            <table aria-labelledby="g-passes-clipped">
+              <thead>
+                <tr>
+                  <th scope="col">Date (UTC)</th>
+                  <th scope="col">Rise (UTC)</th>
+                  <th scope="col">Peak (UTC)</th>
+                  <th scope="col" class="num">Peak elevation</th>
+                  <th scope="col">Set (UTC)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><time datetime="2026-09-27">2026-09-27</time></td>
+                  <td><span class="badge clipped"><svg class="icon" aria-hidden="true"><use href="#i-clipped"/></svg>Clipped</span><span class="sub">In progress at the window start, E at 11.7&deg;</span></td>
+                  <td><time datetime="2026-09-27T16:42:29.000Z">16:42:29</time><span class="sub">Highest at the window edge</span></td>
+                  <td class="num"><span class="num">11.7&deg;</span></td>
+                  <td><time datetime="2026-09-27T16:43:13.255Z">16:43:13</time><span class="sub">to E</span></td>
+                </tr>
+                <tr>
+                  <td><time datetime="2026-09-27">2026-09-27</time></td>
+                  <td><time datetime="2026-09-27T18:15:04.136Z">18:15:04</time><span class="sub">from SW</span></td>
+                  <td><time datetime="2026-09-27T18:18:16.837Z">18:18:16</time></td>
+                  <td class="num"><span class="num">39.5&deg;</span></td>
+                  <td><time datetime="2026-09-27T18:21:30.136Z">18:21:30</time><span class="sub">to NE</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <figcaption>A pass already in progress at the window start: the Clipped badge replaces the rise, with the direction and elevation at the window start, and the peak reads "Highest at the window edge" because the pass has no maximum inside the window. The first two of the four passes the reference run finds for the recorded ISS element set from 2026-09-27T16:42:29Z. A pass still in progress where the search ended shows the badge in the Set column with "In progress where the search ended, {direction} at {elevation}". A pass with more than one maximum adds "{N} maxima" under its peak. When the search stopped before the window end, a line under the element set reads "The search stopped at {YYYY-MM-DD HH:MM:SS} UTC, before the end of the window: {stop_reason}". A peak or set on a later UTC date than the Date cell shows its full date in its own cell.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="panel">
+        <div class="pass-object">
+          <div class="subhead">
+            <h3>OBJECT AJ <span class="mono">57036</span></h3>
+            <span class="caption">0 passes</span>
+          </div>
+          <p class="caption">Element set epoch <time datetime="2026-09-28T14:10:20.740Z">2026-09-28 14:10:20 UTC</time>.</p>
+          <div class="empty">
+            <strong>No pass above 10 degrees in the next 24 hours.</strong>
+          </div>
+        </div>
+      </div>
+      <figcaption>Sample state with illustrative values: computed, with an empty pass list. The recorded OBJECT AJ element set itself has passes in every reference window; this only shows how an empty result reads. It is a result for this element set and window, not an error, so it reads as one; there is no element age because there is no peak. When the search stopped before the window end, the text reads "No pass above 10 degrees before the search stopped." An empty watchlist shows "The watchlist is empty, so no passes are computed." in the same treatment, with no object.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="panel">
+        <div class="pass-object">
+          <div class="subhead">
+            <h3>OBJECT AJ <span class="mono">57036</span></h3>
+            <span class="badge nodata"><svg class="icon" aria-hidden="true"><use href="#i-nodata"/></svg>Element set too old</span>
+          </div>
+          <p class="caption">Element set epoch <time datetime="2026-09-28T14:10:20.740Z">2026-09-28 14:10:20 UTC</time>.</p>
+          <p class="secondary">element set is 11.3 days old at the window start, over the 10 day limit; no passes computed</p>
+        </div>
+      </div>
+      <figcaption>Sample state with illustrative values: no passes computed, status <span class="mono">stale_element_set</span>. The badge carries the short label and the API's reason follows as plain text. The other labels are "No element set", "Element set cannot be used", "Deep space orbit, not computed", "Cannot be propagated" and "Treated as decayed"; a status code the page does not know reads "Not computed ({code})".</figcaption>
+    </figure>
+
+    <figure>
+      <div class="panel">
+        <div class="pass-object">
+          <div class="subhead">
+            <h3>ISS (ZARYA) <span class="mono">25544</span></h3>
+          </div>
+          <p class="secondary">Passes could not be computed for this object.</p>
+        </div>
+      </div>
+      <figcaption>Sample state: the computation failed for this object (passes null, with an error at its path). It is an error, never shown as "no passes". The other objects in the same answer are shown as usual.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="panel">
+        <div class="run-head">
+          <h3 class="section-title">Watchlist passes</h3>
+          <button class="btn btn-secondary" type="button" aria-disabled="true">Refresh passes</button>
+        </div>
+        <p role="status" class="secondary">Computing passes for the watchlist.</p>
+      </div>
+      <div class="panel">
+        <div class="run-head">
+          <h3 class="section-title">Watchlist passes</h3>
+          <button class="btn btn-secondary" type="button">Refresh passes</button>
+        </div>
+        <p role="status" class="secondary">Passes could not be loaded. Use Refresh passes to try again.</p>
+      </div>
+      <figcaption>Loading, and a request that failed as a whole. Passes load once with the page and again only from Refresh passes; the one minute refresh and Pause updates do not touch them. The button is disabled (<span class="mono">aria-disabled</span>) while a request is out. After a refresh succeeds, the panel's status line says "Passes updated at {HH:MM:SS} UTC."; nothing is announced for the first load.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="panel">
+        <div class="run-head">
+          <h3 class="section-title">Watchlist passes</h3>
+          <button class="btn btn-secondary" type="button">Refresh passes</button>
+        </div>
+        <p role="status" class="secondary">Passes could not be refreshed. The passes shown are for the 24 hours from <time datetime="2026-09-27T05:00:00.000Z">2026-09-27 05:00:00 UTC</time>.</p>
+        <dl class="run-meta">
+          <div><dt class="label">Window</dt><dd>24 hours from <time datetime="2026-09-27T05:00:00.000Z">2026-09-27 05:00:00 UTC</time></dd></div>
+        </dl>
+        <div class="pass-object">
+          <div class="subhead">
+            <h3>ISS (ZARYA) <span class="mono">25544</span></h3>
+            <span class="caption">4 passes</span>
+          </div>
+          <p class="caption">Element set epoch <time datetime="2026-09-27T04:10:50.460Z">2026-09-27 04:10:50 UTC</time>, 0.5 to 0.9 d old at the peaks.</p>
+          <p class="secondary">The table of the main view stays here unchanged.</p>
+        </div>
+      </div>
+      <figcaption>A refresh that failed while passes were on screen. The tables from the last answer that succeeded stay, and the status line says they are for the 24 hours from that answer's window start. When the answer's window start cannot be read, the line reads "Passes could not be refreshed. The passes shown are from the last answer that succeeded." Sample state; the times are the main view's.</figcaption>
     </figure>
 
   </div>
