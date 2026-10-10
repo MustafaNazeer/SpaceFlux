@@ -41,6 +41,7 @@
   <main id="main" class="primary-col" tabindex="-1">
     <app-space-weather [current]="spaceWeather()" [failedAt]="data.spaceWeather.failedAt()" [paused]="data.paused()" />
     <app-screening [current]="screening()" [now]="now()" [failedAt]="data.screening.failedAt()" [paused]="data.paused()" />
+    <app-passes-panel />
   </main>
 
   <app-recent-alerts [page]="alerts()" [now]="now()" [failedAt]="data.alerts.failedAt()" [paused]="data.paused()" />

@@ -325,3 +325,105 @@ export const RECENT_ALERTS: TypedDocumentNode<RecentAlertsData, { limit: number 
     }
   }
 `;
+
+export interface PassPoint {
+  time: string;
+  elevation_deg: number;
+  azimuth_deg: number;
+}
+
+export interface Pass {
+  rise: PassPoint | null;
+  rise_clipped: boolean;
+  start_edge: PassPoint | null;
+  set: PassPoint | null;
+  set_clipped: boolean;
+  end_edge: PassPoint | null;
+  peak: PassPoint;
+  peak_at_edge: boolean;
+  peak_count: number;
+  element_age_days: number;
+}
+
+export interface Passes {
+  observer: { name: string; ngs_pid: string };
+  elevation_mask_deg: number;
+  note: string;
+  window_start: string;
+  window_end: string;
+  status: string;
+  reason: string | null;
+  epoch_text: string | null;
+  search_end: string | null;
+  stop_reason: string | null;
+  passes: Pass[] | null;
+}
+
+export interface WatchlistPassesObject {
+  catalog_number: number;
+  name: string | null;
+  /** null, with an INTERNAL_ERROR at this path, when the computation failed; never a stand in for no passes. */
+  passes: Passes | null;
+}
+
+export interface WatchlistPassesData {
+  watchlist: WatchlistPassesObject[];
+}
+
+// The server computes passes on request and refuses a second passes selection in one request, so this is its own
+// document, sent on load and on the viewer's refresh only.
+export const WATCHLIST_PASSES: TypedDocumentNode<WatchlistPassesData, Record<string, never>> = gql`
+  query WatchlistPasses {
+    watchlist {
+      catalog_number
+      name
+      passes {
+        observer {
+          name
+          ngs_pid
+        }
+        elevation_mask_deg
+        note
+        window_start
+        window_end
+        status
+        reason
+        epoch_text
+        search_end
+        stop_reason
+        passes {
+          rise {
+            time
+            elevation_deg
+            azimuth_deg
+          }
+          rise_clipped
+          start_edge {
+            time
+            elevation_deg
+            azimuth_deg
+          }
+          set {
+            time
+            elevation_deg
+            azimuth_deg
+          }
+          set_clipped
+          end_edge {
+            time
+            elevation_deg
+            azimuth_deg
+          }
+          peak {
+            time
+            elevation_deg
+            azimuth_deg
+          }
+          peak_at_edge
+          peak_count
+          element_age_days
+        }
+      }
+    }
+  }
+`;

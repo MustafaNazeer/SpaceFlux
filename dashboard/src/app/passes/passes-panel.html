@@ -1,0 +1,106 @@
+<section class="panel" aria-labelledby="passes-title">
+  <div class="run-head">
+    <h2 id="passes-title" class="section-title">Watchlist passes</h2>
+    <button class="btn btn-secondary" type="button" [attr.aria-disabled]="loading()" (click)="refresh()">Refresh passes</button>
+  </div>
+
+  <p role="status" [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</p>
+  @if (view(); as v) {
+    @if (v.common; as c) {
+      <dl class="run-meta">
+        <div>
+          <dt class="label">Window</dt>
+          <dd>24 hours from <time [attr.datetime]="c.windowStart.datetime">{{ c.windowStart.label }} UTC</time></dd>
+        </div>
+        <div>
+          <dt class="label">Observer</dt>
+          <dd>{{ c.observer }}</dd>
+        </div>
+      </dl>
+      <p id="passes-note" class="caption">{{ c.note }}</p>
+    }
+
+    @for (o of v.objects; track o.catalogNumber) {
+      <div class="pass-object">
+        <div class="subhead">
+          <h3 [id]="'passes-' + o.catalogNumber">{{ o.name }} <span class="mono">{{ o.catalogNumber }}</span></h3>
+          @if (o.count) {
+            <span class="caption">{{ o.count }}</span>
+          }
+          @if (o.badge; as b) {
+            <app-badge [badge]="b" />
+          }
+        </div>
+        @if (o.epoch; as e) {
+          <p class="caption">Element set epoch <time [attr.datetime]="e.datetime || null">{{ e.label }} UTC</time>@if (o.age) {, {{ o.age }}}.</p>
+        }
+        @if (o.stopped; as s) {
+          <p class="secondary">The search stopped at <time [attr.datetime]="s.time.datetime || null">{{ s.time.label }} UTC</time>, before the end of the window: {{ s.reason }}</p>
+        }
+        @switch (o.kind) {
+          @case ('failed') {
+            <p class="secondary">Passes could not be computed for this object.</p>
+          }
+          @case ('refused') {
+            @if (o.reason) {
+              <p class="secondary">{{ o.reason }}</p>
+            }
+          }
+          @default {
+            @if (o.empty) {
+              <div class="empty">
+                <strong>{{ o.empty }}</strong>
+              </div>
+            } @else {
+              <div class="table-wrap" role="region" [attr.aria-labelledby]="'passes-' + o.catalogNumber" tabindex="0">
+                <table [attr.aria-labelledby]="'passes-' + o.catalogNumber" aria-describedby="passes-note">
+                  <thead>
+                    <tr>
+                      <th scope="col">Date (UTC)</th>
+                      <th scope="col">Rise (UTC)</th>
+                      <th scope="col">Peak (UTC)</th>
+                      <th scope="col" class="num">Peak elevation</th>
+                      <th scope="col">Set (UTC)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (r of o.rows; track $index) {
+                      <tr>
+                        <td><time [attr.datetime]="r.date.datetime || null">{{ r.date.label }}</time></td>
+                        <td>
+                          @if (r.rise.kind === 'point') {
+                            <time [attr.datetime]="r.rise.time.datetime || null">{{ r.rise.time.label }}</time><span class="sub">{{ r.rise.text }}</span>
+                          } @else {
+                            <app-badge [badge]="clipped" /><span class="sub">{{ r.rise.text }}</span>
+                          }
+                        </td>
+                        <td>
+                          <time [attr.datetime]="r.peak.datetime || null">{{ r.peak.label }}</time>
+                          @for (n of r.peakNotes; track n) {
+                            <span class="sub">{{ n }}</span>
+                          }
+                        </td>
+                        <td class="num"><span class="num">{{ r.peakElevation }}</span></td>
+                        <td>
+                          @if (r.set.kind === 'point') {
+                            <time [attr.datetime]="r.set.time.datetime || null">{{ r.set.time.label }}</time><span class="sub">{{ r.set.text }}</span>
+                          } @else {
+                            <app-badge [badge]="clipped" /><span class="sub">{{ r.set.text }}</span>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+        }
+      </div>
+    } @empty {
+      <div class="empty">
+        <strong>The watchlist is empty, so no passes are computed.</strong>
+      </div>
+    }
+  }
+</section>

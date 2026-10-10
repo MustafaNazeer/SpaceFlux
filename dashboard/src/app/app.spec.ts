@@ -17,6 +17,7 @@ import { SESSION_PATH } from './session/session.service';
 import { respond } from '../testing/graphql';
 import {
   ALERTS_ANONYMOUS,
+  PASSES_WATCHLIST,
   SCREENING_CURRENT,
   SPACE_WEATHER_MIXED,
   SPACE_WEATHER_RECORDED,
@@ -27,6 +28,7 @@ const ROOTS: Record<string, object> = {
   SpaceWeatherCurrent: SPACE_WEATHER_MIXED,
   ScreeningCurrent: SCREENING_CURRENT,
   RecentAlerts: ALERTS_ANONYMOUS,
+  WatchlistPasses: PASSES_WATCHLIST,
 };
 
 /** Waits for Apollo, which delivers results after the HTTP response on its own schedule. */
@@ -90,6 +92,7 @@ describe('App', () => {
       'RecentAlerts',
       'ScreeningCurrent',
       'SpaceWeatherCurrent',
+      'WatchlistPasses',
     ]);
     for (const p of posts) {
       expect(p.request.headers.get('X-XSRF-TOKEN')).toBe('8d1e5c1a-36f1-4f43-9b7e-0c2f4b2a9d11');
@@ -111,6 +114,10 @@ describe('App', () => {
     expect(el.querySelectorAll('.banner').length).toBe(1);
     expect(squash(el.querySelector('app-screening tbody tr')?.textContent)).toContain('OBJECT AJ');
     expect(el.querySelectorAll('.alert-item').length).toBe(6);
+    expect(
+      Array.from(el.querySelectorAll('main#main > *')).map((c) => c.tagName.toLowerCase()),
+    ).toEqual(['app-space-weather', 'app-screening', 'app-passes-panel']);
+    expect(el.querySelectorAll('app-passes-panel table').length).toBe(2);
   });
 
   it('shows the signed in operator by name', async () => {
@@ -245,12 +252,37 @@ describe('App', () => {
     await settle(fixture);
     expect(squash(button.textContent)).toBe('Pause updates');
     const refetched = http.match({ method: 'POST', url: GRAPHQL_PATH });
-    expect(refetched.length).toBe(3);
+    expect(refetched.map((p) => p.request.body.operationName).sort()).toEqual([
+      'RecentAlerts',
+      'ScreeningCurrent',
+      'SpaceWeatherCurrent',
+    ]);
     refetched.forEach((p) => answer(p));
     await settle(fixture);
     expect(el.querySelector('.live-dot')).toBe(dot);
     expect(dot.classList).toContain('pulse');
     expect(squash(el.querySelector('.live-label')?.textContent)).toBe('Live');
+  });
+
+  it('keeps Refresh passes working while updates are paused, and sends only the passes request', async () => {
+    const fixture = await start({ status: 401, body: {} });
+    http.match(GRAPHQL_PATH).forEach((p) => answer(p));
+    await settle(fixture);
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLButtonElement>('header button')!.click();
+    await settle(fixture);
+    http.expectNone(GRAPHQL_PATH);
+
+    el.querySelector<HTMLButtonElement>('app-passes-panel .run-head button')!.click();
+    await settle(fixture);
+    const sent = http.match(GRAPHQL_PATH);
+    expect(sent.map((p) => p.request.body.operationName)).toEqual(['WatchlistPasses']);
+    answer(sent[0]);
+    await settle(fixture);
+    expect(squash(el.querySelector('app-passes-panel [role="status"]')?.textContent)).toBe(
+      'Passes updated at 05:00:00 UTC.',
+    );
+    expect(squash(el.querySelector('.live-label')?.textContent)).toBe('Paused');
   });
 
   describe('while paused', () => {

@@ -92,31 +92,6 @@
   line-height: 16px;
 }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: 32px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-md);
-  font: inherit;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color var(--duration-instant) var(--ease-standard);
-}
-.btn-secondary {
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--border-strong);
-}
-.btn-secondary:hover {
-  background: var(--surface-3);
-}
-.btn-secondary:active {
-  background: var(--surface-2);
-}
-
 .session {
   display: flex;
   align-items: center;

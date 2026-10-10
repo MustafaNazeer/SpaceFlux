@@ -20,5 +20,11 @@ exports[`dashboard queries > reports the measured numbers, so a change that near
     52,
     880,
   ],
+  [
+    "WatchlistPasses",
+    5,
+    51,
+    1420,
+  ],
 ]
 `;

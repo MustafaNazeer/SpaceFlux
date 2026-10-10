@@ -12,6 +12,9 @@ import sLevel from '../../../schemas/alerts/examples/valid-s-level.json';
 import screeningRunCut from '../../../schemas/alerts/examples/valid-screening-run-cut.json';
 import screeningRun from '../../../schemas/alerts/examples/valid-screening-run.json';
 import screeningRunStack from '../../../schemas/alerts/examples/valid-screening-run-stack.json';
+import passesReference from '../../../query-api/src/test/resources/passes/reference-passes.json';
+
+import { parseUtc } from '../app/format';
 
 /** The as_of of the docs/api/rest.md section 1 example. */
 export const AS_OF = '2026-10-04T18:00:00.000000Z';
@@ -317,3 +320,132 @@ export const ALERTS_ENDED = {
     next: null,
   },
 };
+
+/** PassesController.NOTE, verbatim: the API sends it with every passes answer. */
+export const PASSES_NOTE =
+  'Geometric passes: times when this public element set, propagated with SGP4, puts the object at or above 10 ' +
+  'degrees of elevation from this point, with no atmospheric refraction. They do not say whether the object can ' +
+  'be seen (sunlight, darkness, weather), they grow less accurate as the element set ages, and they are not an ' +
+  'operational prediction.';
+
+const DAY_MS = 86_400_000;
+
+/**
+ * One window of query-api/src/test/resources/passes/reference-passes.json (computed with Skyfield, see its
+ * PROVENANCE.md) in the shape of a computed passes answer. element_age_days is composed: the time from the
+ * element set's epoch to each peak, as the API defines it.
+ */
+function referencePasses(norad: number, kind: string) {
+  const object = passesReference.objects.find((o) => o.norad_cat_id === norad)!;
+  const window = object.windows.find((w) => w.kind === kind)!;
+  const epochMs = parseUtc(`${object.epoch}Z`);
+  return {
+    catalog_number: norad,
+    name: object.object_name,
+    passes: {
+      catalog_number: norad,
+      name: object.object_name,
+      observer: passesReference.observer,
+      elevation_mask_deg: passesReference.settings.threshold_deg,
+      note: PASSES_NOTE,
+      window_start: window.start,
+      window_end: window.end,
+      status: 'computed',
+      epoch_text: object.epoch,
+      search_end: window.end,
+      passes: window.passes.map((p) => ({
+        ...p,
+        element_age_days: (parseUtc(p.peak.time) - epochMs) / DAY_MS,
+      })),
+    },
+  };
+}
+
+/** The base window of docs/api/rest.md section 10 (ISS from 2026-09-27T05:00:00Z) and the station sharing it. */
+const ISS_BASE = referencePasses(25544, 'base');
+const CSS_BASE = referencePasses(48274, 'base');
+
+/** Composed for the states the reference cannot produce; the catalog numbers and names say they are samples. */
+function sample(catalogNumber: number, name: string, passes: object) {
+  const { observer, elevation_mask_deg, note, window_start, window_end } = ISS_BASE.passes;
+  return {
+    catalog_number: catalogNumber,
+    name,
+    passes: {
+      catalog_number: catalogNumber,
+      name,
+      observer,
+      elevation_mask_deg,
+      note,
+      window_start,
+      window_end,
+      ...passes,
+    },
+  };
+}
+
+/** The reason text PassFinder writes for a stale element set, with sample numbers. */
+export const STALE_REASON =
+  'element set is 12.3 days old at the window start, over the 10 day limit; no passes computed';
+
+/** Sgp4Propagator's decay text, with a sample altitude and time. */
+export const DECAY_STOP =
+  'SGP4 altitude 79.6 km at 2026-09-27T20:00:00.000Z, under the 80 km decay floor; propagation stops here ' +
+  '(a convention for treating the element set as decayed, not a reentry prediction)';
+
+/**
+ * The watchlist's passes in one answer: two computed objects from the reference, a computed object with no pass,
+ * a stale element set, and an object whose computation failed (passes null with an INTERNAL_ERROR at its path).
+ */
+export const PASSES_WATCHLIST = {
+  watchlist: [
+    ISS_BASE,
+    CSS_BASE,
+    sample(90001, 'SAMPLE NO PASS', {
+      status: 'computed',
+      epoch_text: '2026-09-27T01:00:00.000000',
+      search_end: ISS_BASE.passes.window_end,
+      passes: [],
+    }),
+    sample(90002, 'SAMPLE STALE', {
+      status: 'stale_element_set',
+      reason: STALE_REASON,
+      epoch_text: '2026-09-14T22:00:00.000000',
+    }),
+    {
+      catalog_number: 90003,
+      name: 'SAMPLE FAILED',
+      passes: () => {
+        throw new Error('Internal error');
+      },
+    },
+  ],
+};
+
+/** ISS from inside a pass: the first pass is clipped at the window start and peaks at that edge. */
+export const PASSES_CLIPPED_START = { watchlist: [referencePasses(25544, 'starts_inside_pass')] };
+
+/**
+ * SL-12 DEB over a window that starts and ends inside passes: the first is clipped at the start with its peak at
+ * the edge, the last is clipped where the search ended with a true peak inside.
+ */
+export const PASSES_CLIPPED_BOTH = { watchlist: [referencePasses(27958, 'ends_inside_pass')] };
+
+/** Composed: ISS's base window cut at a sample decay stop, and its second pass given a second maximum. */
+export const PASSES_STOPPED = {
+  watchlist: [
+    {
+      ...ISS_BASE,
+      passes: {
+        ...ISS_BASE.passes,
+        search_end: '2026-09-27T20:00:00.000Z',
+        stop_reason: DECAY_STOP,
+        passes: ISS_BASE.passes.passes
+          .filter((p) => p.peak.time < '2026-09-27T20:00:00.000Z')
+          .map((p, i) => (i === 1 ? { ...p, peak_count: 2 } : p)),
+      },
+    },
+  ],
+};
+
+export const PASSES_EMPTY_WATCHLIST = { watchlist: [] };

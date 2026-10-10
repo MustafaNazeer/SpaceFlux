@@ -13,6 +13,7 @@ import { Clock } from './data/clock';
 import { DashboardData } from './data/dashboard-data';
 import { datetimeAttr, hms, parseUtc } from './format';
 import { IconSprite } from './icons/icon-sprite';
+import { PassesPanel } from './passes/passes-panel';
 import { Screening } from './screening/screening';
 import { SessionService } from './session/session.service';
 import { SpaceWeather } from './space-weather/space-weather';
@@ -20,7 +21,7 @@ import { SpaceWeather } from './space-weather/space-weather';
 @Component({
   selector: 'app-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconSprite, StaleBanners, SpaceWeather, Screening, RecentAlerts],
+  imports: [IconSprite, StaleBanners, SpaceWeather, Screening, PassesPanel, RecentAlerts],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })

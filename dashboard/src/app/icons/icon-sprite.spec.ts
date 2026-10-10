@@ -20,6 +20,7 @@ describe('IconSprite', () => {
       'i-clock',
       'i-approach',
       'i-check',
+      'i-clipped',
       'i-open',
     ]);
   });

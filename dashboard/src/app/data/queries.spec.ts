@@ -19,6 +19,7 @@ import {
   RECENT_ALERTS_PAGE,
   SCREENING_CURRENT,
   SPACE_WEATHER_CURRENT,
+  WATCHLIST_PASSES,
 } from './queries';
 
 // The limits of ADR 0012 as query-api's GraphQlLimits applies them (docs/api/graphql.md, Limits).
@@ -29,6 +30,7 @@ const TOP_LEVEL_PAGE = 50;
 const NESTED_PAGE = 20;
 const WATCHLIST_MAX = 10;
 const COST_CEILING = 100_000;
+const PASSES_WEIGHT = 100;
 
 function fields(set: SelectionSetNode | undefined): FieldNode[] {
   return (set?.selections ?? []).filter((s): s is FieldNode => s.kind === Kind.FIELD);
@@ -46,7 +48,7 @@ function fieldCount(set: SelectionSetNode | undefined): number {
 /**
  * GraphQlLimits.COST: a field with a limit argument costs that limit (or its default page) times one plus its
  * children; the top level watchlist counts as its bound of 10 rows; any other field counts once; and no one field
- * costs more than the 100,000 ceiling. graphql-java leaves __typename out of the cost but counts it in the field count; both were measured
+ * costs more than the 100,000 ceiling; a watchlist object's passes cost 100 more than their plain cost. graphql-java leaves __typename out of the cost but counts it in the field count; both were measured
  * against the running API (see the last two tests).
  */
 function cost(
@@ -73,7 +75,9 @@ function cost(
     } else if (parent.name === 'Query' && f.name.value === 'watchlist') {
       rows = WATCHLIST_MAX;
     }
-    return sum + Math.min(rows * (1 + children), COST_CEILING);
+    const weight =
+      parent.name === 'WatchlistObject' && f.name.value === 'passes' ? PASSES_WEIGHT : 0;
+    return sum + Math.min(weight + rows * (1 + children), COST_CEILING);
   }, 0);
 }
 
@@ -87,7 +91,20 @@ const DOCUMENTS: [string, DocumentNode, Record<string, unknown>][] = [
   ['SpaceWeatherCurrent', SPACE_WEATHER_CURRENT, {}],
   ['ScreeningCurrent', SCREENING_CURRENT, {}],
   ['RecentAlerts', RECENT_ALERTS, { limit: RECENT_ALERTS_PAGE }],
+  ['WatchlistPasses', WATCHLIST_PASSES, {}],
 ];
+
+/** Every WatchlistObject.passes field in the document, however deep: the server answers at most one per request. */
+function passesFields(set: SelectionSetNode | undefined, parent: GraphQLObjectType): number {
+  return fields(set).reduce((n, f) => {
+    if (f.name.value === '__typename') {
+      return n;
+    }
+    const type = getNamedType(parent.getFields()[f.name.value].type);
+    const own = parent.name === 'WatchlistObject' && f.name.value === 'passes' ? 1 : 0;
+    return n + own + (isObjectType(type) ? passesFields(f.selectionSet, type) : 0);
+  }, 0);
+}
 
 describe('dashboard queries', () => {
   for (const [name, doc, variables] of DOCUMENTS) {
@@ -137,10 +154,41 @@ describe('dashboard queries', () => {
       [RECENT_ALERTS, fixtures.ALERTS_OPERATOR, { limit: RECENT_ALERTS_PAGE }],
       [RECENT_ALERTS, fixtures.ALERTS_EMPTY, { limit: RECENT_ALERTS_PAGE }],
       [RECENT_ALERTS, fixtures.ALERTS_ENDED, { limit: RECENT_ALERTS_PAGE }],
+      [WATCHLIST_PASSES, fixtures.PASSES_CLIPPED_START, {}],
+      [WATCHLIST_PASSES, fixtures.PASSES_CLIPPED_BOTH, {}],
+      [WATCHLIST_PASSES, fixtures.PASSES_STOPPED, {}],
+      [WATCHLIST_PASSES, fixtures.PASSES_EMPTY_WATCHLIST, {}],
     ];
     for (const [doc, root, variables] of cases) {
       expect(respond(addTypenameToDocument(doc), root, variables).errors).toBeUndefined();
     }
+  });
+
+  it('answers the failed object of the watchlist fixture with null passes and one error at its path', () => {
+    const result = respond(addTypenameToDocument(WATCHLIST_PASSES), fixtures.PASSES_WATCHLIST);
+    expect(result.errors?.map((e) => e.path)).toEqual([['watchlist', 4, 'passes']]);
+    const objects = (result.data as { watchlist: { passes: unknown }[] }).watchlist;
+    expect(objects.map((o) => o.passes === null)).toEqual([false, false, false, false, true]);
+  });
+
+  it('asks for passes once, which is all the server answers in one request', () => {
+    expect(
+      passesFields(
+        operation(addTypenameToDocument(WATCHLIST_PASSES)).selectionSet,
+        SCHEMA.getQueryType()!,
+      ),
+    ).toBe(1);
+  });
+
+  // PassesCostTest pins these two costs under the server's own calculator.
+  it('agrees with the cost the server pins for passes', () => {
+    const c = (q: string) => cost(operation(parse(q)).selectionSet, SCHEMA.getQueryType()!, {});
+    expect(c('{ watchlist { passes { status } } }')).toBe(1030);
+    expect(
+      c(
+        '{ watchlist { catalog_number passes { status window_start window_end passes { peak { time elevation_deg azimuth_deg } } } } }',
+      ),
+    ).toBe(1110);
   });
 
   it('reports the measured numbers, so a change that nears a limit is visible in review', () => {

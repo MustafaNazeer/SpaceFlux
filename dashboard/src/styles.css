@@ -221,9 +221,50 @@ p {
   color: var(--stale);
   border: 1px solid var(--stale);
 }
+.badge.clipped {
+  color: var(--text-secondary);
+  border: 1px solid var(--border-strong);
+}
 .badge.approach {
   color: var(--text-primary);
   border: 1px solid var(--border-strong);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--duration-instant) var(--ease-standard);
+}
+.btn-secondary {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+}
+.btn-secondary:hover {
+  background: var(--surface-3);
+}
+.btn-secondary:active {
+  background: var(--surface-2);
+}
+.btn:disabled,
+.btn:disabled:hover,
+.btn:disabled:active,
+.btn[aria-disabled='true'],
+.btn[aria-disabled='true']:hover,
+.btn[aria-disabled='true']:active {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+  cursor: not-allowed;
 }
 
 /* Stale banners */
