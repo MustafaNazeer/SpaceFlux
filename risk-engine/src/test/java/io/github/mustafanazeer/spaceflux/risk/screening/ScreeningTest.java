@@ -268,7 +268,7 @@ class ScreeningTest {
             assertThat(n.role()).isEqualTo(Role.WATCHLIST);
             assertThat(n.kind()).isEqualTo(StopKind.STOPPED_IN_WINDOW);
             assertThat(n.screenedUntil().durationFrom(decaying.tle().getDate())).isEqualTo(2640.0);
-            assertThat(n.reason()).contains("SGP4 altitude", "80 km screening floor", "not a reentry prediction")
+            assertThat(n.reason()).contains("SGP4 altitude", "80 km decay floor", "not a reentry prediction")
                     .containsPattern(UTC_INSTANT);
         });
     }

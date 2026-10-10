@@ -55,8 +55,8 @@ public final class Sgp4Propagator {
         double radius = pv.getPosition().getNorm();
         if (radius < DECAY_RADIUS_M) {
             throw new PropagationStoppedException(String.format(Locale.ROOT,
-                    "SGP4 altitude %.1f km at %s, under the %.0f km screening floor; screening stops here "
-                            + "(a screening convention, not a reentry prediction)",
+                    "SGP4 altitude %.1f km at %s, under the %.0f km decay floor; propagation stops here "
+                            + "(a convention for treating the element set as decayed, not a reentry prediction)",
                     (radius / 1000) - TLEConstants.EARTH_RADIUS, date.toStringRfc3339(OrekitData.utc()),
                     DECAY_ALTITUDE_FLOOR_M / 1000));
         }

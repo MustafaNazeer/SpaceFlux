@@ -86,6 +86,18 @@ class Sgp4PropagatorTest {
                 .hasMessageContaining("altitude 79.9");
     }
 
+    /** Shared by screening and passes, so it names neither. */
+    @Test
+    void theDecayFloorMessageIsNeutralAndSaysItIsAConvention() throws IOException {
+        TLE tle = tle(published(28350));
+        Sgp4Propagator propagator = new Sgp4Propagator(tle);
+
+        assertThatThrownBy(() -> propagator.screeningState(tle.getDate().shiftedBy(1200 * 60.0)))
+                .isInstanceOf(PropagationStoppedException.class)
+                .hasMessageMatching("SGP4 altitude 79\\.9 km at \\S+, under the 80 km decay floor; propagation stops "
+                        + "here \\(a convention for treating the element set as decayed, not a reentry prediction\\)");
+    }
+
     @Test
     void keepsGoingJustAboveTheEightyKilometreFloor() throws IOException {
         TLE tle = tle(published(28350));
