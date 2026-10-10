@@ -12,6 +12,7 @@ COPY query-api/pom.xml query-api/
 RUN mvn -B -q -pl query-api -am dependency:go-offline
 COPY schemas/ schemas/
 COPY kafka-contracts/src/main/ kafka-contracts/src/main/
+COPY orbit-core/src/main/ orbit-core/src/main/
 COPY query-api/src/main/ query-api/src/main/
 RUN mvn -B -q -pl query-api -am -DskipTests package \
  && cp query-api/target/query-api-*.jar /src/query-api.jar

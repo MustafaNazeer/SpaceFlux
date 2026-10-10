@@ -49,8 +49,19 @@
       <artifactId>kafka-contracts</artifactId>
     </dependency>
     <dependency>
+      <groupId>io.github.mustafanazeer.spaceflux</groupId>
+      <artifactId>orbit-core</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- The recorded CelesTrak element sets the pass tests read are kept once, in orbit-core. -->
+    <dependency>
+      <groupId>io.github.mustafanazeer.spaceflux</groupId>
+      <artifactId>orbit-core</artifactId>
+      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>

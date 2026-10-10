@@ -1,0 +1,1833 @@
+{
+  "description": "Reference satellite passes over NGS mark GEMINI 3 (PID AW6997), computed with Skyfield and the sgp4 package; see PROVENANCE.md.",
+  "generator": "query-api/tools/passes/reference_passes.py",
+  "versions": {
+    "skyfield": "1.55",
+    "sgp4": "2.27",
+    "numpy": "2.5.3"
+  },
+  "observer": {
+    "name": "GEMINI 3",
+    "ngs_pid": "AW6997",
+    "latitude_deg": 29.557976853,
+    "longitude_deg": -95.091374225,
+    "height_m": -22.182,
+    "ellipsoid": "WGS84"
+  },
+  "settings": {
+    "threshold_deg": 10.0,
+    "window_s": 86400,
+    "delta_t_s": 69.184,
+    "ut1_minus_utc_s": 0.0,
+    "polar_motion": "none",
+    "sgp4_gravity_model": "WGS72",
+    "sgp4_opsmode": "i",
+    "teme_to_earth_fixed": "GMST 1982 rotation",
+    "refraction": "none",
+    "search_step_s": 1.0,
+    "search_epsilon_s": 0.001,
+    "times": "UTC, rounded to the millisecond; angles are evaluated at the rounded time and rounded to 1e-6 degree"
+  },
+  "objects": [
+    {
+      "norad_cat_id": 25544,
+      "object_name": "ISS (ZARYA)",
+      "epoch": "2026-09-27T04:10:50.460096",
+      "source_file": "orbit-core/src/test/resources/celestrak/gp-catnr-25544.json",
+      "source_sha256": "7097564cb9924c63a9a180de8fa68b7ac65bc753603ee597be9b8b4a271bb966",
+      "windows": [
+        {
+          "kind": "base",
+          "cut": null,
+          "start": "2026-09-27T05:00:00.000Z",
+          "end": "2026-09-28T05:00:00.000Z",
+          "elevation_at_start_deg": -13.779401,
+          "elevation_at_end_deg": -70.111514,
+          "pass_count": 4,
+          "passes": [
+            {
+              "rise": {
+                "time": "2026-09-27T16:40:18.339Z",
+                "elevation_deg": 10.000041,
+                "azimuth_deg": 150.625376
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T16:43:13.255Z",
+                "elevation_deg": 9.999989,
+                "azimuth_deg": 99.34233
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T16:41:45.749Z",
+                  "elevation_deg": 12.264574,
+                  "azimuth_deg": 124.969125
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T16:41:45.749Z",
+                "elevation_deg": 12.264574,
+                "azimuth_deg": 124.969125
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T18:15:04.136Z",
+                "elevation_deg": 10.000012,
+                "azimuth_deg": 245.56057
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T18:21:30.137Z",
+                "elevation_deg": 9.999928,
+                "azimuth_deg": 28.301772
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T18:18:16.837Z",
+                  "elevation_deg": 39.460373,
+                  "azimuth_deg": 316.902922
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T18:18:16.837Z",
+                "elevation_deg": 39.460373,
+                "azimuth_deg": 316.902922
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-28T00:50:11.182Z",
+                "elevation_deg": 10.000015,
+                "azimuth_deg": 5.184185
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-28T00:53:31.550Z",
+                "elevation_deg": 9.999954,
+                "azimuth_deg": 65.089155
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-28T00:51:51.541Z",
+                  "elevation_deg": 13.048273,
+                  "azimuth_deg": 35.133706
+                }
+              ],
+              "peak": {
+                "time": "2026-09-28T00:51:51.541Z",
+                "elevation_deg": 13.048273,
+                "azimuth_deg": 35.133706
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-28T02:25:37.669Z",
+                "elevation_deg": 10.000015,
+                "azimuth_deg": 305.290463
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-28T02:32:07.037Z",
+                "elevation_deg": 9.999897,
+                "azimuth_deg": 153.334295
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-28T02:28:53.113Z",
+                  "elevation_deg": 49.171074,
+                  "azimuth_deg": 229.370793
+                }
+              ],
+              "peak": {
+                "time": "2026-09-28T02:28:53.113Z",
+                "elevation_deg": 49.171074,
+                "azimuth_deg": 229.370793
+              },
+              "peak_at_edge": false
+            }
+          ],
+          "maxima_within_0_001_deg_of_threshold": []
+        },
+        {
+          "kind": "starts_inside_pass",
+          "cut": "start after the highest peak of the base window pass rising at 2026-09-27T16:40:18.339Z",
+          "start": "2026-09-27T16:42:29.000Z",
+          "end": "2026-09-28T16:42:29.000Z",
+          "elevation_at_start_deg": 11.659569,
+          "elevation_at_end_deg": -86.117414,
+          "pass_count": 4,
+          "passes": [
+            {
+              "rise": null,
+              "rise_clipped": true,
+              "start_edge": {
+                "time": "2026-09-27T16:42:29.000Z",
+                "elevation_deg": 11.659569,
+                "azimuth_deg": 111.64043
+              },
+              "set": {
+                "time": "2026-09-27T16:43:13.255Z",
+                "elevation_deg": 9.999989,
+                "azimuth_deg": 99.34233
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 0,
+              "peaks": [],
+              "peak": {
+                "time": "2026-09-27T16:42:29.000Z",
+                "elevation_deg": 11.659569,
+                "azimuth_deg": 111.64043
+              },
+              "peak_at_edge": true
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T18:15:04.136Z",
+                "elevation_deg": 10.000012,
+                "azimuth_deg": 245.56057
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T18:21:30.136Z",
+                "elevation_deg": 10.000029,
+                "azimuth_deg": 28.301676
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T18:18:16.837Z",
+                  "elevation_deg": 39.460373,
+                  "azimuth_deg": 316.902922
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T18:18:16.837Z",
+                "elevation_deg": 39.460373,
+                "azimuth_deg": 316.902922
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-28T00:50:11.182Z",
+                "elevation_deg": 10.000015,
+                "azimuth_deg": 5.184185
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-28T00:53:31.549Z",
+                "elevation_deg": 10.000006,
+                "azimuth_deg": 65.088904
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-28T00:51:51.540Z",
+                  "elevation_deg": 13.048273,
+                  "azimuth_deg": 35.133379
+                }
+              ],
+              "peak": {
+                "time": "2026-09-28T00:51:51.540Z",
+                "elevation_deg": 13.048273,
+                "azimuth_deg": 35.133379
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-28T02:25:37.669Z",
+                "elevation_deg": 10.000015,
+                "azimuth_deg": 305.290463
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-28T02:32:07.036Z",
+                "elevation_deg": 10.000003,
+                "azimuth_deg": 153.334363
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-28T02:28:53.113Z",
+                  "elevation_deg": 49.171074,
+                  "azimuth_deg": 229.370793
+                }
+              ],
+              "peak": {
+                "time": "2026-09-28T02:28:53.113Z",
+                "elevation_deg": 49.171074,
+                "azimuth_deg": 229.370793
+              },
+              "peak_at_edge": false
+            }
+          ],
+          "maxima_within_0_001_deg_of_threshold": []
+        },
+        {
+          "kind": "ends_inside_pass",
+          "cut": "end after the highest peak of the base window pass rising at 2026-09-28T02:25:37.669Z",
+          "start": "2026-09-27T02:30:30.000Z",
+          "end": "2026-09-28T02:30:30.000Z",
+          "elevation_at_start_deg": -84.443039,
+          "elevation_at_end_deg": 25.015185,
+          "pass_count": 5,
+          "passes": [
+            {
+              "rise": {
+                "time": "2026-09-27T03:13:07.777Z",
+                "elevation_deg": 10.00008,
+                "azimuth_deg": 288.667883
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T03:18:41.266Z",
+                "elevation_deg": 9.999928,
+                "azimuth_deg": 175.677978
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T03:15:55.002Z",
+                  "elevation_deg": 24.337149,
+                  "azimuth_deg": 232.231583
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T03:15:55.002Z",
+                "elevation_deg": 24.337149,
+                "azimuth_deg": 232.231583
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T16:40:18.338Z",
+                "elevation_deg": 9.999995,
+                "azimuth_deg": 150.625633
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T16:43:13.255Z",
+                "elevation_deg": 9.999989,
+                "azimuth_deg": 99.34233
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T16:41:45.749Z",
+                  "elevation_deg": 12.264574,
+                  "azimuth_deg": 124.969125
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T16:41:45.749Z",
+                "elevation_deg": 12.264574,
+                "azimuth_deg": 124.969125
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T18:15:04.136Z",
+                "elevation_deg": 10.000012,
+                "azimuth_deg": 245.56057
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T18:21:30.137Z",
+                "elevation_deg": 9.999928,
+                "azimuth_deg": 28.301772
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T18:18:16.837Z",
+                  "elevation_deg": 39.460373,
+                  "azimuth_deg": 316.902922
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T18:18:16.837Z",
+                "elevation_deg": 39.460373,
+                "azimuth_deg": 316.902922
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-28T00:50:11.182Z",
+                "elevation_deg": 10.000015,
+                "azimuth_deg": 5.184185
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-28T00:53:31.550Z",
+                "elevation_deg": 9.999954,
+                "azimuth_deg": 65.089155
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-28T00:51:51.540Z",
+                  "elevation_deg": 13.048273,
+                  "azimuth_deg": 35.133379
+                }
+              ],
+              "peak": {
+                "time": "2026-09-28T00:51:51.540Z",
+                "elevation_deg": 13.048273,
+                "azimuth_deg": 35.133379
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-28T02:25:37.669Z",
+                "elevation_deg": 10.000015,
+                "azimuth_deg": 305.290463
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": null,
+              "set_clipped": true,
+              "end_edge": {
+                "time": "2026-09-28T02:30:30.000Z",
+                "elevation_deg": 25.015185,
+                "azimuth_deg": 165.747252
+              },
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-28T02:28:53.113Z",
+                  "elevation_deg": 49.171074,
+                  "azimuth_deg": 229.370793
+                }
+              ],
+              "peak": {
+                "time": "2026-09-28T02:28:53.113Z",
+                "elevation_deg": 49.171074,
+                "azimuth_deg": 229.370793
+              },
+              "peak_at_edge": false
+            }
+          ],
+          "maxima_within_0_001_deg_of_threshold": []
+        }
+      ]
+    },
+    {
+      "norad_cat_id": 48274,
+      "object_name": "CSS (TIANHE)",
+      "epoch": "2026-09-26T21:00:21.314016",
+      "source_file": "orbit-core/src/test/resources/celestrak/gp-stations.json",
+      "source_sha256": "d8cb53b7044135e9ae8e7e613d7d4b15f4db21be6f527f987ffc222fe0463abd",
+      "windows": [
+        {
+          "kind": "base",
+          "cut": null,
+          "start": "2026-09-27T05:00:00.000Z",
+          "end": "2026-09-28T05:00:00.000Z",
+          "elevation_at_start_deg": -50.479882,
+          "elevation_at_end_deg": -30.877746,
+          "pass_count": 5,
+          "passes": [
+            {
+              "rise": {
+                "time": "2026-09-27T12:31:02.660Z",
+                "elevation_deg": 10.000059,
+                "azimuth_deg": 236.071985
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T12:37:23.482Z",
+                "elevation_deg": 9.999932,
+                "azimuth_deg": 58.753461
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T12:34:12.593Z",
+                  "elevation_deg": 86.537271,
+                  "azimuth_deg": 147.383869
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T12:34:12.593Z",
+                "elevation_deg": 86.537271,
+                "azimuth_deg": 147.383869
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T14:09:10.942Z",
+                "elevation_deg": 10.000001,
+                "azimuth_deg": 298.036819
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T14:13:35.225Z",
+                "elevation_deg": 9.999975,
+                "azimuth_deg": 25.906169
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T14:11:22.940Z",
+                  "elevation_deg": 17.078898,
+                  "azimuth_deg": 341.971681
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T14:11:22.940Z",
+                "elevation_deg": 17.078898,
+                "azimuth_deg": 341.971681
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T17:24:54.310Z",
+                "elevation_deg": 10.000027,
+                "azimuth_deg": 336.57313
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T17:28:59.684Z",
+                "elevation_deg": 9.999965,
+                "azimuth_deg": 56.668774
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T17:26:57.060Z",
+                  "elevation_deg": 15.689723,
+                  "azimuth_deg": 16.623596
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T17:26:57.060Z",
+                "elevation_deg": 15.689723,
+                "azimuth_deg": 16.623596
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T19:01:00.161Z",
+                "elevation_deg": 10.000099,
+                "azimuth_deg": 304.671574
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T19:07:21.583Z",
+                "elevation_deg": 9.999954,
+                "azimuth_deg": 118.223688
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T19:04:11.221Z",
+                  "elevation_deg": 76.984938,
+                  "azimuth_deg": 31.472776
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T19:04:11.221Z",
+                "elevation_deg": 76.984938,
+                "azimuth_deg": 31.472776
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T20:40:10.779Z",
+                "elevation_deg": 10.000008,
+                "azimuth_deg": 232.58209
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T20:41:15.482Z",
+                "elevation_deg": 10.000004,
+                "azimuth_deg": 212.883954
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T20:40:43.138Z",
+                  "elevation_deg": 10.308522,
+                  "azimuth_deg": 222.735226
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T20:40:43.138Z",
+                "elevation_deg": 10.308522,
+                "azimuth_deg": 222.735226
+              },
+              "peak_at_edge": false
+            }
+          ],
+          "maxima_within_0_001_deg_of_threshold": []
+        },
+        {
+          "kind": "starts_inside_pass",
+          "cut": "start before the highest peak of the base window pass rising at 2026-09-27T12:31:02.660Z",
+          "start": "2026-09-27T12:32:37.000Z",
+          "end": "2026-09-28T12:32:37.000Z",
+          "elevation_at_start_deg": 26.622373,
+          "elevation_at_end_deg": -72.894287,
+          "pass_count": 6,
+          "passes": [
+            {
+              "rise": null,
+              "rise_clipped": true,
+              "start_edge": {
+                "time": "2026-09-27T12:32:37.000Z",
+                "elevation_deg": 26.622373,
+                "azimuth_deg": 235.287098
+              },
+              "set": {
+                "time": "2026-09-27T12:37:23.482Z",
+                "elevation_deg": 9.999932,
+                "azimuth_deg": 58.753461
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T12:34:12.593Z",
+                  "elevation_deg": 86.537271,
+                  "azimuth_deg": 147.383869
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T12:34:12.593Z",
+                "elevation_deg": 86.537271,
+                "azimuth_deg": 147.383869
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T14:09:10.943Z",
+                "elevation_deg": 10.000076,
+                "azimuth_deg": 298.037041
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T14:13:35.225Z",
+                "elevation_deg": 9.999975,
+                "azimuth_deg": 25.906169
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T14:11:22.940Z",
+                  "elevation_deg": 17.078898,
+                  "azimuth_deg": 341.971681
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T14:11:22.940Z",
+                "elevation_deg": 17.078898,
+                "azimuth_deg": 341.971681
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T17:24:54.310Z",
+                "elevation_deg": 10.000027,
+                "azimuth_deg": 336.57313
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T17:28:59.684Z",
+                "elevation_deg": 9.999965,
+                "azimuth_deg": 56.668774
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T17:26:57.061Z",
+                  "elevation_deg": 15.689723,
+                  "azimuth_deg": 16.623984
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T17:26:57.061Z",
+                "elevation_deg": 15.689723,
+                "azimuth_deg": 16.623984
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T19:01:00.161Z",
+                "elevation_deg": 10.000099,
+                "azimuth_deg": 304.671574
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T19:07:21.583Z",
+                "elevation_deg": 9.999954,
+                "azimuth_deg": 118.223688
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T19:04:11.221Z",
+                  "elevation_deg": 76.984938,
+                  "azimuth_deg": 31.472776
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T19:04:11.221Z",
+                "elevation_deg": 76.984938,
+                "azimuth_deg": 31.472776
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T20:40:10.779Z",
+                "elevation_deg": 10.000008,
+                "azimuth_deg": 232.58209
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T20:41:15.483Z",
+                "elevation_deg": 9.999985,
+                "azimuth_deg": 212.883655
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T20:40:43.138Z",
+                  "elevation_deg": 10.308522,
+                  "azimuth_deg": 222.735226
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T20:40:43.138Z",
+                "elevation_deg": 10.308522,
+                "azimuth_deg": 222.735226
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-28T11:32:17.685Z",
+                "elevation_deg": 10.000032,
+                "azimuth_deg": 213.836457
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-28T11:38:15.543Z",
+                "elevation_deg": 10.000025,
+                "azimuth_deg": 73.110336
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-28T11:35:16.197Z",
+                  "elevation_deg": 38.495303,
+                  "azimuth_deg": 143.431744
+                }
+              ],
+              "peak": {
+                "time": "2026-09-28T11:35:16.197Z",
+                "elevation_deg": 38.495303,
+                "azimuth_deg": 143.431744
+              },
+              "peak_at_edge": false
+            }
+          ],
+          "maxima_within_0_001_deg_of_threshold": []
+        },
+        {
+          "kind": "ends_inside_pass",
+          "cut": "end before the highest peak of the base window pass rising at 2026-09-27T19:01:00.161Z",
+          "start": "2026-09-26T19:02:35.000Z",
+          "end": "2026-09-27T19:02:35.000Z",
+          "elevation_at_start_deg": -66.806691,
+          "elevation_at_end_deg": 26.422877,
+          "pass_count": 5,
+          "passes": [
+            {
+              "rise": {
+                "time": "2026-09-26T20:00:02.702Z",
+                "elevation_deg": 10.000047,
+                "azimuth_deg": 291.204104
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-26T20:06:12.476Z",
+                "elevation_deg": 9.9999,
+                "azimuth_deg": 139.755645
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-26T20:03:07.950Z",
+                  "elevation_deg": 48.111467,
+                  "azimuth_deg": 215.516118
+                }
+              ],
+              "peak": {
+                "time": "2026-09-26T20:03:07.950Z",
+                "elevation_deg": 48.111467,
+                "azimuth_deg": 215.516118
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T12:31:02.660Z",
+                "elevation_deg": 10.000059,
+                "azimuth_deg": 236.071985
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T12:37:23.482Z",
+                "elevation_deg": 9.999932,
+                "azimuth_deg": 58.753461
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T12:34:12.593Z",
+                  "elevation_deg": 86.537271,
+                  "azimuth_deg": 147.383869
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T12:34:12.593Z",
+                "elevation_deg": 86.537271,
+                "azimuth_deg": 147.383869
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T14:09:10.942Z",
+                "elevation_deg": 10.000001,
+                "azimuth_deg": 298.036819
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T14:13:35.225Z",
+                "elevation_deg": 9.999975,
+                "azimuth_deg": 25.906169
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T14:11:22.940Z",
+                  "elevation_deg": 17.078898,
+                  "azimuth_deg": 341.971681
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T14:11:22.940Z",
+                "elevation_deg": 17.078898,
+                "azimuth_deg": 341.971681
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T17:24:54.310Z",
+                "elevation_deg": 10.000027,
+                "azimuth_deg": 336.57313
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-27T17:28:59.684Z",
+                "elevation_deg": 9.999965,
+                "azimuth_deg": 56.668774
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-27T17:26:57.061Z",
+                  "elevation_deg": 15.689723,
+                  "azimuth_deg": 16.623984
+                }
+              ],
+              "peak": {
+                "time": "2026-09-27T17:26:57.061Z",
+                "elevation_deg": 15.689723,
+                "azimuth_deg": 16.623984
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-27T19:01:00.160Z",
+                "elevation_deg": 9.999988,
+                "azimuth_deg": 304.671552
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": null,
+              "set_clipped": true,
+              "end_edge": {
+                "time": "2026-09-27T19:02:35.000Z",
+                "elevation_deg": 26.422877,
+                "azimuth_deg": 308.507238
+              },
+              "peak_count": 0,
+              "peaks": [],
+              "peak": {
+                "time": "2026-09-27T19:02:35.000Z",
+                "elevation_deg": 26.422877,
+                "azimuth_deg": 308.507238
+              },
+              "peak_at_edge": true
+            }
+          ],
+          "maxima_within_0_001_deg_of_threshold": []
+        }
+      ]
+    },
+    {
+      "norad_cat_id": 57036,
+      "object_name": "OBJECT AJ",
+      "epoch": "2026-09-28T14:10:20.740512",
+      "source_file": "orbit-core/src/test/resources/celestrak/gp-catnr-57036.json",
+      "source_sha256": "9b8afffc8da9bf84153a3b7586b4c865e70276ed0fca07ee3b80edaf1fe73376",
+      "windows": [
+        {
+          "kind": "base",
+          "cut": null,
+          "start": "2026-09-28T15:00:00.000Z",
+          "end": "2026-09-29T15:00:00.000Z",
+          "elevation_at_start_deg": -30.385531,
+          "elevation_at_end_deg": -50.682241,
+          "pass_count": 3,
+          "passes": [
+            {
+              "rise": {
+                "time": "2026-09-28T19:30:36.684Z",
+                "elevation_deg": 10.000058,
+                "azimuth_deg": 355.33527
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-28T19:37:36.744Z",
+                "elevation_deg": 10.000011,
+                "azimuth_deg": 213.611876
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-28T19:34:06.912Z",
+                  "elevation_deg": 41.139006,
+                  "azimuth_deg": 284.538686
+                }
+              ],
+              "peak": {
+                "time": "2026-09-28T19:34:06.912Z",
+                "elevation_deg": 41.139006,
+                "azimuth_deg": 284.538686
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T06:03:50.500Z",
+                "elevation_deg": 10.000038,
+                "azimuth_deg": 136.146795
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T06:10:21.420Z",
+                "elevation_deg": 9.999965,
+                "azimuth_deg": 12.395824
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T06:07:05.781Z",
+                  "elevation_deg": 29.83037,
+                  "azimuth_deg": 74.211201
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T06:07:05.781Z",
+                "elevation_deg": 29.83037,
+                "azimuth_deg": 74.211201
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T07:39:54.433Z",
+                "elevation_deg": 10.000021,
+                "azimuth_deg": 248.144388
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T07:42:07.374Z",
+                "elevation_deg": 9.999993,
+                "azimuth_deg": 283.318183
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T07:41:00.853Z",
+                  "elevation_deg": 11.06595,
+                  "azimuth_deg": 265.726965
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T07:41:00.853Z",
+                "elevation_deg": 11.06595,
+                "azimuth_deg": 265.726965
+              },
+              "peak_at_edge": false
+            }
+          ],
+          "maxima_within_0_001_deg_of_threshold": []
+        },
+        {
+          "kind": "starts_inside_pass",
+          "cut": "start after the highest peak of the base window pass rising at 2026-09-28T19:30:36.684Z",
+          "start": "2026-09-28T19:35:51.000Z",
+          "end": "2026-09-29T19:35:51.000Z",
+          "elevation_at_start_deg": 24.351172,
+          "elevation_at_end_deg": -32.962354,
+          "pass_count": 4,
+          "passes": [
+            {
+              "rise": null,
+              "rise_clipped": true,
+              "start_edge": {
+                "time": "2026-09-28T19:35:51.000Z",
+                "elevation_deg": 24.351172,
+                "azimuth_deg": 229.423804
+              },
+              "set": {
+                "time": "2026-09-28T19:37:36.744Z",
+                "elevation_deg": 10.000011,
+                "azimuth_deg": 213.611876
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 0,
+              "peaks": [],
+              "peak": {
+                "time": "2026-09-28T19:35:51.000Z",
+                "elevation_deg": 24.351172,
+                "azimuth_deg": 229.423804
+              },
+              "peak_at_edge": true
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T06:03:50.500Z",
+                "elevation_deg": 10.000038,
+                "azimuth_deg": 136.146795
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T06:10:21.420Z",
+                "elevation_deg": 9.999965,
+                "azimuth_deg": 12.395824
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T06:07:05.781Z",
+                  "elevation_deg": 29.83037,
+                  "azimuth_deg": 74.211201
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T06:07:05.781Z",
+                "elevation_deg": 29.83037,
+                "azimuth_deg": 74.211201
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T07:39:54.433Z",
+                "elevation_deg": 10.000021,
+                "azimuth_deg": 248.144388
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T07:42:07.374Z",
+                "elevation_deg": 9.999993,
+                "azimuth_deg": 283.318183
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T07:41:00.853Z",
+                  "elevation_deg": 11.06595,
+                  "azimuth_deg": 265.726965
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T07:41:00.853Z",
+                "elevation_deg": 11.06595,
+                "azimuth_deg": 265.726965
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T19:13:24.093Z",
+                "elevation_deg": 10.000012,
+                "azimuth_deg": 7.949923
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T19:20:48.040Z",
+                "elevation_deg": 9.999943,
+                "azimuth_deg": 196.715875
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T19:17:06.360Z",
+                  "elevation_deg": 76.789326,
+                  "azimuth_deg": 282.397481
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T19:17:06.360Z",
+                "elevation_deg": 76.789326,
+                "azimuth_deg": 282.397481
+              },
+              "peak_at_edge": false
+            }
+          ],
+          "maxima_within_0_001_deg_of_threshold": []
+        },
+        {
+          "kind": "ends_inside_pass",
+          "cut": "end before the highest peak of the base window pass rising at 2026-09-29T07:39:54.433Z",
+          "start": "2026-09-28T07:40:27.000Z",
+          "end": "2026-09-29T07:40:27.000Z",
+          "elevation_at_start_deg": -31.338238,
+          "elevation_at_end_deg": 10.77852,
+          "pass_count": 3,
+          "passes": [
+            {
+              "rise": {
+                "time": "2026-09-28T19:30:36.683Z",
+                "elevation_deg": 9.999959,
+                "azimuth_deg": 355.335353
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-28T19:37:36.745Z",
+                "elevation_deg": 9.999911,
+                "azimuth_deg": 213.611792
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-28T19:34:06.912Z",
+                  "elevation_deg": 41.139006,
+                  "azimuth_deg": 284.538686
+                }
+              ],
+              "peak": {
+                "time": "2026-09-28T19:34:06.912Z",
+                "elevation_deg": 41.139006,
+                "azimuth_deg": 284.538686
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T06:03:50.500Z",
+                "elevation_deg": 10.000038,
+                "azimuth_deg": 136.146795
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T06:10:21.420Z",
+                "elevation_deg": 9.999965,
+                "azimuth_deg": 12.395824
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T06:07:05.781Z",
+                  "elevation_deg": 29.83037,
+                  "azimuth_deg": 74.211201
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T06:07:05.781Z",
+                "elevation_deg": 29.83037,
+                "azimuth_deg": 74.211201
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T07:39:54.432Z",
+                "elevation_deg": 9.99999,
+                "azimuth_deg": 248.144138
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": null,
+              "set_clipped": true,
+              "end_edge": {
+                "time": "2026-09-29T07:40:27.000Z",
+                "elevation_deg": 10.77852,
+                "azimuth_deg": 256.571285
+              },
+              "peak_count": 0,
+              "peaks": [],
+              "peak": {
+                "time": "2026-09-29T07:40:27.000Z",
+                "elevation_deg": 10.77852,
+                "azimuth_deg": 256.571285
+              },
+              "peak_at_edge": true
+            }
+          ],
+          "maxima_within_0_001_deg_of_threshold": []
+        }
+      ]
+    },
+    {
+      "norad_cat_id": 27958,
+      "object_name": "SL-12 DEB",
+      "epoch": "2026-09-25T22:48:49.415616",
+      "source_file": "orbit-core/src/test/resources/celestrak/gp-catnr-27958.json",
+      "source_sha256": "cc8a3fa0ccc4c52c008cfb1b7304847d653ae16a465c99b81926b75f0686ae03",
+      "windows": [
+        {
+          "kind": "base",
+          "cut": null,
+          "start": "2026-09-28T15:00:00.000Z",
+          "end": "2026-09-29T15:00:00.000Z",
+          "elevation_at_start_deg": -14.754296,
+          "elevation_at_end_deg": -17.0162,
+          "pass_count": 5,
+          "passes": [
+            {
+              "rise": {
+                "time": "2026-09-28T20:32:17.721Z",
+                "elevation_deg": 10.000014,
+                "azimuth_deg": 142.28393
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-28T21:01:49.247Z",
+                "elevation_deg": 9.999989,
+                "azimuth_deg": 34.038287
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-28T20:40:31.588Z",
+                  "elevation_deg": 30.34416,
+                  "azimuth_deg": 83.395636
+                }
+              ],
+              "peak": {
+                "time": "2026-09-28T20:40:31.588Z",
+                "elevation_deg": 30.34416,
+                "azimuth_deg": 83.395636
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T00:04:53.060Z",
+                "elevation_deg": 10.000047,
+                "azimuth_deg": 256.002413
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T01:04:11.911Z",
+                "elevation_deg": 9.999997,
+                "azimuth_deg": 35.757298
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T00:17:47.272Z",
+                  "elevation_deg": 43.24419,
+                  "azimuth_deg": 325.745129
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T00:17:47.272Z",
+                "elevation_deg": 43.24419,
+                "azimuth_deg": 325.745129
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T03:54:22.736Z",
+                "elevation_deg": 10.000015,
+                "azimuth_deg": 319.903022
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T05:50:15.371Z",
+                "elevation_deg": 9.99998,
+                "azimuth_deg": 107.036673
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T04:46:37.976Z",
+                  "elevation_deg": 39.813398,
+                  "azimuth_deg": 37.345576
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T04:46:37.976Z",
+                "elevation_deg": 39.813398,
+                "azimuth_deg": 37.345576
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T07:42:30.097Z",
+                "elevation_deg": 10.000002,
+                "azimuth_deg": 331.547763
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T09:37:39.688Z",
+                "elevation_deg": 9.999993,
+                "azimuth_deg": 175.350881
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T08:52:00.247Z",
+                  "elevation_deg": 78.933411,
+                  "azimuth_deg": 261.247115
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T08:52:00.247Z",
+                "elevation_deg": 78.933411,
+                "azimuth_deg": 261.247115
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T11:42:58.132Z",
+                "elevation_deg": 10.000008,
+                "azimuth_deg": 316.597866
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T12:40:01.185Z",
+                "elevation_deg": 9.999998,
+                "azimuth_deg": 265.124351
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T12:12:07.844Z",
+                  "elevation_deg": 16.0986,
+                  "azimuth_deg": 292.571288
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T12:12:07.844Z",
+                "elevation_deg": 16.0986,
+                "azimuth_deg": 292.571288
+              },
+              "peak_at_edge": false
+            }
+          ],
+          "maxima_within_0_001_deg_of_threshold": []
+        },
+        {
+          "kind": "starts_inside_pass",
+          "cut": "start before the highest peak of the base window pass rising at 2026-09-28T20:32:17.721Z",
+          "start": "2026-09-28T20:36:24.000Z",
+          "end": "2026-09-29T20:36:24.000Z",
+          "elevation_at_start_deg": 25.358692,
+          "elevation_at_end_deg": -45.053725,
+          "pass_count": 5,
+          "passes": [
+            {
+              "rise": null,
+              "rise_clipped": true,
+              "start_edge": {
+                "time": "2026-09-28T20:36:24.000Z",
+                "elevation_deg": 25.358692,
+                "azimuth_deg": 113.195493
+              },
+              "set": {
+                "time": "2026-09-28T21:01:49.247Z",
+                "elevation_deg": 9.999989,
+                "azimuth_deg": 34.038287
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-28T20:40:31.589Z",
+                  "elevation_deg": 30.34416,
+                  "azimuth_deg": 83.395532
+                }
+              ],
+              "peak": {
+                "time": "2026-09-28T20:40:31.589Z",
+                "elevation_deg": 30.34416,
+                "azimuth_deg": 83.395532
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T00:04:53.060Z",
+                "elevation_deg": 10.000047,
+                "azimuth_deg": 256.002413
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T01:04:11.911Z",
+                "elevation_deg": 9.999997,
+                "azimuth_deg": 35.757298
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T00:17:47.272Z",
+                  "elevation_deg": 43.24419,
+                  "azimuth_deg": 325.745129
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T00:17:47.272Z",
+                "elevation_deg": 43.24419,
+                "azimuth_deg": 325.745129
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T03:54:22.736Z",
+                "elevation_deg": 10.000015,
+                "azimuth_deg": 319.903022
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T05:50:15.370Z",
+                "elevation_deg": 9.999997,
+                "azimuth_deg": 107.036658
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T04:46:37.977Z",
+                  "elevation_deg": 39.813398,
+                  "azimuth_deg": 37.345597
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T04:46:37.977Z",
+                "elevation_deg": 39.813398,
+                "azimuth_deg": 37.345597
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T07:42:30.097Z",
+                "elevation_deg": 10.000002,
+                "azimuth_deg": 331.547763
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T09:37:39.688Z",
+                "elevation_deg": 9.999993,
+                "azimuth_deg": 175.350881
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T08:52:00.247Z",
+                  "elevation_deg": 78.933411,
+                  "azimuth_deg": 261.247115
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T08:52:00.247Z",
+                "elevation_deg": 78.933411,
+                "azimuth_deg": 261.247115
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T11:42:58.132Z",
+                "elevation_deg": 10.000008,
+                "azimuth_deg": 316.597866
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T12:40:01.185Z",
+                "elevation_deg": 9.999998,
+                "azimuth_deg": 265.124351
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T12:12:07.844Z",
+                  "elevation_deg": 16.0986,
+                  "azimuth_deg": 292.571288
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T12:12:07.844Z",
+                "elevation_deg": 16.0986,
+                "azimuth_deg": 292.571288
+              },
+              "peak_at_edge": false
+            }
+          ],
+          "maxima_within_0_001_deg_of_threshold": []
+        },
+        {
+          "kind": "ends_inside_pass",
+          "cut": "end after the highest peak of the base window pass rising at 2026-09-29T11:42:58.132Z",
+          "start": "2026-09-28T12:26:04.000Z",
+          "end": "2026-09-29T12:26:04.000Z",
+          "elevation_at_start_deg": 11.995893,
+          "elevation_at_end_deg": 14.630743,
+          "pass_count": 6,
+          "passes": [
+            {
+              "rise": null,
+              "rise_clipped": true,
+              "start_edge": {
+                "time": "2026-09-28T12:26:04.000Z",
+                "elevation_deg": 11.995893,
+                "azimuth_deg": 250.323452
+              },
+              "set": {
+                "time": "2026-09-28T12:28:44.553Z",
+                "elevation_deg": 9.99999,
+                "azimuth_deg": 246.986778
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 0,
+              "peaks": [],
+              "peak": {
+                "time": "2026-09-28T12:26:04.000Z",
+                "elevation_deg": 11.995893,
+                "azimuth_deg": 250.323452
+              },
+              "peak_at_edge": true
+            },
+            {
+              "rise": {
+                "time": "2026-09-28T20:32:17.721Z",
+                "elevation_deg": 10.000014,
+                "azimuth_deg": 142.28393
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-28T21:01:49.247Z",
+                "elevation_deg": 9.999989,
+                "azimuth_deg": 34.038287
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-28T20:40:31.588Z",
+                  "elevation_deg": 30.34416,
+                  "azimuth_deg": 83.395636
+                }
+              ],
+              "peak": {
+                "time": "2026-09-28T20:40:31.588Z",
+                "elevation_deg": 30.34416,
+                "azimuth_deg": 83.395636
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T00:04:53.059Z",
+                "elevation_deg": 9.999976,
+                "azimuth_deg": 256.002351
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T01:04:11.911Z",
+                "elevation_deg": 9.999997,
+                "azimuth_deg": 35.757298
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T00:17:47.272Z",
+                  "elevation_deg": 43.24419,
+                  "azimuth_deg": 325.745129
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T00:17:47.272Z",
+                "elevation_deg": 43.24419,
+                "azimuth_deg": 325.745129
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T03:54:22.735Z",
+                "elevation_deg": 9.999991,
+                "azimuth_deg": 319.902994
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T05:50:15.370Z",
+                "elevation_deg": 9.999997,
+                "azimuth_deg": 107.036658
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T04:46:37.977Z",
+                  "elevation_deg": 39.813398,
+                  "azimuth_deg": 37.345597
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T04:46:37.977Z",
+                "elevation_deg": 39.813398,
+                "azimuth_deg": 37.345597
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T07:42:30.097Z",
+                "elevation_deg": 10.000002,
+                "azimuth_deg": 331.547763
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": {
+                "time": "2026-09-29T09:37:39.688Z",
+                "elevation_deg": 9.999993,
+                "azimuth_deg": 175.350881
+              },
+              "set_clipped": false,
+              "end_edge": null,
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T08:52:00.247Z",
+                  "elevation_deg": 78.933411,
+                  "azimuth_deg": 261.247115
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T08:52:00.247Z",
+                "elevation_deg": 78.933411,
+                "azimuth_deg": 261.247115
+              },
+              "peak_at_edge": false
+            },
+            {
+              "rise": {
+                "time": "2026-09-29T11:42:58.131Z",
+                "elevation_deg": 10.000001,
+                "azimuth_deg": 316.597879
+              },
+              "rise_clipped": false,
+              "start_edge": null,
+              "set": null,
+              "set_clipped": true,
+              "end_edge": {
+                "time": "2026-09-29T12:26:04.000Z",
+                "elevation_deg": 14.630743,
+                "azimuth_deg": 279.434356
+              },
+              "peak_count": 1,
+              "peaks": [
+                {
+                  "time": "2026-09-29T12:12:07.844Z",
+                  "elevation_deg": 16.0986,
+                  "azimuth_deg": 292.571288
+                }
+              ],
+              "peak": {
+                "time": "2026-09-29T12:12:07.844Z",
+                "elevation_deg": 16.0986,
+                "azimuth_deg": 292.571288
+              },
+              "peak_at_edge": false
+            }
+          ],
+          "maxima_within_0_001_deg_of_threshold": []
+        }
+      ]
+    }
+  ]
+}
