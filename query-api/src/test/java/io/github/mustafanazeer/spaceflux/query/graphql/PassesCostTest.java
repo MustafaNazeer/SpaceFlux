@@ -22,7 +22,7 @@ class PassesCostTest {
     static GraphQLSchema schema() throws IOException {
         try (InputStream in = PassesCostTest.class.getResourceAsStream("/graphql/schema.graphqls")) {
             return new SchemaGenerator().makeExecutableSchema(new SchemaParser().parse(
-                    new String(in.readAllBytes(), StandardCharsets.UTF_8)), RuntimeWiring.newRuntimeWiring().build());
+                    new String(in.readAllBytes(), StandardCharsets.UTF_8)), RuntimeWiring.newRuntimeWiring().scalar(UInt32.SCALAR).build());
         }
     }
 

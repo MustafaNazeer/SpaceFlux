@@ -110,3 +110,14 @@ Four changes, each with a test in `query-api`:
 * **The watchlist is costed at a size bound of 10.** It has no `limit`, and counting it once let `watchlist { catalog { close_approaches(limit: 50) } }` read 51 rows per watchlist object while costing as if there were one. A test fails if the seeded watchlist ever grows past the bound.
 * **Request bodies are capped at 64 KiB.** Tomcat's `maxPostSize` covers only form and multipart parameters, and neither Spring for GraphQL nor Jackson's defaults bound a JSON body, so a 90 MiB `variables` value was accepted. A filter on `POST /api/graphql` answers `413` when the declared length is over the cap, without waiting for the body, and reads a chunked body only up to one byte over the cap before refusing it. The dashboard's queries are a few KiB.
 * **Introspection defaults to off.** The service reads `GRAPHQL_INTROSPECTION` and defaults to `false`; only the local Compose stack sets it to `true`. An environment that forgets the setting now gets the safe value, and the depth exemption, which follows the same setting, goes with it.
+
+## Amendment, 2026-10-10: an unsigned 32 bit scalar
+
+A stored alert with a valid `rules_version` above 2147483647 made the alerts list fail to serialize. The contract sets no upper bound on `rules_version` or on a screening run's counts, and `query-api` stores them in `INT UNSIGNED` columns, which hold up to 4294967295 (a larger value is dead lettered as not storable). GraphQL's `Int` is a signed 32 bit integer and stops at 2147483647, so the schema promised a type that a valid row could exceed.
+
+* **A scalar `UInt32`**, defined in `query-api`: a whole number from 0 to 4294967295, written as a JSON integer.
+* **Whole numbers only.** A value with a decimal point and a whole value, such as `1.0`, which the contract's JSON Schema `integer` accepts, is the same number and is written as an integer. A fraction such as `1.5`, a negative number, a value over 4294967295, a string or a boolean is refused, never converted. A query literal of this type must be an integer literal.
+* **Retyped fields:** `rules_version` on `ScaleState`, `Alert` and `WatchlistObject`; `ScreeningRun.approach_count`; the six `Coverage` counts (`watchlist_accepted`, `catalog_admitted`, `pairs`, `pairs_not_screenable`, `pairs_removed_by_prefilter`, `pairs_searched`); and the seven `Omitted` counts (`approach_event_ids`, `suppressed`, `rejected`, `not_screened`, `epoch_after_start`, `differing_copies`, `differing_copies_over_cap`).
+* **Not retyped yet:** `records_not_listed` and `rev_at_epoch` stay `Int` for now; their type is a separate decision.
+
+The change is visible to clients: the type name changes in the schema, while every value that was valid before is written exactly as before.

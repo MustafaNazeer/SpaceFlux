@@ -2,6 +2,9 @@
 # schemas/alerts/v1.schema.json use. Times are RFC 3339 UTC strings; a time kept as text in a contract is returned
 # exactly as received. Writes stay on REST: this schema has no mutations.
 
+"A whole number from 0 to 4294967295, the range of the INT UNSIGNED columns it comes from, written as a JSON integer. GraphQL's Int stops at 2147483647."
+scalar UInt32
+
 type Query {
   "G, R and S, always all three (REST section 1)."
   space_weather_current: SpaceWeatherCurrent!
@@ -40,7 +43,7 @@ type ScaleState {
   no_data_reason: String
   no_data_since: String
   age_limit_s: Int
-  rules_version: Int
+  rules_version: UInt32
 }
 
 type SpaceWeatherHistory {
@@ -96,7 +99,7 @@ type AlertPage {
 type Alert {
   schema_version: Int!
   kind: String!
-  rules_version: Int!
+  rules_version: UInt32!
   event_id: String!
   produced_at: String!
   received_at: String!
@@ -162,7 +165,7 @@ type ScreeningRun {
   input_fetched_at: String!
   report_distance_m: Float!
   coverage: Coverage!
-  approach_count: Int!
+  approach_count: UInt32!
   approach_event_ids: [String!]!
   suppressed: [SuppressedPair!]!
   rejected: [RejectedObject!]!
@@ -174,12 +177,12 @@ type ScreeningRun {
 }
 
 type Coverage {
-  watchlist_accepted: Int!
-  catalog_admitted: Int!
-  pairs: Int!
-  pairs_not_screenable: Int!
-  pairs_removed_by_prefilter: Int!
-  pairs_searched: Int!
+  watchlist_accepted: UInt32!
+  catalog_admitted: UInt32!
+  pairs: UInt32!
+  pairs_not_screenable: UInt32!
+  pairs_removed_by_prefilter: UInt32!
+  pairs_searched: UInt32!
 }
 
 type SuppressedPair {
@@ -237,13 +240,13 @@ type DifferingCopiesOverCap {
 }
 
 type Omitted {
-  approach_event_ids: Int!
-  suppressed: Int!
-  rejected: Int!
-  not_screened: Int!
-  epoch_after_start: Int!
-  differing_copies: Int!
-  differing_copies_over_cap: Int!
+  approach_event_ids: UInt32!
+  suppressed: UInt32!
+  rejected: UInt32!
+  not_screened: UInt32!
+  epoch_after_start: UInt32!
+  differing_copies: UInt32!
+  differing_copies_over_cap: UInt32!
 }
 
 type CatalogObject {
@@ -277,7 +280,7 @@ type CatalogObject {
 type WatchlistObject {
   catalog_number: Int!
   name: String
-  rules_version: Int!
+  rules_version: UInt32!
   catalog: CatalogObject
   "Geometric passes over the fixed observer for 24 hours from the request, computed on request (REST section 10). Every object in one request shares the same window_start. Null, with an INTERNAL_ERROR entry in errors at this path, when the computation fails for this object; null never means no passes."
   passes: Passes
