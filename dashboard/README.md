@@ -2,7 +2,7 @@
 
 The operator console for SpaceFlux: the current G, R and S space weather levels, a stale banner for each feed past its age limit, the latest close approach screening run with its coverage and suppressed pairs, and the recent alerts with their acknowledgement state. It is read only for now.
 
-It is an Angular 22 app. Data comes from the query API's GraphQL endpoint (`POST /api/graphql`, see [docs/api/graphql.md](../docs/api/graphql.md)) through Apollo Client, and the page refreshes every 60 seconds. A Pause updates button in the header stops the refresh until you resume it. The look follows [docs/design/tokens.md](../docs/design/tokens.md) and the canonical design in [docs/design/dashboard.html](../docs/design/dashboard.html), written as plain component CSS.
+It is an Angular 22 app. Data comes from the query API's GraphQL endpoint (`POST /api/graphql`, see [docs/api/graphql.md](../docs/api/graphql.md)) through Apollo Client, and the page refreshes every 60 seconds. New alerts also arrive as soon as they are stored, through the live alert subscription over WebSocket (`/api/graphql/ws`), and are added to the top of the recent alerts list; the 60 second refresh stays as the fallback. A Pause updates button in the header stops the refresh and closes the subscription until you resume it. The look follows [docs/design/tokens.md](../docs/design/tokens.md) and the canonical design in [docs/design/dashboard.html](../docs/design/dashboard.html), written as plain component CSS.
 
 SpaceFlux is a public data demonstration, not an operational warning system.
 
@@ -16,7 +16,7 @@ npm ci
 npm start
 ```
 
-Then open http://localhost:4200. The dev server proxies `/api` to the query API at `http://127.0.0.1:8081` ([proxy.conf.json](proxy.conf.json)), so the page and the API share one origin and the session and CSRF cookies work as they would behind the ingress. Start the core Compose stack first (see [docs/setup-guide.md](../docs/setup-guide.md)); without it the page loads and says it is not updating.
+Then open http://localhost:4200. The dev server proxies `/api` to the query API at `http://127.0.0.1:8081` ([proxy.conf.json](proxy.conf.json)), so the page and the API share one origin and the session and CSRF cookies work as they would behind the ingress. It also forwards the WebSocket upgrade on `/api/graphql/ws` with the browser's `Origin` unchanged, and the API accepts that socket only from exactly `http://localhost:4200`, so a page opened at http://127.0.0.1:4200 gets no live alerts and relies on the 60 second refresh alone. Start the core Compose stack first (see [docs/setup-guide.md](../docs/setup-guide.md)); without it the page loads and says it is not updating.
 
 At startup the app calls `GET /api/auth/session` once. That answer says who is signed in and sets the `XSRF-TOKEN` cookie, which Angular's HttpClient echoes in the `X-XSRF-TOKEN` header on every GraphQL `POST`.
 

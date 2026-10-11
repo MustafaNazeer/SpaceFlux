@@ -1,7 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { Clock } from '../data/clock';
-import { RECENT_ALERTS, RECENT_ALERTS_PAGE, RecentAlertsData } from '../data/queries';
+import {
+  Alert,
+  ALERT_STORED,
+  AlertStoredData,
+  RECENT_ALERTS,
+  RECENT_ALERTS_PAGE,
+  RecentAlertsData,
+} from '../data/queries';
 import { parseUtc } from '../format';
 import { dataOf } from '../../testing/graphql';
 import {
@@ -10,27 +17,62 @@ import {
   ALERTS_ENDED,
   ALERTS_OPERATOR,
 } from '../../testing/fixtures';
+import { AlertList, EMPTY_LIVE, shown, withNotice, withPoll } from './alert-list';
+import { Announcer, LogEntry } from './announcer';
 import { RecentAlerts } from './recent-alerts';
 
 const NOW = parseUtc('2026-09-30T20:00:00Z');
 const squash = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
+
+function pageOf(root: object) {
+  return dataOf<RecentAlertsData>(RECENT_ALERTS, root, { limit: RECENT_ALERTS_PAGE }).alerts;
+}
 
 async function render(
   root: object | undefined,
   failedAt?: number,
   paused = false,
 ): Promise<HTMLElement> {
+  const page = root ? pageOf(root) : undefined;
+  return (
+    await mount(
+      page ? { items: page.items, more: page.next !== null } : undefined,
+      failedAt,
+      paused,
+    )
+  ).nativeElement as HTMLElement;
+}
+
+async function mount(
+  list: AlertList | undefined,
+  failedAt?: number,
+  paused = false,
+  log: LogEntry[] = [],
+): Promise<ComponentFixture<RecentAlerts>> {
   TestBed.inject(Clock).set(NOW);
   const fixture: ComponentFixture<RecentAlerts> = TestBed.createComponent(RecentAlerts);
-  const page = root
-    ? dataOf<RecentAlertsData>(RECENT_ALERTS, root, { limit: RECENT_ALERTS_PAGE }).alerts
-    : undefined;
-  fixture.componentRef.setInput('page', page);
+  fixture.componentRef.setInput('page', list);
+  fixture.componentRef.setInput('log', log);
   fixture.componentRef.setInput('now', NOW);
   fixture.componentRef.setInput('failedAt', failedAt);
   fixture.componentRef.setInput('paused', paused);
   await fixture.whenStable();
-  return fixture.nativeElement as HTMLElement;
+  return fixture;
+}
+
+function logOf(alerts: Alert[], list: Parameters<typeof shown>[0]): LogEntry[] {
+  const a = new Announcer(5);
+  a.queue(alerts);
+  a.flush(shown(list, RECENT_ALERTS_PAGE));
+  return a.entries;
+}
+
+const RECORDED = ALERTS_ANONYMOUS.alerts.items as unknown as Record<string, unknown>[];
+
+function notice(from: number, eventId: string) {
+  const { acknowledgement: _, ...alert } = RECORDED[from];
+  return dataOf<AlertStoredData>(ALERT_STORED, { alert_stored: { ...alert, event_id: eventId } })
+    .alert_stored;
 }
 
 function items(el: HTMLElement): HTMLElement[] {
@@ -157,5 +199,94 @@ describe('RecentAlerts', () => {
     const kept = shown.querySelector('[role="status"]')!;
     expect(kept.textContent?.trim()).toBe('');
     expect(kept.classList).toContain('visually-hidden');
+  });
+
+  it('renders an alert added by a notice exactly as the list renders the same alert', async () => {
+    const polled = withPoll(EMPTY_LIVE, pageOf(ALERTS_ANONYMOUS));
+    // Item 1 is the S1 level, which the poll lists with no acknowledgement, as a new alert has none.
+    const { list, added } = withNotice(polled, notice(1, 'new/1'), RECENT_ALERTS_PAGE);
+    const el = (
+      await mount(shown(list, RECENT_ALERTS_PAGE), undefined, false, logOf([added!], list))
+    ).nativeElement as HTMLElement;
+    const li = items(el);
+    expect(li.length).toBe(7);
+    expect(li[0].innerHTML).toBe(li[2].innerHTML);
+    expect(squash(li[0].querySelector('.ack-state')?.textContent)).toBe('Not acknowledged');
+  });
+
+  it('says more alerts exist when notices push the page past its size', async () => {
+    const el = await mount({ items: pageOf(ALERTS_OPERATOR).items, more: true });
+    expect(squash(el.nativeElement.textContent)).toContain('Showing the 1 newest.');
+  });
+
+  it('speaks each entry once, in a polite log after the list, and keeps earlier entries in place', async () => {
+    const announcer = new Announcer(5);
+    const first = withNotice(
+      withPoll(EMPTY_LIVE, pageOf(ALERTS_ANONYMOUS)),
+      notice(4, 'new/1'),
+      20,
+    );
+    announcer.queue([first.added!]);
+    announcer.flush(shown(first.list, 20));
+    const fixture = await mount(shown(first.list, 20), undefined, false, [...announcer.entries]);
+    const el = fixture.nativeElement as HTMLElement;
+    const log = el.querySelector('[role="log"]')!;
+    expect(log.classList).toContain('visually-hidden');
+    expect(log.getAttribute('aria-live')).toBe('polite');
+    expect(log.closest('ol')).toBeNull();
+    const aside = el.querySelector('aside')!;
+    expect(aside.lastElementChild).toBe(log);
+    expect(Array.from(log.querySelectorAll('p')).map((p) => squash(p.textContent))).toEqual([
+      'New alert, G4 Severe: G4 level from SWPC estimated planetary Kp 7.67, 2024-05-10 15:00 to 18:00 UTC.',
+    ]);
+    const spoken = log.querySelector('p')!;
+
+    const second = withNotice(first.list, notice(5, 'new/2'), 20);
+    announcer.queue([second.added!]);
+    announcer.flush(shown(second.list, 20));
+    fixture.componentRef.setInput('page', shown(second.list, 20));
+    fixture.componentRef.setInput('log', [...announcer.entries]);
+    await fixture.whenStable();
+    const ps = Array.from(log.querySelectorAll('p'));
+    expect(ps.length).toBe(2);
+    expect(ps[0]).toBe(spoken);
+    expect(squash(ps[1].textContent)).toBe(
+      'New alert, close approach: OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC.',
+    );
+  });
+
+  it('has the log in the page, after everything else in the panel, before any list exists', async () => {
+    const el = await render(undefined);
+    const log = el.querySelector('aside [role="log"]')!;
+    expect(log).not.toBeNull();
+    expect(el.querySelector('aside')!.lastElementChild).toBe(log);
+    expect(log.textContent?.trim()).toBe('');
+  });
+
+  it('reports the newest entry it has drawn, so older ones are trimmed only after they rendered', async () => {
+    const drawn: number[] = [];
+    const fixture = TestBed.createComponent(RecentAlerts);
+    fixture.componentInstance.logRendered.subscribe((id) => drawn.push(id));
+    const list = { items: pageOf(ALERTS_ANONYMOUS).items, more: false };
+    fixture.componentRef.setInput('page', list);
+    fixture.componentRef.setInput('now', NOW);
+    fixture.componentRef.setInput('log', []);
+    await fixture.whenStable();
+    expect(drawn).toEqual([]);
+    const entries: LogEntry[] = [
+      { id: 7, segments: [], eventIds: ['x'] },
+      { id: 8, segments: [], eventIds: ['y'] },
+    ];
+    fixture.componentRef.setInput('log', entries);
+    await fixture.whenStable();
+    expect(drawn.at(-1)).toBe(8);
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('[role="log"] p').length).toBe(
+      2,
+    );
+  });
+
+  it('has an empty log when nothing new has arrived', async () => {
+    const el = await render(ALERTS_ANONYMOUS);
+    expect(el.querySelector('[role="log"]')?.textContent?.trim()).toBe('');
   });
 });

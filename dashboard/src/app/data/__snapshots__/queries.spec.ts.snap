@@ -26,5 +26,11 @@ exports[`dashboard queries > reports the measured numbers, so a change that near
     51,
     1420,
   ],
+  [
+    "AlertStored",
+    4,
+    40,
+    35,
+  ],
 ]
 `;

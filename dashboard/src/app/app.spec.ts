@@ -11,9 +11,12 @@ import { Apollo } from 'apollo-angular';
 import { App } from './app';
 import { appConfig } from './app.config';
 import { Clock, CLOCK_TICK_MS } from './data/clock';
+import { ANNOUNCE_WINDOW_MS } from './data/dashboard-data';
 import { GRAPHQL_PATH, POLL_INTERVAL_MS } from './data/graphql';
+import { ALERT_STORED } from './data/queries';
 import { parseUtc } from './format';
 import { SESSION_PATH } from './session/session.service';
+import { FakeSocket, provideFakeSocket } from '../testing/fake-socket';
 import { respond } from '../testing/graphql';
 import {
   ALERTS_ANONYMOUS,
@@ -60,8 +63,11 @@ describe('App', () => {
         provideHttpClientTesting(),
         { provide: POLL_INTERVAL_MS, useValue: 0 },
         { provide: CLOCK_TICK_MS, useValue: 0 },
+        provideFakeSocket(),
+        { provide: ANNOUNCE_WINDOW_MS, useValue: 0 },
       ],
     });
+    FakeSocket.reset();
     http = TestBed.inject(HttpTestingController);
   });
 
@@ -118,6 +124,28 @@ describe('App', () => {
       Array.from(el.querySelectorAll('main#main > *')).map((c) => c.tagName.toLowerCase()),
     ).toEqual(['app-space-weather', 'app-screening', 'app-passes-panel']);
     expect(el.querySelectorAll('app-passes-panel table').length).toBe(2);
+  });
+
+  it('opens the live alert subscription and shows a new alert at the top of the list, announced in the log', async () => {
+    const fixture = await start({ status: 401, body: {} });
+    http.match(GRAPHQL_PATH).forEach((p) => answer(p));
+    await settle(fixture);
+    expect(FakeSocket.all.length).toBe(1);
+    const socket = FakeSocket.latest();
+    socket.accept();
+    await settle(fixture);
+    const { acknowledgement: _, ...alert } = ALERTS_ANONYMOUS.alerts.items[4];
+    socket.next(respond(ALERT_STORED, { alert_stored: { ...alert, event_id: 'new/1' } }).data!);
+    await settle(fixture);
+    const el = fixture.nativeElement as HTMLElement;
+    const list = el.querySelectorAll('.alert-item');
+    expect(list.length).toBe(7);
+    expect(squash(list[0].querySelector('h3')?.textContent)).toBe(
+      squash(list[5].querySelector('h3')?.textContent),
+    );
+    expect(squash(el.querySelector('app-recent-alerts [role="log"]')?.textContent)).toBe(
+      'New alert, G4 Severe: G4 level from SWPC estimated planetary Kp 7.67, 2024-05-10 15:00 to 18:00 UTC.',
+    );
   });
 
   it('shows the signed in operator by name', async () => {

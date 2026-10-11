@@ -326,6 +326,60 @@ export const RECENT_ALERTS: TypedDocumentNode<RecentAlertsData, { limit: number 
   }
 `;
 
+/** A newly stored alert, as the alert_stored subscription sends it: no acknowledgement and no screening run. */
+export type AlertNotice = Omit<Alert, 'screening_run' | 'acknowledgement'>;
+
+export interface AlertStoredData {
+  alert_stored: AlertNotice;
+}
+
+// The same selection as each RecentAlerts item, less screening_run and acknowledgement, which a notice does not
+// carry, so a notice renders exactly as a list item (queries.spec.ts checks the two stay alike).
+export const ALERT_STORED: TypedDocumentNode<AlertStoredData, Record<string, never>> = gql`
+  subscription AlertStored {
+    alert_stored {
+      kind
+      event_id
+      received_at
+      space_weather_level {
+        scale
+        state
+        derived_level
+        derived_label
+        previous_state
+        previous_derived_level
+        trigger
+        satellite
+        value
+        unit
+        xray_class
+        interval_start
+        interval_end
+        sample_time
+        no_data_since
+        no_data_reason
+        ended_by_satellite
+      }
+      close_approach {
+        run_id
+        watchlist_object {
+          catalog_number
+          name
+          element_age_days
+        }
+        other_object {
+          catalog_number
+          name
+          element_age_days
+        }
+        time_of_closest_approach
+        miss_distance_m
+        relative_speed_m_per_s
+      }
+    }
+  }
+`;
+
 export interface PassPoint {
   time: string;
   elevation_deg: number;

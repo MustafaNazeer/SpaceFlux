@@ -1,10 +1,14 @@
 import { inject, InjectionToken } from '@angular/core';
-import { ApolloClient, InMemoryCache, TypePolicies } from '@apollo/client';
+import { ApolloClient, ApolloLink, InMemoryCache, TypePolicies } from '@apollo/client';
+import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { HttpLink } from 'apollo-angular/http';
+import { OperationTypeNode } from 'graphql';
+
+import { ALERT_SOCKET } from './alert-socket';
 
 export const GRAPHQL_PATH = '/api/graphql';
 
-/** How often the panels refresh, until alerts arrive over a subscription. */
+/** How often the panels refresh; for recent alerts it is the fallback behind the live subscription. */
 export const POLL_INTERVAL_MS = new InjectionToken<number>('POLL_INTERVAL_MS', {
   factory: () => 60_000,
 });
@@ -24,8 +28,14 @@ export const TYPE_POLICIES: TypePolicies = {
 
 export function apolloOptions(): ApolloClient.Options {
   const httpLink = inject(HttpLink);
+  // The API serves subscriptions over WebSocket only and everything else over HTTP only (ADR 0014, decision 1).
+  const link = ApolloLink.split(
+    (operation) => operation.operationType === OperationTypeNode.SUBSCRIPTION,
+    new GraphQLWsLink(inject(ALERT_SOCKET)),
+    httpLink.create({ uri: GRAPHQL_PATH }),
+  );
   return {
-    link: httpLink.create({ uri: GRAPHQL_PATH }),
+    link,
     cache: new InMemoryCache({ typePolicies: TYPE_POLICIES }),
   };
 }

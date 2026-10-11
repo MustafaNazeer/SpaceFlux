@@ -19,7 +19,7 @@
           </li>
         }
       </ol>
-      @if (p.next) {
+      @if (p.more) {
         <p class="caption">Showing the {{ p.items.length }} newest.</p>
       }
     } @else {
@@ -32,4 +32,9 @@
       </div>
     }
   }
+  <div class="visually-hidden" role="log" aria-live="polite" aria-label="New alerts">
+    @for (entry of log(); track entry.id) {
+      <p><app-segments [segments]="entry.segments" /></p>
+    }
+  </div>
 </aside>

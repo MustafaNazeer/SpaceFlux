@@ -34,7 +34,7 @@ export class App {
     () => this.data.spaceWeather.data()?.space_weather_current,
   );
   protected readonly screening = computed(() => this.data.screening.data()?.screening_current);
-  protected readonly alerts = computed(() => this.data.alerts.data()?.alerts);
+  protected readonly alerts = this.data.recentAlerts;
 
   /** Browser time of each query's newest failed refresh. */
   private readonly failures = computed<Failures>(() => ({

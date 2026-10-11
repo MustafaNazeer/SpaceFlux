@@ -44,7 +44,14 @@
     <app-passes-panel />
   </main>
 
-  <app-recent-alerts [page]="alerts()" [now]="now()" [failedAt]="data.alerts.failedAt()" [paused]="data.paused()" />
+  <app-recent-alerts
+    [page]="alerts()"
+    [log]="data.log()"
+    (logRendered)="data.logRendered($event)"
+    [now]="now()"
+    [failedAt]="data.alerts.failedAt()"
+    [paused]="data.paused()"
+  />
 </div>
 
 <footer class="app-footer">

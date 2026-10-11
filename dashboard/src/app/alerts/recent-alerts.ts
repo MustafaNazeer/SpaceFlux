@@ -1,10 +1,18 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import {
+  afterRenderEffect,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  input,
+  output,
+} from '@angular/core';
 
 import { AckState } from '../ack/ack-state';
 import { Badge } from '../badge/badge';
 import { Segments } from '../badge/segments';
-import { RecentAlertsData } from '../data/queries';
+import { AlertList } from './alert-list';
 import { alertView } from './alert-view';
+import { LogEntry } from './announcer';
 
 /** Recent alerts, newest first, with their acknowledgement state. Read only. */
 @Component({
@@ -16,7 +24,11 @@ import { alertView } from './alert-view';
   host: { style: 'display: contents' },
 })
 export class RecentAlerts {
-  readonly page = input.required<RecentAlertsData['alerts'] | undefined>();
+  readonly page = input.required<AlertList | undefined>();
+  /** The live log's entries, oldest first; each is spoken once when it is added. */
+  readonly log = input<LogEntry[]>([]);
+  /** The id of the newest log entry drawn, so the data layer trims only entries already spoken. */
+  readonly logRendered = output<number>();
   readonly now = input.required<number>();
   /** Browser time of the newest failed fetch, so a first fetch that fails does not read as loading forever. */
   readonly failedAt = input<number | undefined>(undefined);
@@ -32,6 +44,15 @@ export class RecentAlerts {
       ? 'Loading recent alerts.'
       : `Recent alerts could not be loaded. The page tries again ${this.paused() ? 'when updates resume' : 'at the next refresh'}.`;
   });
+
+  constructor() {
+    afterRenderEffect(() => {
+      const newest = this.log().at(-1);
+      if (newest) {
+        this.logRendered.emit(newest.id);
+      }
+    });
+  }
 
   protected readonly views = computed(() => {
     const p = this.page();

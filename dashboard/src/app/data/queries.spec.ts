@@ -15,6 +15,7 @@ import {
 import { respond, SCHEMA } from '../../testing/graphql';
 import * as fixtures from '../../testing/fixtures';
 import {
+  ALERT_STORED,
   RECENT_ALERTS,
   RECENT_ALERTS_PAGE,
   SCREENING_CURRENT,
@@ -66,7 +67,8 @@ function cost(
     let rows = 1;
     if (def.args.some((a) => a.name === 'limit')) {
       const arg = f.arguments?.find((a) => a.name.value === 'limit')?.value;
-      rows = parent.name === 'Query' ? TOP_LEVEL_PAGE : NESTED_PAGE;
+      rows =
+        parent.name === 'Query' || parent.name === 'Subscription' ? TOP_LEVEL_PAGE : NESTED_PAGE;
       if (arg?.kind === Kind.INT) {
         rows = Math.max(Number(arg.value), 1);
       } else if (arg?.kind === Kind.VARIABLE) {
@@ -81,6 +83,13 @@ function cost(
   }, 0);
 }
 
+/** A selection set as nested field names, for comparing two documents' selections. */
+function shape(set: SelectionSetNode | undefined): unknown[] {
+  return fields(set).map((f) =>
+    f.selectionSet ? { [f.name.value]: shape(f.selectionSet) } : f.name.value,
+  );
+}
+
 function operation(doc: DocumentNode): OperationDefinitionNode {
   return doc.definitions.find(
     (d): d is OperationDefinitionNode => d.kind === Kind.OPERATION_DEFINITION,
@@ -92,7 +101,13 @@ const DOCUMENTS: [string, DocumentNode, Record<string, unknown>][] = [
   ['ScreeningCurrent', SCREENING_CURRENT, {}],
   ['RecentAlerts', RECENT_ALERTS, { limit: RECENT_ALERTS_PAGE }],
   ['WatchlistPasses', WATCHLIST_PASSES, {}],
+  ['AlertStored', ALERT_STORED, {}],
 ];
+
+/** The root type an operation starts from; the server's cost calculator treats Subscription as a root like Query. */
+function rootOf(op: OperationDefinitionNode): GraphQLObjectType {
+  return op.operation === 'subscription' ? SCHEMA.getSubscriptionType()! : SCHEMA.getQueryType()!;
+}
 
 /** Every WatchlistObject.passes field in the document, however deep: the server answers at most one per request. */
 function passesFields(set: SelectionSetNode | undefined, parent: GraphQLObjectType): number {
@@ -126,12 +141,32 @@ describe('dashboard queries', () => {
       });
 
       it('stays within the cost limit', () => {
-        expect(cost(op.selectionSet, SCHEMA.getQueryType()!, variables)).toBeLessThanOrEqual(
-          MAX_COST,
-        );
+        expect(cost(op.selectionSet, rootOf(op), variables)).toBeLessThanOrEqual(MAX_COST);
       });
     });
   }
+
+  it('selects the same alert fields in the subscription as in the recent alerts list, so a notice renders as a list item', () => {
+    const selected = (doc: DocumentNode, path: string[]) => {
+      let set = operation(doc).selectionSet;
+      for (const name of path) {
+        set = fields(set).find((f) => f.name.value === name)!.selectionSet!;
+      }
+      return JSON.stringify(shape(set));
+    };
+    for (const kind of ['space_weather_level', 'close_approach']) {
+      expect(selected(ALERT_STORED, ['alert_stored', kind])).toBe(
+        selected(RECENT_ALERTS, ['alerts', 'items', kind]),
+      );
+    }
+    const top = (set: SelectionSetNode | undefined) => fields(set).map((f) => f.name.value);
+    const items = fields(fields(operation(RECENT_ALERTS).selectionSet)[0].selectionSet).find(
+      (f) => f.name.value === 'items',
+    )!;
+    expect(top(fields(operation(ALERT_STORED).selectionSet)[0].selectionSet)).toEqual(
+      top(items.selectionSet).filter((n) => n !== 'screening_run' && n !== 'acknowledgement'),
+    );
+  });
 
   it('asks for a recent alerts page the API allows (1 to 200)', () => {
     expect(RECENT_ALERTS_PAGE).toBeGreaterThanOrEqual(1);
@@ -158,6 +193,12 @@ describe('dashboard queries', () => {
       [WATCHLIST_PASSES, fixtures.PASSES_CLIPPED_BOTH, {}],
       [WATCHLIST_PASSES, fixtures.PASSES_STOPPED, {}],
       [WATCHLIST_PASSES, fixtures.PASSES_EMPTY_WATCHLIST, {}],
+      ...fixtures.ALERTS_ANONYMOUS.alerts.items.map(
+        (item): [DocumentNode, object, Record<string, unknown>] => {
+          const { acknowledgement: _, ...alert } = item;
+          return [ALERT_STORED, { alert_stored: alert }, {}];
+        },
+      ),
     ];
     for (const [doc, root, variables] of cases) {
       expect(respond(addTypenameToDocument(doc), root, variables).errors).toBeUndefined();
@@ -198,7 +239,7 @@ describe('dashboard queries', () => {
         name,
         depth(op.selectionSet),
         fieldCount(op.selectionSet),
-        cost(op.selectionSet, SCHEMA.getQueryType()!, variables),
+        cost(op.selectionSet, rootOf(op), variables),
       ];
     });
     expect(measured).toMatchSnapshot();
