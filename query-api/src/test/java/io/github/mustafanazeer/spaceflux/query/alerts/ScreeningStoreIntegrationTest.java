@@ -88,7 +88,7 @@ class ScreeningStoreIntegrationTest {
         String start = freshWindowStart();
         ObjectNode e = approach(start);
 
-        assertThat(process(e)).isEqualTo(AlertsProcessor.Outcome.STORED);
+        assertThat(process(e)).isInstanceOf(AlertsProcessor.Outcome.Stored.class);
 
         Map<String, Object> row = db.sql("SELECT * FROM close_approach WHERE alert_seq = ?").param(seq(e)).query()
                 .singleRow();
@@ -107,7 +107,7 @@ class ScreeningStoreIntegrationTest {
     void aCutSummaryIsStoredWithItsCountsAndItsListsInOrder() throws Exception {
         ObjectNode e = run("valid-screening-run-cut.json", freshWindowStart());
 
-        assertThat(process(e)).isEqualTo(AlertsProcessor.Outcome.STORED);
+        assertThat(process(e)).isInstanceOf(AlertsProcessor.Outcome.Stored.class);
 
         long s = seq(e);
         Map<String, Object> row = db.sql("SELECT * FROM screening_run WHERE alert_seq = ?").param(s).query()
@@ -136,7 +136,7 @@ class ScreeningStoreIntegrationTest {
         ids.add("close_approach/1/a");
         ((ObjectNode) e.get("screening_run")).put("approach_count", 2);
 
-        assertThat(process(e)).isEqualTo(AlertsProcessor.Outcome.STORED);
+        assertThat(process(e)).isInstanceOf(AlertsProcessor.Outcome.Stored.class);
 
         long s = seq(e);
         assertThat(db.sql("SELECT omitted_suppressed FROM screening_run WHERE alert_seq = ?").param(s)
@@ -178,7 +178,7 @@ class ScreeningStoreIntegrationTest {
         AlertsProcessor.Outcome outcome = processor.process(new AlertsProcessor.In("k", value, 0, 0), NOW);
 
         assertThat(outcome).as("%s", outcome instanceof AlertsProcessor.Outcome.DeadLetter(var d)
-                ? JSON.readTree(d.value()).get("reason").asString() : "").isEqualTo(AlertsProcessor.Outcome.STORED);
+                ? JSON.readTree(d.value()).get("reason").asString() : "").isInstanceOf(AlertsProcessor.Outcome.Stored.class);
 
         List<Long> positions = db.sql("SELECT position FROM screening_run_suppressed WHERE run_alert_seq = ? "
                 + "ORDER BY position").param(seq(e)).query(Long.class).list();

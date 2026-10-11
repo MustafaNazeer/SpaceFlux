@@ -205,6 +205,9 @@ services:
       ACK_OPERATOR_BCRYPT_COST: ${ACK_OPERATOR_BCRYPT_COST:-14}
       # Local only: the demo environment leaves GraphQL introspection at its default, off (ADR 0012).
       GRAPHQL_INTROSPECTION: "true"
+      # The one origin allowed to open the live alert WebSocket (ADR 0014), matched exactly: the dashboard's
+      # development server. Without it every handshake is refused and the rest of the API serves normally.
+      SPACEFLUX_DASHBOARD_ORIGIN: http://localhost:4200
       # As for risk-engine: snappy and zstd unpack a native library, so they get an exec tmpfs of their own
       # and /tmp stays noexec. query-api checks every codec at startup.
       JAVA_TOOL_OPTIONS: -Dorg.xerial.snappy.tempdir=/native -DZstdTempFolder=/native

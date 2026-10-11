@@ -20,7 +20,7 @@ public final class AlertsPlanFeed {
     /** Stores one event; anything else, a dead letter included, fails the caller. */
     public void store(byte[] value, Instant now) {
         AlertsProcessor.Outcome outcome = processor.process(new AlertsProcessor.In("plan", value, 0, 0), now);
-        if (outcome != AlertsProcessor.Outcome.STORED) {
+        if (!(outcome instanceof AlertsProcessor.Outcome.Stored)) {
             throw new IllegalStateException("not stored: " + (outcome instanceof AlertsProcessor.Outcome.DeadLetter d
                     ? new String(d.message().value(), java.nio.charset.StandardCharsets.UTF_8) : outcome));
         }

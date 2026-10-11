@@ -72,7 +72,7 @@ class AlertsProcessorTest {
         for (String file : List.of("valid-g-level.json", "valid-close-approach.json", "valid-screening-run.json")) {
             byte[] value = example(file);
 
-            assertThat(processor.process(in("k", value), NOW)).isEqualTo(AlertsProcessor.Outcome.STORED);
+            assertThat(processor.process(in("k", value), NOW)).isInstanceOf(AlertsProcessor.Outcome.Stored.class);
         }
 
         assertThat(store.rows).hasSize(3);
@@ -80,6 +80,17 @@ class AlertsProcessorTest {
                 StandardCharsets.UTF_8));
         assertThat(store.rows.get(0).partition()).isZero();
         assertThat(store.rows.get(0).offset()).isEqualTo(41);
+    }
+
+    @Test
+    void theStoredOutcomeNamesTheEventItStored() throws Exception {
+        ObjectNode e = (ObjectNode) JSON.readTree(example("valid-close-approach.json"));
+        String eventId = e.get("event_id").asString() + "/named";
+        e.put("event_id", eventId);
+
+        AlertsProcessor.Outcome outcome = processor.process(in("k", JSON.writeValueAsBytes(e)), NOW);
+
+        assertThat(outcome).isEqualTo(new AlertsProcessor.Outcome.Stored(eventId));
     }
 
     @Test
@@ -174,7 +185,7 @@ class AlertsProcessorTest {
     void aNumberADoubleHoldsExactlyIsStored() throws Exception {
         for (String raw : List.of("4.9E-324", "1.7976931348623157E308", "5", "7.670")) {
             assertThat(processor.process(in("k", withRaw("valid-r-level.json", "value", raw)), NOW))
-                    .as(raw).isEqualTo(AlertsProcessor.Outcome.STORED);
+                    .as(raw).isInstanceOf(AlertsProcessor.Outcome.Stored.class);
             store.ids.clear();
         }
     }
@@ -221,13 +232,13 @@ class AlertsProcessorTest {
     @Test
     void aCloseApproachTimeDaysAheadIsStored() throws Exception {
         assertThat(processor.process(in("k", withRaw("valid-close-approach.json", "time_of_closest_approach",
-                "\"2026-10-10T00:00:00Z\"")), NOW)).isEqualTo(AlertsProcessor.Outcome.STORED);
+                "\"2026-10-10T00:00:00Z\"")), NOW)).isInstanceOf(AlertsProcessor.Outcome.Stored.class);
     }
 
     @Test
     void aSeriesTimeExactlyAnHourAfterTheClockIsStored() throws Exception {
         assertThat(processor.process(in("k", withRaw("valid-r-level.json", "freshness_reference",
-                "\"2026-10-04T13:00:00Z\"")), NOW)).isEqualTo(AlertsProcessor.Outcome.STORED);
+                "\"2026-10-04T13:00:00Z\"")), NOW)).isInstanceOf(AlertsProcessor.Outcome.Stored.class);
     }
 
     @Test

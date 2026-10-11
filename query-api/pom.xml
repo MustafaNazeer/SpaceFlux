@@ -35,6 +35,11 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-graphql</artifactId>
     </dependency>
+    <!-- The live alert subscription over WebSocket (ADR 0014); no SockJS or STOMP is configured. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-websocket</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.mysql</groupId>
       <artifactId>mysql-connector-j</artifactId>

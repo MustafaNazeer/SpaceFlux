@@ -1,6 +1,6 @@
 # MySQL indexes
 
-* **Status:** decided on 2026-10-02; the queries of Q1, Q2, Q4, Q7 and Q8, the single alert and catalog lookups, the acknowledgement write path, and the consumers' lookups were checked with `EXPLAIN` (see [Results](#results)). The two alert lists, Q3 and the approaches of Q6, were designed and checked on 2026-10-06, with the index on (`listed`, `alert_seq`) added for Q3 ([Results for the alert lists](#results-for-the-alert-lists)). The passes lookup, Q10, was checked on 2026-10-08 ([Results](#results)). Q5, the rest of Q6, and Q9 have no query in the code yet, so their indexes are not proven; each is checked when its query is written.
+* **Status:** decided on 2026-10-02; the queries of Q1, Q2, Q4, Q7 and Q8, the single alert and catalog lookups, the acknowledgement write path, and the consumers' lookups were checked with `EXPLAIN` (see [Results](#results)). The two alert lists, Q3 and the approaches of Q6, were designed and checked on 2026-10-06, with the index on (`listed`, `alert_seq`) added for Q3 ([Results for the alert lists](#results-for-the-alert-lists)). The passes lookup, Q10, was checked on 2026-10-08 ([Results](#results)). The lookup behind the live alert notice was checked on 2026-10-11 ([Results](#results)). Q5, the rest of Q6, and Q9 have no query in the code yet, so their indexes are not proven; each is checked when its query is written.
 * **Applies to:** the schema in [mysql-schema.md](mysql-schema.md), on MySQL 8.4 LTS with InnoDB. The query numbers (Q1 to Q10) are the rows of its [Queries the API needs](mysql-schema.md#queries-the-api-needs) table.
 
 ## Rules I follow
@@ -18,7 +18,7 @@
 | Index | Columns | Used by | Why |
 | --- | --- | --- | --- |
 | Primary key | `alert_seq` | Q3 and Q6, joining each listed row; the kind tables' joins | Every kind table joins on it. Q3 no longer scans it: its rows come from the kind tables' own indexes (see [`space_weather_event`](#space_weather_event)) |
-| Unique | `event_id` | Idempotent insert; Q3 and Q8 joins from `alert_acknowledgement`; Q4 completeness and approaches; one alert | The duplicate key on this index is what turns a redelivered event into a no op. It is also the parent key of the acknowledgement foreign key |
+| Unique | `event_id` | Idempotent insert; Q3 and Q8 joins from `alert_acknowledgement`; Q4 completeness and approaches; one alert; the live alert notice | The duplicate key on this index is what turns a redelivered event into a no op. It is also the parent key of the acknowledgement foreign key |
 | Secondary | (`kind`, `alert_seq`) | No query today | Planned for Q3 filtered by kind, but the alert list has no kind filter and reads each kind from its own table. Under rule 1 it is a candidate to drop |
 
 ### `space_weather_event`
@@ -125,6 +125,7 @@ The plans are in [plans/](plans/), one file per query the service runs today: th
 * A history page after the first reads (`event_id`, `ack_id`) from the cursor down. The plan is taken with a cursor in the middle of the table; for a cursor near the start of the table the optimizer rightly reads the primary key instead, since only the few rows below that `ack_id` are in range.
 * The only table scan is of `space_weather_series` (Q1, a few rows, one per series); `watchlist_object` (Q7, a handful of configured objects) is read whole through its primary key.
 * Q10 reads one `watchlist_object` row and its `catalog_object` row, each a `const` lookup on its primary key (`watchlist-object-passes`). Through GraphQL, `watchlist { passes }` runs Q7 and then Q10 once for each watchlist object, one pair of primary key lookups each, and a request may hold only one `passes` selection ([GraphQL API](../api/graphql.md)).
+* The live alert notice reads one stored alert back by `event_id` and keeps it only when the recent alerts list (Q3) would show it: a close approach, or a space weather event whose `listed` is true. Each of the three tables is a `const` lookup: `alert_event` on its unique `event_id`, then `close_approach` and `space_weather_event` on their primary keys (`alert-listed-by-id`). `listed` is virtual, so it is computed from the row the primary key lookup already read. The query runs once for each stored alert, and only while someone is subscribed ([ADR 0014](../adr/0014-live-alert-subscription.md), decision 2).
 * The newest run is read backward from the end of (`window_start`, `rules_version`), as the plan note "(reverse)" shows, and the next batch is a range on the same index.
 * `QueryPlansIntegrationTest` in the normal build seeds a week of space weather and a year of screening runs, then asserts for every query each table's access type and index, the column each range is on, both bounds of each history range, and that only Q1 sorts. With too few runs the optimizer rightly sorts the whole run table instead, which would prove nothing, so the build keeps a year of them.
 

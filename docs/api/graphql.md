@@ -1,7 +1,7 @@
 # GraphQL API
 
 * **Status:** accepted, 2026-10-06.
-* **Served by:** `query-api` at `POST /api/graphql`, the dashboard's read API. The schema is [`query-api/src/main/resources/graphql/schema.graphqls`](../../query-api/src/main/resources/graphql/schema.graphqls). Limits are decided in [ADR 0012](../adr/0012-graphql-introspection-and-limits.md).
+* **Served by:** `query-api` at `POST /api/graphql`, the dashboard's read API, and the live alert subscription over WebSocket at `/api/graphql/ws`. The schema is [`query-api/src/main/resources/graphql/schema.graphqls`](../../query-api/src/main/resources/graphql/schema.graphqls). Limits are decided in [ADR 0012](../adr/0012-graphql-introspection-and-limits.md), and the subscription in [ADR 0014](../adr/0014-live-alert-subscription.md).
 
 GraphQL serves the same reads as the [REST API](rest.md), shaped by the client in one request: an object, its close approaches and alerts, and the space weather context. Writes stay on REST: acknowledging an alert, signing in and signing out have no GraphQL form, and the schema has no mutations.
 
@@ -32,6 +32,45 @@ GraphQL serves the same reads as the [REST API](rest.md), shaped by the client i
 
 **Paging** follows the REST rules: a list that can grow takes `limit` and `after`, and returns `next` until the last page. A top level list defaults to 50 items and allows at most 200; a list nested under another object defaults to 20 and allows at most 50. A `limit` out of range is an error, never quietly cut.
 
+## Live alert subscription
+
+```graphql
+subscription { alert_stored { kind event_id produced_at received_at space_weather_level { scale state } close_approach { run_id miss_distance_m } } }
+```
+
+`alert_stored` sends each alert the recent alerts list would show (above), once, as soon as `query-api` has stored it. A notice is an `AlertNotice`: `kind`, `rules_version`, `event_id`, `produced_at`, the stored `received_at`, and exactly one of `space_weather_level` and `close_approach`, typed as on `Alert`; the other is `null`. It has no acknowledgement and no screening run, since a new alert has no acknowledgement yet; anything more is fetched with `alert(event_id)`. The field takes no arguments.
+
+The `alerts` query stays the source of truth: a notice can be lost (a client that is not connected, a full queue, a restart between the store and the push), so the dashboard keeps polling the list once a minute, keys both by `event_id`, and ignores a notice for an alert it already shows. A notice is pushed only by the instance that stored the alert, which is complete while `query-api` runs as one replica.
+
+**Protocol.** GraphQL over WebSocket with the `graphql-transport-ws` subprotocol: the client sends `connection_init`, the server answers `connection_ack`, then the client sends one `subscribe`. The server sends a protocol `ping` every 30 seconds, which the client answers with `pong`. No SockJS or STOMP fallback exists.
+
+**Rules for a connection.**
+
+| Rule | Value | What happens |
+|---|---|---|
+| Origin | One configured dashboard origin, matched exactly (`SPACEFLUX_DASHBOARD_ORIGIN`, for example `http://localhost:4200` locally); no pattern or wildcard | Any other origin, `null`, more than one `Origin` header, or none at all: `403` before the upgrade. With no origin configured every handshake is refused, and the rest of the API serves normally. The HTTP endpoint still has no CORS configuration |
+| Connections per client address | 4 | `429` with `Retry-After: 30`, before the upgrade |
+| Connections across the service | 64 | `503` with `Retry-After: 30`, before the upgrade |
+| Subscriptions per connection | 1 | A second `subscribe` gets a protocol `error` message, `One subscription per connection.`, and the first keeps running |
+| `connection_init` | within 5 seconds | Close `4408` |
+| Silence from the client | 75 seconds without any message, a `pong` included | Close `1001` |
+| A blocked send | 20 seconds | The connection is closed |
+| Lifetime | 60 minutes | Close `1001`; the client reconnects, and passes the origin check and the caps again |
+| Text message size | 8,192 characters | Close `1009` |
+| Binary message | any | Close `1003` |
+| Messages after `connection_init` | 20 in any 60 seconds | Close `1008` |
+| Notices waiting for one client | 16 | Close `1008`, so a client that stops reading never slows the others; a client whose delivery fails is closed with `1008` too, so it reconnects |
+
+A refusal before the upgrade has the API's problem body. A browser sees every refused handshake only as a failed connection, so the client reconnects with backoff and relies on the poll meanwhile. The 30 second ping keeps a quiet but healthy connection open through a proxy, and the client's `pong` is what keeps it inside the 75 second limit.
+
+Behind the cloud ingress the client address is the forwarded one, trusted only from the ingress, the same rule as login throttling; until that is configured every client shares the ingress's address and the per address cap acts as a second service wide cap.
+
+**One operation type per transport.** The WebSocket serves `subscription` operations only: a query sent there gets the error `Only subscriptions are served over WebSocket.` and nothing runs. The HTTP endpoint serves queries only: a subscription sent by `POST` gets the error `Subscriptions are served over WebSocket only.` with no data, and a `POST` that accepts `text/event-stream` is answered `406`, so no Server Sent Events stream exists.
+
+**Anonymous.** Everything sent over the socket is in the anonymous form, whatever session the handshake carried, and `AlertNotice` has no field that differs for the operator, so signing out or a session expiring has nothing to take back from an open socket. The handshake never creates a session.
+
+**Limits.** The document size, field count, depth and cost limits below hold for a subscription as for a query; the cost calculator treats `Subscription` as a root like `Query`. A text message of at most 8,192 characters is the tighter bound on a document sent over the socket.
+
 ## Limits
 
 Checked in this order, each refusal an error with no data:
@@ -45,7 +84,7 @@ Checked in this order, each refusal an error with no data:
 | Cost | 2,000, where a list with a `limit` costs that limit (or its default page) times what it selects, `watchlist` costs its size bound of 10 times what it selects, and a watchlist object's `passes` cost 100 plus what they select | Tracks rows read rather than fields named; a pass computation propagates a day of SGP4 states and takes a fraction of a second, so it is weighted as about 100 rows, and the whole watchlist's passes (1,470 with every field) fit once but not twice. A `limit` below 1 costs as 1 and no field costs more than 100,000, so no value can overflow the sum |
 | Passes | At most one `passes` selection per request, counted on the normalized operation | The cost calculator undercounts a reused named fragment, so without this count a fragment could ask for the watchlist's passes many times at the cost of once |
 | Statement time | 3 seconds per SQL statement on the API's connection pool | What actually bounds a slow request; it applies to REST too |
-| Request time | 5 seconds | A backstop only: it does not stop a data fetcher that blocks on the request thread, which every fetcher here does |
+| Request time | 5 seconds | A backstop only: it does not stop a data fetcher that blocks on the request thread, which every fetcher here does, and it does not end a subscription, whose bounds are the connection rules above |
 
 A cost limit alone is not enough: graphql-java's complexity calculator undercounts a named fragment spread under several aliases (ADR 0012, fact 8), so the field count stands beside it. `FragmentCountTest` pins both numbers, so an upgrade that changes either one fails the build.
 
@@ -53,4 +92,4 @@ A cost limit alone is not enough: graphql-java's complexity calculator undercoun
 
 ## Tests
 
-`GraphQlIntegrationTest` compares every field of the current space weather, the watchlist with its catalog rows, a catalog object, history items, the current screening run and one alert of each kind with the REST answer, value for value; it checks `null` where REST answers `404`, the BAD_REQUEST error text, the CSRF check, the anonymous view of an acknowledgement on `alert`, `screening_current` and both lists, and pages both lists, ties included. `GraphQlLimitsIntegrationTest` checks each limit just under and just over its value: depth plain, aliased and through inline and named fragments; field count aliased and through a named fragment; cost plain, through inline and named fragments, with huge and negative limits and with the watchlist bound; every parser limit; the operation picked by `operationName`; malformed requests, a batch, and the body cap by declared and by chunked length; and the statement timeout; and passes asked for twice, by alias and through named fragments. `PassesCostTest` pins what passes cost, `PassesApiIntegrationTest` compares every `passes` field with the REST answer, with and without computed passes, and `PassesFailureIntegrationTest` checks that a failed computation nulls only that object's `passes`, while another object's `passes` still answers, with one `INTERNAL_ERROR` at that path and no detail of the failure. `GraphQlTimeoutIntegrationTest` shows the request timeout does not stop a blocking fetcher and that a cancelled statement gets a generic error, and `IntrospectionOffIntegrationTest` checks the default setting.
+`GraphQlIntegrationTest` compares every field of the current space weather, the watchlist with its catalog rows, a catalog object, history items, the current screening run and one alert of each kind with the REST answer, value for value; it checks `null` where REST answers `404`, the BAD_REQUEST error text, the CSRF check, the anonymous view of an acknowledgement on `alert`, `screening_current` and both lists, and pages both lists, ties included. `GraphQlLimitsIntegrationTest` checks each limit just under and just over its value: depth plain, aliased and through inline and named fragments; field count aliased and through a named fragment; cost plain, through inline and named fragments, with huge and negative limits and with the watchlist bound; every parser limit; the operation picked by `operationName`; malformed requests, a batch, and the body cap by declared and by chunked length; and the statement timeout; and passes asked for twice, by alias and through named fragments. `PassesCostTest` pins what passes cost, `PassesApiIntegrationTest` compares every `passes` field with the REST answer, with and without computed passes, and `PassesFailureIntegrationTest` checks that a failed computation nulls only that object's `passes`, while another object's `passes` still answers, with one `INTERNAL_ERROR` at that path and no detail of the failure. `AlertSocketIntegrationTest` checks each connection rule above over a real socket: every origin variant, the caps and their `Retry-After`, a thousand connections opened and closed in five ways (closed by the client before and after `connection_init`, closed by the init timeout, refused for their origin, refused by the upgrade itself) leaving no slot held, closed connections leaving no task on the timer, a second subscription, the message size, binary and message count limits, one operation type per transport, the field count and parser limits for a subscription in aliased and named fragment forms, a socket opened with the operator's session served anonymously, also after that session is logged out, expires or is replaced by a newer login, a mutation document refused with nothing run, and that a notice carries the stored `received_at` and `null` for the other kind, arrives after the request timeout has passed, and is sent only for an alert the list shows. `AlertSocketTimeIntegrationTest` checks the time limits with lowered values; `AlertSocketSlowReaderIntegrationTest` that a client that stops reading is closed by the send timeout without holding up one that reads; `AlertSocketCapIntegrationTest` the service wide cap; `AlertSocketNoOriginIntegrationTest` the refusal with no origin configured; `AlertNoticesTest` the per client buffer, that a subscriber whose delivery fails is closed once and never keeps a notice from the others, and that storing an alert never waits on the push; `AlertsListenerTest` that only a stored alert is pushed and that a failed push never fails its record; and `AlertSubscriptionKafkaIntegrationTest` the whole path from the `alerts` topic: a repeat, a dead letter and a screening run send nothing, and two close approaches arrive once each, in order. `GraphQlTimeoutIntegrationTest` shows the request timeout does not stop a blocking fetcher and that a cancelled statement gets a generic error, and `IntrospectionOffIntegrationTest` checks the default setting.

@@ -31,11 +31,13 @@ class AlertsListener {
 
     private final AlertsProcessor processor;
     private final KafkaTemplate<String, byte[]> kafka;
+    private final AlertStored stored;
     private final Clock clock = Clock.systemUTC();
 
-    AlertsListener(AlertStore store, KafkaTemplate<String, byte[]> kafka) {
+    AlertsListener(AlertStore store, KafkaTemplate<String, byte[]> kafka, AlertStored stored) {
         this.processor = new AlertsProcessor(TopicSchemas.fromClasspath(), store);
         this.kafka = kafka;
+        this.stored = stored;
     }
 
     @KafkaListener(topics = AlertsProcessor.TOPIC, groupId = GROUP)
@@ -46,12 +48,23 @@ class AlertsListener {
                     clock.instant());
             if (outcome instanceof AlertsProcessor.Outcome.DeadLetter(DeadLetters.Message m)) {
                 send(m);
+            } else if (outcome instanceof AlertsProcessor.Outcome.Stored(String eventId)) {
+                handOn(eventId);
             }
         } catch (RuntimeException e) {
             // The error handler retries without logging each attempt, so an outage would otherwise be silent.
             LOG.warn("alerts record {}@{} not stored, delivered again: {}", record.partition(), record.offset(),
                     Failures.describe(e));
             throw e;
+        }
+    }
+
+    /** The alert is stored and its offset must be committed whatever happens to the live subscription. */
+    private void handOn(String eventId) {
+        try {
+            stored.stored(eventId);
+        } catch (RuntimeException e) {
+            LOG.warn("stored alert not handed to live subscribers: {}", Failures.describe(e));
         }
     }
 

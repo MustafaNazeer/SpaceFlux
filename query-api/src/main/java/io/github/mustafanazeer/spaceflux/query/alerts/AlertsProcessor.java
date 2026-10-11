@@ -29,10 +29,10 @@ final class AlertsProcessor {
 
     sealed interface Outcome permits Outcome.Stored, Outcome.Repeat, Outcome.DeadLetter {
 
-        Outcome STORED = new Stored();
         Outcome REPEAT = new Repeat();
 
-        record Stored() implements Outcome {
+        /** The event's insert committed. */
+        record Stored(String eventId) implements Outcome {
         }
 
         record Repeat() implements Outcome {
@@ -70,7 +70,7 @@ final class AlertsProcessor {
         }
         try {
             return store.store(rows, text, in.partition(), in.offset())
-                    ? Outcome.STORED : Outcome.REPEAT;
+                    ? new Outcome.Stored(rows.envelope().eventId()) : Outcome.REPEAT;
         } catch (NotStorable e) {
             return deadLetter(in, value, null, e.getMessage(), now);
         }

@@ -81,7 +81,7 @@ class SpaceWeatherStoreIntegrationTest {
         TestMysql.rootSql("DELETE FROM spaceflux.space_weather_series WHERE scale = 'G'");
         ObjectNode e = event("valid-g-level.json", p -> { });
 
-        assertThat(process(e)).isEqualTo(AlertsProcessor.Outcome.STORED);
+        assertThat(process(e)).isInstanceOf(AlertsProcessor.Outcome.Stored.class);
 
         Map<String, Object> row = db.sql("SELECT * FROM space_weather_event WHERE alert_seq = ?").param(seq(e))
                 .query().singleRow();
@@ -142,7 +142,7 @@ class SpaceWeatherStoreIntegrationTest {
         TestMysql.rootSql("DELETE FROM spaceflux.space_weather_series WHERE scale = 'R' AND series_satellite = 9102");
         ObjectNode restated = event("valid-r-restatement.json", p -> p.put("satellite", 9102));
 
-        assertThat(process(restated)).isEqualTo(AlertsProcessor.Outcome.STORED);
+        assertThat(process(restated)).isInstanceOf(AlertsProcessor.Outcome.Stored.class);
 
         assertThat(db.sql("SELECT COUNT(*) FROM space_weather_event WHERE alert_seq = ?").param(seq(restated))
                 .query(Integer.class).single()).isEqualTo(1);
@@ -168,7 +168,7 @@ class SpaceWeatherStoreIntegrationTest {
             TestMysql.rootSql("GRANT UPDATE ON spaceflux.space_weather_series TO 'spaceflux_consumer'@'%'");
         }
 
-        assertThat(process(refresh)).isEqualTo(AlertsProcessor.Outcome.STORED);
+        assertThat(process(refresh)).isInstanceOf(AlertsProcessor.Outcome.Stored.class);
         assertThat(((Number) series("S", 9103).get("last_alert_seq")).longValue()).isEqualTo(seq(refresh));
     }
 }

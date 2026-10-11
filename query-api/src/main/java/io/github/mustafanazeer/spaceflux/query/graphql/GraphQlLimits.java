@@ -127,9 +127,10 @@ class GraphQlLimits {
     }
 
     /**
-     * A field that takes a limit costs that limit, or its default page, times one plus what it selects; the watchlist
-     * costs its size bound times one plus what it selects; a watchlist object's passes cost PASSES_WEIGHT plus one
-     * plus what they select; every other field costs one plus what it selects. Other lists without a limit are ones
+     * A field that takes a limit costs that limit, or its default page, times one plus what it selects, a root field
+     * of a subscription counting as top level just as a root field of a query does; the watchlist costs its size
+     * bound times one plus what it selects; a watchlist object's passes cost PASSES_WEIGHT plus one plus what they
+     * select; every other field costs one plus what it selects. Other lists without a limit are ones
      * the contract bounds (a run's lists, a day's passes), so they are counted once. A limit below 1
      * is costed as 1, so no field can cost less than nothing and cancel the rest of the query; the data fetcher
      * refuses it anyway. Costs are worked out in long and each field's cost stops at COST_CEILING: the
@@ -137,7 +138,8 @@ class GraphQlLimits {
      * int sum graphql-java keeps, while every cost up to the ceiling is still reported exactly (ADR 0012).
      */
     static final FieldComplexityCalculator COST = (env, children) -> {
-        boolean topLevel = "Query".equals(GraphQLTypeUtil.simplePrint(env.getParentType()));
+        String parent = GraphQLTypeUtil.simplePrint(env.getParentType());
+        boolean topLevel = "Query".equals(parent) || "Subscription".equals(parent);
         long rows;
         if (env.getFieldDefinition().getArgument("limit") != null) {
             Object limit = env.getArguments().get("limit");

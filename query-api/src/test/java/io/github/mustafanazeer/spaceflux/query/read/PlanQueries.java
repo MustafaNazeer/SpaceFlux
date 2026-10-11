@@ -6,6 +6,7 @@ public final class PlanQueries {
     public static final String SPACE_WEATHER_CURRENT = SpaceWeatherController.CURRENT;
     public static final String ALERT_BY_ID = AlertController.BY_ID;
     public static final String LATEST_ACKNOWLEDGEMENT = Acknowledgement.LATEST;
+    public static final String ALERT_LISTED_BY_ID = ListedAlerts.LISTED_BY_ID;
     public static final String CATALOG_BY_NUMBER = CatalogController.BY_NUMBER;
     public static final String WATCHLIST = WatchlistController.WATCHLIST;
     public static final String RUN_CANDIDATES = ScreeningController.CANDIDATES;

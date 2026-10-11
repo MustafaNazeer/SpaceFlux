@@ -15,6 +15,11 @@ spring:
   graphql:
     http:
       path: /api/graphql
+    # The live alert subscription (ADR 0014). Its handshake, caps and message limits are set in code and below.
+    websocket:
+      path: /api/graphql/ws
+      connection-init-timeout: 5s
+      keep-alive: 30s
     schema:
       introspection:
         # Off unless GRAPHQL_INTROSPECTION=true, which only the local Compose stack sets. Turning it off is JVM
@@ -60,6 +65,21 @@ spaceflux:
       username: ${CONSUMER_USER:spaceflux_consumer}
     api:
       username: ${API_USER:spaceflux_api}
+  # The live alert subscription's limits (ADR 0014, decisions 5 to 8). With no dashboard origin every WebSocket
+  # handshake is refused; the origin is matched exactly, for example http://localhost:4200.
+  websocket:
+    allowed-origin: ${SPACEFLUX_DASHBOARD_ORIGIN:}
+    connections-per-address: 4
+    connections: 64
+    retry-after: 30s
+    read-idle-timeout: 75s
+    send-timeout: 20s
+    max-lifetime: 60m
+    max-text-message-chars: 8192
+    messages-per-window: 20
+    message-window: 60s
+    subscriber-buffer: 16
+    notice-queue: 1024
   # The one operator who may acknowledge alerts (ADR 0009, decision 2). The hash is bcrypt, generated offline, in
   # the delegating encoder's form ({bcrypt}...). With either value missing nobody can sign in and every read works.
   operator:

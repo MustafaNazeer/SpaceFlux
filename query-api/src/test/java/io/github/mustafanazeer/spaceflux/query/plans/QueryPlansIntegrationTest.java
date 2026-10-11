@@ -110,6 +110,8 @@ class QueryPlansIntegrationTest {
                 .param(seeded.acknowledgements() / 2).query(Long.class).single();
         String middleEvent = api.sql("SELECT event_id FROM alert_acknowledgement WHERE ack_id = ?").param(middle)
                 .query(String.class).single();
+        String approachEvent = api.sql("SELECT e.event_id FROM alert_event e JOIN close_approach c "
+                + "ON c.alert_seq = e.alert_seq ORDER BY e.alert_seq LIMIT 1").query(String.class).single();
         LocalDateTime from = LocalDateTime.of(2025, 1, 4, 0, 0);
         LocalDateTime to = from.plusDays(7);
         LocalDateTime cursor = from.plusDays(2);
@@ -149,6 +151,8 @@ class QueryPlansIntegrationTest {
                         null, "c ref ix_close_approach_run", "e eq_ref PRIMARY", "k eq_ref PRIMARY", "x ref " + ack),
                 new Plan("alert-by-id", "api", PlanQueries.ALERT_BY_ID, List.of(acknowledged), false, null,
                         "alert_event const uk_alert_event_event_id"),
+                new Plan("alert-listed-by-id", "api", PlanQueries.ALERT_LISTED_BY_ID, List.of(approachEvent), false,
+                        null, "e const uk_alert_event_event_id", "c const PRIMARY", "w const PRIMARY"),
                 new Plan("alert-latest-acknowledgement", "api", PlanQueries.LATEST_ACKNOWLEDGEMENT,
                         List.of(acknowledged), false, null, "alert_acknowledgement ref " + ack),
                 new Plan("ack-target", "api", AckPlanQueries.TARGET, List.of(acknowledged), false, null,

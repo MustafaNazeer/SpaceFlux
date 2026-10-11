@@ -1,6 +1,7 @@
 # The read API for the dashboard (docs/api/graphql.md). Field names and meanings are the ones docs/api/rest.md and
 # schemas/alerts/v1.schema.json use. Times are RFC 3339 UTC strings; a time kept as text in a contract is returned
-# exactly as received. Writes stay on REST: this schema has no mutations.
+# exactly as received. Writes stay on REST: this schema has no mutations. The one subscription is served over the
+# WebSocket endpoint only, and queries over HTTP only.
 
 "A whole number from 0 to 4294967295, the range of the INT UNSIGNED columns it comes from, written as a JSON integer. GraphQL's Int stops at 2147483647."
 scalar UInt32
@@ -20,6 +21,23 @@ type Query {
   catalog_object(norad_cat_id: Int!): CatalogObject
   "Every watchlist object, ordered by catalog number (REST section 6)."
   watchlist: [WatchlistObject!]!
+}
+
+"Served only over the WebSocket endpoint (docs/api/graphql.md)."
+type Subscription {
+  "Each alert the recent alerts list would show, once, as it is stored. The alerts query stays the source of truth."
+  alert_stored: AlertNotice!
+}
+
+"A newly stored alert, without its acknowledgement or a screening run. Exactly one of the two kind fields is set."
+type AlertNotice {
+  kind: String!
+  rules_version: UInt32!
+  event_id: String!
+  produced_at: String!
+  received_at: String!
+  space_weather_level: SpaceWeatherLevel
+  close_approach: CloseApproach
 }
 
 type SpaceWeatherCurrent {
