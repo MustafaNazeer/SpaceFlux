@@ -211,6 +211,52 @@ Read `alerts` with the command above, `--topic alerts` and a larger `--max-messa
 
 The three dead letter topics are normally empty. A record there carries the reason it was rejected.
 
+### Storing an alert on demand, for local checks only
+
+Real alerts are rare, so checking the live alert subscription by hand (and the screen reader checks M9 and M10 in [the WCAG checklist](a11y/wcag-checklist.md)) needs a way to store one when I choose. `deploy/replay-alerts.sh` replays committed example events from `schemas/alerts/examples/` onto the `alerts` topic of the running local stack, through the console producer inside the `kafka` container. It is for the local stack only and is never run against the demo environment. It sends each file byte for byte with only its line breaks removed, keyed the way the risk engine keys it, and the provenance of every example is in [docs/data/topics.md](data/topics.md#examples-1), under `alerts`. It uses three examples, all of which the recent alerts list shows: the close approach, the R1 level and the S1 level. The two G examples are left out because storing a level change also sets its series' current state, and a replayed 2024 Kp value would then show as the current G level.
+
+I run these checks on a throwaway Compose project, `spaceflux-check`, so my real local data never gains these rows. Compose's `-p` option takes precedence over the `name:` line in `deploy/compose.yaml`, and the file sets no `container_name` and no external volume, so the throwaway project gets its own containers, networks and volumes (`spaceflux-check_kafka-data` and `spaceflux-check_mysql-data`, beside the real `spaceflux_kafka-data` and `spaceflux_mysql-data`). It reuses the passwords in `deploy/secrets/` and `deploy/.env`. The host ports are fixed (`127.0.0.1:9092` for Kafka and `127.0.0.1:8081` for the API, which the dashboard's development server also expects), so the real stack must be stopped first; `stop` keeps its containers and its data:
+
+```sh
+docker compose -p spaceflux -f deploy/compose.yaml --profile core stop
+docker compose -p spaceflux -f deploy/compose.yaml --profile core ps -a   # every container shows Exited
+```
+
+Then start only what the checks need. Naming `query-api` starts it with `kafka`, `topics`, `mysql` and `migrate`, and leaves out `ingest` and `risk-engine`, so no CelesTrak request is made and no real alert can arrive between the replayed ones (the space weather panel reads no data, since no series exists):
+
+```sh
+docker compose -p spaceflux-check -f deploy/compose.yaml --profile core up -d --build query-api
+docker compose -p spaceflux-check -f deploy/compose.yaml --profile core ps -a
+```
+
+`kafka`, `mysql` and `query-api` should be `running`, and `topics` and `migrate` should have exited with code 0. Then start the dashboard (`npm start` in `dashboard/`) and store alerts with the script, which needs the project named every time:
+
+```sh
+deploy/replay-alerts.sh --project spaceflux-check status       # which examples are already stored
+deploy/replay-alerts.sh --project spaceflux-check one          # store the next example not yet stored
+deploy/replay-alerts.sh --project spaceflux-check burst 3      # store the next three together, in one producer run
+deploy/replay-alerts.sh --project spaceflux-check again        # send the last stored one again, which query-api drops as a repeat
+deploy/replay-alerts.sh --project spaceflux-check --dry-run burst 3   # print the keys and values and send nothing
+```
+
+The script refuses to run without `--project`, and refuses `--project spaceflux`, the real stack, unless `--real-stack` is given as well. `status`, `one`, `burst` and `again` need the project's `kafka` and `mysql` services running; the stored check is one read only `SELECT` on `alert_event`. `query-api` stores each `event_id` once, so each example becomes a new alert once per database: after that it is a repeat, which is dropped and pushed to no subscriber. When the examples needed are already stored, the script stops and says so; it never deletes or rewrites a row or an example. The R1 and S1 examples also leave a series row for GOES-16 and GOES-13. Their values are years old, so the current space weather panel never shows them as a level: a newer satellite's row is shown instead, and with no other row for that scale the panel reads no data, past the age limit.
+
+Three examples are one fresh database's worth. For another fresh run, this stops the throwaway project and deletes its containers, its networks and its two volumes, `spaceflux-check_kafka-data` and `spaceflux-check_mysql-data`, and nothing of the real `spaceflux` project. The images it built are kept, so the next run starts without a rebuild:
+
+```sh
+docker compose -p spaceflux-check -f deploy/compose.yaml --profile core down --volumes
+docker volume ls --filter name=spaceflux-check   # prints only the header
+docker volume ls --filter name=spaceflux_        # the real volumes are still listed
+```
+
+Start it again with the `up` command above for the next run. When I am done with the checks, the same command with `--rmi local` also removes the images the throwaway project built:
+
+```sh
+docker compose -p spaceflux-check -f deploy/compose.yaml --profile core down --volumes --rmi local
+```
+
+Then I start the real stack again as usual.
+
 ## Measuring memory
 
 `deploy/measure-ram.sh` samples the memory of the running Compose containers and writes the samples and a summary under `docs/perf/data/`. The method and the recorded results are in [docs/perf/local-memory.md](perf/local-memory.md).
