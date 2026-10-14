@@ -18,6 +18,13 @@
   composed for this page, and are not taken from one real run.
   Page clock (as_of): 2026-09-29T18:00:00Z.
 
+  The alert pages reuse the same samples. Their produced and fetched times, and so the
+  space weather event ids built from them, are illustrative; the event id shapes follow
+  docs/data/topics.md. The OBJECT AJ catalog entry (international designator, element set
+  epoch, fetch time) is the recorded CelesTrak capture in
+  orbit-core/src/test/resources/celestrak/gp-catnr-57036.json. Object 99999 in the no catalog entry
+  example is illustrative.
+
   The passes panel does not follow the page clock. Its main view is the docs/api/rest.md section 10
   example: the recorded ISS element set (epoch 2026-09-27T04:10:50.460096) and a request at
   2026-09-27T05:00:00Z. The first row is the REST example; the other three rows and the clipped
@@ -396,6 +403,84 @@ textarea, input[type="text"], input[type="password"] {
 textarea { min-height: 72px; resize: vertical; }
 textarea::placeholder, input::placeholder { color: var(--text-muted); }
 
+/* Alert views: links, New badge, kind filter, Load older, held alerts */
+a.title-link { color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px; scroll-margin-block: var(--space-2); }
+a.title-link:hover { color: var(--accent-hover); }
+.badge.new { color: var(--accent); border: 1px solid var(--accent); }
+.badge.new .icon { width: 8px; height: 8px; }
+.alert-badges { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.alert-item.is-new.approach, .alert-item.is-new.plain { border-left-color: var(--border-strong); }
+
+.kind-filter { border: 0; margin: 0; padding: 0; min-width: 0; }
+.kind-filter legend { padding: 0; margin-bottom: var(--space-2); }
+.kind-options { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.kind-option {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--duration-instant) var(--ease-standard);
+}
+.kind-option input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+.kind-option .icon { display: none; width: 14px; height: 14px; }
+.kind-option:hover { background: var(--surface-3); }
+.kind-option:has(input:checked) { background: var(--surface-3); color: var(--text-primary); border-color: var(--accent-active); }
+.kind-option:has(input:checked) .icon { display: inline-block; }
+.kind-option:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.list-end { display: grid; gap: var(--space-2); justify-items: start; }
+.list-end-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+
+.held-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+
+/* Routed pages: alert detail and one object's close approaches */
+.route-frame { border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+.route-bar { padding: var(--space-3) var(--space-5) 0; }
+.back-link { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 32px; }
+.back-link::before {
+  content: "";
+  flex: none;
+  width: 6px; height: 6px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  margin-left: var(--space-1);
+}
+.route-page {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-5);
+  max-width: 800px;
+  padding: var(--space-4) var(--space-5) var(--space-6);
+}
+.page-head { display: grid; gap: var(--space-2); }
+.page-title { margin: 0; font-size: 28px; line-height: 36px; font-weight: 600; overflow-wrap: anywhere; }
+.detail-facts { display: grid; grid-template-columns: minmax(144px, max-content) minmax(0, 1fr); gap: var(--space-2) var(--space-4); margin: 0; }
+.detail-facts dt { color: var(--text-muted); font-size: 12px; line-height: 22px; }
+.detail-facts dd { margin: 0; color: var(--text-primary); min-width: 0; }
+.detail-facts dd .sub { display: block; color: var(--text-muted); font-size: 12px; line-height: 16px; }
+.event-id { overflow-wrap: anywhere; }
+.slot-reserved {
+  display: grid; gap: var(--space-1);
+  min-height: 48px;
+  padding: var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+}
+.state-block { display: grid; gap: var(--space-3); justify-items: start; }
+.panel-title { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; }
+.alert-item .alert-title { margin: 0; font-size: 14px; line-height: 22px; font-weight: 500; }
+
 /* Footer */
 .app-footer {
   max-width: 1440px;
@@ -424,6 +509,11 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
   .brand h1 { font-size: 22px; line-height: 30px; }
   .scales { grid-template-columns: minmax(0, 1fr); }
   .gallery, .app-footer { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .route-bar { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .route-page { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .page-title { font-size: 22px; line-height: 30px; }
+  .detail-facts { grid-template-columns: minmax(0, 1fr); gap: 0 var(--space-4); }
+  .detail-facts dd + dt { margin-top: var(--space-2); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -451,6 +541,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
   <symbol id="i-check" viewBox="0 0 16 16"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-clipped" viewBox="0 0 16 16"><path d="M5 1.75v12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 3.5a4.5 4.5 0 0 1 0 9" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
   <symbol id="i-open" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-new" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" fill="currentColor"/></symbol>
 </svg>
 
 <a class="skip-link" href="#main">Skip to space weather</a>
@@ -579,8 +670,8 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           </thead>
           <tbody>
             <tr>
-              <td>OBJECT AJ<span class="sub mono">57036, elements 1.6 d old</span></td>
-              <td>SL-12 DEB<span class="sub mono">27958, elements 4.2 d old</span></td>
+              <td><a href="/objects/57036/alerts">OBJECT AJ</a><span class="sub mono">57036, elements 1.6 d old</span></td>
+              <td><a href="/objects/27958/alerts">SL-12 DEB</a><span class="sub mono">27958, elements 4.2 d old</span></td>
               <td><time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></td>
               <td class="num"><span class="num">2 km</span></td>
               <td class="num"><span class="num">15.7 km/s</span></td>
@@ -638,7 +729,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
 
       <div class="pass-object">
         <div class="subhead">
-          <h3 id="passes-25544">ISS (ZARYA) <span class="mono">25544</span></h3>
+          <h3 id="passes-25544"><a href="/objects/25544/alerts">ISS (ZARYA)</a> <span class="mono">25544</span></h3>
           <span class="caption">4 passes</span>
         </div>
         <p class="caption">Element set epoch <time datetime="2026-09-27T04:10:50.460Z">2026-09-27 04:10:50 UTC</time>, 0.5 to 0.9 d old at the peaks.</p>
@@ -692,15 +783,26 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
 
   <aside id="alerts" class="panel alerts" aria-labelledby="alerts-title" tabindex="-1">
     <h2 id="alerts-title" class="section-title">Recent alerts</h2>
+    <fieldset class="kind-filter">
+      <legend class="label">Show</legend>
+      <div class="kind-options">
+        <label class="kind-option"><input type="radio" name="kind" value="" checked><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>All</label>
+        <label class="kind-option"><input type="radio" name="kind" value="close_approach"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Close approaches</label>
+        <label class="kind-option"><input type="radio" name="kind" value="space_weather_level"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Space weather</label>
+      </div>
+    </fieldset>
     <p class="visually-hidden" role="status"></p>
     <ol class="alert-list">
 
       <li class="alert-item is-new l1">
         <div class="alert-top">
-          <span class="badge solid l1"><svg class="icon" aria-hidden="true"><use href="#i-l1"/></svg>R1 Minor</span>
-          <span class="caption">New, received <time datetime="2026-09-29T17:58:00Z">17:58 UTC</time></span>
+          <span class="alert-badges">
+            <span class="badge solid l1"><svg class="icon" aria-hidden="true"><use href="#i-l1"/></svg>R1 Minor</span>
+            <span class="badge new"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg>New</span>
+          </span>
+          <span class="caption">Received <time datetime="2026-09-29T17:58:00Z">17:58 UTC</time></span>
         </div>
-        <h3>R1 level from GOES-18 X-ray flux 1.06e-5 W m<sup>&minus;2</sup> (class M1.0) at <time datetime="2026-09-29T17:52:00Z">17:52 UTC</time></h3>
+        <h3><a class="title-link" href="/alerts/space_weather_level%2F1%2FR%2F18%2F2026-09-29T17%3A52%3A00Z%2F2026-09-29T17%3A57%3A41Z">R1 level from GOES-18 X-ray flux 1.06e-5 W m<sup>&minus;2</sup> (class M1.0) at <time datetime="2026-09-29T17:52:00Z">17:52 UTC</time></a></h3>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
         <div class="ack-actions">
           <button class="btn btn-primary" type="button">Acknowledge</button>
@@ -721,7 +823,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <span class="badge approach"><svg class="icon" aria-hidden="true"><use href="#i-approach"/></svg>Close approach</span>
           <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
         </div>
-        <h3>OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></h3>
+        <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">06:02 UTC</time> by operator</p>
         <p class="ack-note">Reviewed; element ages 1.6 and 4.2 days.</p>
         <div class="ack-actions">
@@ -734,7 +836,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <span class="badge outline l1"><svg class="icon" aria-hidden="true"><use href="#i-l1"/></svg>R1 Minor</span>
           <span class="caption">Received <time datetime="2026-09-29T16:47:00Z">16:47 UTC</time></span>
         </div>
-        <h3>R1 level from GOES-18 X-ray flux 1.21e-5 W m<sup>&minus;2</sup> (class M1.2) at <time datetime="2026-09-29T16:41:00Z">16:41 UTC</time></h3>
+        <h3><a class="title-link" href="/alerts/space_weather_level%2F1%2FR%2F18%2F2026-09-29T16%3A41%3A00Z%2F2026-09-29T16%3A46%3A40Z">R1 level from GOES-18 X-ray flux 1.21e-5 W m<sup>&minus;2</sup> (class M1.2) at <time datetime="2026-09-29T16:41:00Z">16:41 UTC</time></a></h3>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Unacknowledged <time datetime="2026-09-29T16:59:00Z">16:59 UTC</time> by operator</p>
         <div class="ack-actions">
           <button class="btn btn-primary" type="button">Acknowledge</button>
@@ -742,6 +844,14 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
       </li>
 
     </ol>
+    <div class="list-end">
+      <div class="list-end-row">
+        <span class="caption">3 shown, newest first</span>
+        <button class="btn btn-secondary" type="button">Load older</button>
+      </div>
+      <p class="secondary" role="status"></p>
+    </div>
+    <div class="visually-hidden" role="log" aria-live="polite" aria-label="New alerts"></div>
   </aside>
 
 </div>
@@ -882,12 +992,12 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
     <figure>
       <div class="alert-item">
         <div class="alert-top">
-          <span class="badge nodata"><svg class="icon" aria-hidden="true"><use href="#i-nodata"/></svg>Ended</span>
+          <span class="badge nodata"><svg class="icon" aria-hidden="true"><use href="#i-nodata"/></svg>No longer primary</span>
           <span class="caption">Received <time datetime="2026-09-28T23:08:00Z">2026-09-28 23:08 UTC</time></span>
         </div>
-        <h3>GOES-19 X-ray flux is no longer SWPC's primary series; GOES-18 took over. Newest GOES-19 record at <time datetime="2026-09-28T23:02:00Z">2026-09-28 23:02</time> UTC, last level R1.</h3>
+        <h3><a class="title-link" href="/alerts/space_weather_level%2F1%2FR%2F19%2Fended%2F18%2F2026-09-28T23%3A02%3A00Z">GOES-19 X-ray flux is no longer SWPC's primary series; GOES-18 took over. Newest GOES-19 record at <time datetime="2026-09-28T23:02:00Z">2026-09-28 23:02</time> UTC, last level R1.</a></h3>
       </div>
-      <figcaption>An ended series: the no data treatment and icon with the text Ended. The last clause is left out when the series was not at a level.</figcaption>
+      <figcaption>An ended series: the no data treatment and icon with the text "No longer primary". The last clause is left out when the series was not at a level.</figcaption>
     </figure>
 
     <figure>
@@ -896,10 +1006,10 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <span class="badge approach"><svg class="icon" aria-hidden="true"><use href="#i-approach"/></svg>Close approach</span>
           <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
         </div>
-        <h3>OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></h3>
+        <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">06:02 UTC</time></p>
       </div>
-      <figcaption>Anonymous view of an alert: the acknowledgement state and time only. No note, no name, no controls.</figcaption>
+      <figcaption>Anonymous view of an alert: the acknowledgement state and time only. No note, no name, and no control other than the title link to the alert's own page.</figcaption>
     </figure>
 
     <figure>
@@ -1075,6 +1185,372 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
         </div>
       </div>
       <figcaption>A refresh that failed while passes were on screen. The tables from the last answer that succeeded stay, and the status line says they are for the 24 hours from that answer's window start. When the answer's window start cannot be read, the line reads "Passes could not be refreshed. The passes shown are from the last answer that succeeded." Sample state; the times are the main view's.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="alert-item is-new approach">
+        <div class="alert-top">
+          <span class="alert-badges">
+            <span class="badge approach"><svg class="icon" aria-hidden="true"><use href="#i-approach"/></svg>Close approach</span>
+            <span class="badge new"><svg class="icon" aria-hidden="true"><use href="#i-new"/></svg>New</span>
+          </span>
+          <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
+        </div>
+        <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
+        <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
+      </div>
+      <figcaption>New badge. An item that joined the list while the page was open, from a live notice or from a refresh that listed it above the previous newest, carries the word badge "New" next to its kind badge and a 2 px left border: its alert color for a level, <span class="mono">border-strong</span> for a close approach, a level that was left, no data and ended. Items listed by the first answer are never New, with one exception: alerts that arrived while another page was shown, and that match the filter, are marked New for 10 minutes when the console is shown again, and the New alerts log sums them up once, naming what the list holds under its filter: "1 alert arrived while you were away." or "{N} alerts arrived while you were away." under All, "1 close approach arrived while you were away." or "{N} space weather alerts arrived while you were away." under a kind. When the count can be short it reads "{N} or more alerts arrived while you were away.": a refresh while away could not count everything it added, the console comes back under another kind than the one kind it was left under, or more than 20 alerts of a kind the list shows arrived, since only the newest page of each kind is kept. Nothing is logged while another page is shown. The badge and the border clear together 10 minutes after the item joined the list or was marked on return, and marks made before leaving the console do not come back. They do not animate beyond the border fade, and they are not announced: the New alerts log already spoke the item.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="panel alerts">
+        <h3 class="section-title">Recent alerts</h3>
+        <fieldset class="kind-filter">
+          <legend class="label">Show</legend>
+          <div class="kind-options">
+            <label class="kind-option"><input type="radio" name="kind-g1" value=""><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>All</label>
+            <label class="kind-option"><input type="radio" name="kind-g1" value="close_approach" checked><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Close approaches</label>
+            <label class="kind-option"><input type="radio" name="kind-g1" value="space_weather_level"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Space weather</label>
+          </div>
+        </fieldset>
+        <p role="status" class="secondary">Loading close approaches.</p>
+      </div>
+      <div class="panel alerts">
+        <h3 class="section-title">Recent alerts</h3>
+        <p class="caption">Filter set to Close approaches. The visually hidden status line reads "No close approaches are stored yet."</p>
+        <p role="status" class="visually-hidden">No close approaches are stored yet.</p>
+        <div class="empty">
+          <strong>No close approaches are stored yet.</strong>
+          <p class="secondary">A close approach is listed when a screening run finds a searched pair within its report distance. Only searched pairs are covered, so an empty list does not mean nothing came close.</p>
+        </div>
+      </div>
+      <div class="panel alerts">
+        <h3 class="section-title">Recent alerts</h3>
+        <p class="caption">Filter set to Space weather, with older ones stored. The visually hidden status line reads "20 space weather alerts shown, newest first. Older ones can be loaded."; the list itself is left out here.</p>
+        <p role="status" class="visually-hidden">20 space weather alerts shown, newest first. Older ones can be loaded.</p>
+      </div>
+      <div class="panel alerts">
+        <h3 class="section-title">Recent alerts</h3>
+        <p class="caption">Filter set to Space weather, with none stored.</p>
+        <div class="empty">
+          <strong>No space weather alerts are stored yet.</strong>
+          <p class="secondary">Each change into, between or out of a derived space weather level is listed here newest first. Changes between none and no data are not listed; the space weather panels show the current state.</p>
+        </div>
+      </div>
+      <figcaption>Filter by kind: All, Close approaches, Space weather, as native radio buttons in a fieldset whose legend is "Show". Each option is its own 32 px target; the selected one takes the <span class="mono">surface-3</span> fill, an <span class="mono">accent-active</span> outline and a check mark, so the selection never rests on color. Arrow keys move between options as with any radio group. Choosing an option replaces the list with the first page of that kind: while no list is shown the panel's status line is visible and reads "Loading close approaches." ("Loading recent alerts." for All, "Loading space weather alerts." for Space weather). Once the first page for the new filter is drawn, the same status line gives the result, visually hidden since the list or its empty state already shows it, so a listener hears it without moving focus: the end line's own words when the whole stored list is shown ("All 7 stored close approaches are shown, newest first.", "The one stored close approach is shown."), "{n} {kind} shown, newest first. Older ones can be loaded." while older ones exist, or the empty state's lead ("No close approaches are stored yet."). It is emptied without a word as soon as the list shown changes (a live notice or a refresh adds an alert, Load older adds a page, or the filter changes again), so it never stays behind as a count that is no longer true, and a repeated result is spoken again; the end line itself is not live, since Load older and live notices change it too. The first list the panel shows is not a filter change and leaves the line empty. A failed load reads "Close approaches could not be loaded. The page tries again at the next refresh." ("... when updates resume." while updates are paused). With a filter set, only matching live notices join the list and are announced, and the summaries for alerts that arrived while updates were paused or while another page was shown count only matching alerts and name what the list holds: "1 close approach arrived while paused.", "{N} space weather alerts arrived while you were away.", "{N} alerts arrived while paused." under All, and "{N} or more close approaches arrived while paused." when the refresh after the pause could not count them all. The two empty states replace "No alerts are stored yet." under their filter; reached by a filter change, each also has its lead in the visually hidden status line, as in the Close approaches sample. The "Filter set to" captions here only label the samples.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="panel">
+        <div class="list-end">
+          <div class="list-end-row">
+            <span class="caption">20 shown, newest first</span>
+            <button class="btn btn-secondary" type="button" aria-disabled="true">Load older</button>
+          </div>
+          <p class="secondary" role="status">Loading older alerts.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="list-end">
+          <div class="list-end-row">
+            <span class="caption">40 shown, newest first</span>
+            <button class="btn btn-secondary" type="button">Load older</button>
+          </div>
+          <p class="secondary" role="status">20 older alerts loaded.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="list-end">
+          <div class="list-end-row">
+            <span class="caption">20 shown, newest first</span>
+            <button class="btn btn-secondary" type="button">Load older</button>
+          </div>
+          <p class="secondary" role="status">Older alerts could not be loaded. Use Load older to try again.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="list-end">
+          <p class="caption" tabindex="-1">All 43 stored alerts are shown, newest first.</p>
+          <p class="secondary" role="status">3 older alerts loaded. No older alerts are stored.</p>
+        </div>
+      </div>
+      <figcaption>Load older, at the end of the list: loading (the button keeps its label and is disabled with <span class="mono">aria-disabled</span>, and further presses send nothing), loaded, failed, and no more. It asks for the page after the oldest item shown, works while updates are paused, and adds the page below the last item. Focus stays on the button while older alerts remain; when a press reaches the end the button is removed and focus moves to the title link of the first item that press added, or to the end line when it added none. Once an older page is loaded the list is never trimmed; live notices still join at the top. Changing the filter goes back to the first page. The end line names the kind: "alerts", "close approaches" or "space weather alerts", and "The one stored close approach is shown." for a single item. The loaded lines name it too: "20 older close approaches loaded.", "1 older space weather alert loaded.", "No older close approaches are stored.", and so do the loading and failed lines: "Loading older close approaches.", "Older space weather alerts could not be loaded. Use Load older to try again." (the samples here are under All). The status line under it is persistent and polite, and empties when a new request goes out so a repeated result is spoken again.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="panel alerts">
+        <h3 class="section-title">Recent alerts</h3>
+        <div class="held-bar">
+          <span>2 new alerts are waiting. They join the list when focus leaves it.</span>
+          <button class="btn btn-secondary" type="button">Show new alerts</button>
+        </div>
+        <ol class="alert-list">
+          <li class="alert-item">
+            <div class="alert-top">
+              <span class="badge outline l1"><svg class="icon" aria-hidden="true"><use href="#i-l1"/></svg>R1 Minor</span>
+              <span class="caption">Received <time datetime="2026-09-29T16:47:00Z">16:47 UTC</time></span>
+            </div>
+            <h3><a class="title-link" href="/alerts/space_weather_level%2F1%2FR%2F18%2F2026-09-29T16%3A41%3A00Z%2F2026-09-29T16%3A46%3A40Z">R1 level from GOES-18 X-ray flux 1.21e-5 W m<sup>&minus;2</sup> (class M1.2) at <time datetime="2026-09-29T16:41:00Z">16:41 UTC</time></a></h3>
+          </li>
+        </ol>
+      </div>
+      <figcaption>New alerts held while focus is inside the list or an item's form is open. The list does not trim or reorder; a bar above the list counts what is waiting ("1 new alert is waiting. It joins the list when focus leaves it." for one). Show new alerts adds them at once and moves focus to the first one's title link; pressing it with the mouse does not end the hold first. The bar is not a live region: each held alert is still spoken once through the New alerts log, worded for what is true while the list is held, "New alert waiting above the list, {rest of its sentence}" for one and "{N} new alerts waiting above the list. The top one, {rest of its sentence}" for several, never as if it were already at the top of the list. An entry while others already wait gives the total the bar shows: "{k} more new alerts waiting above the list, {N} in all. The top one, {rest of its sentence}", or "1 more new alert waiting above the list, {N} in all. The new one, {rest of its sentence}" for one. A level that was left keeps its own lead, so it reads "New alert waiting above the list. Below G1: {rest of its sentence}" or "1 more new alert waiting above the list, {N} in all. The new one. Below G1: {rest of its sentence}". Alerts listed within 2 s of the first one waiting to be spoken are spoken together; when some of them joined the list before the hold began and the rest wait in the bar, the log adds two entries, the listed ones first in their usual words ("New alert, {rest of its sentence}" or "{N} new alerts. Top of the list, {rest of its sentence}"), then the waiting ones as above. When the bar appears while focus is on an item below it, the window scrolls by the height the bar added, so the focused item stays where it was on screen. The bar goes away when the held alerts join.</figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<section class="gallery" aria-labelledby="pages-title">
+  <h2 id="pages-title">Alert pages</h2>
+  <p class="secondary">Two pages of their own: one alert at <span class="mono">/alerts/{event_id}</span>, with the event id percent encoded as one path segment, and one object's close approaches at <span class="mono">/objects/{norad_cat_id}/alerts</span>. Each keeps the console's header and footer; the frames below stand in for a whole browser window. In the app the page title in each frame is the page's only <span class="mono">h1</span>, the content sits in <span class="mono">main</span>, the panel headings are <span class="mono">h2</span>, and the Back to the console bar sits in its own <span class="mono">nav</span> landmark named "Page", just before <span class="mono">main</span>, so no content is outside a landmark (only the first frame carries that <span class="mono">nav</span> here, so the samples do not repeat one landmark name); on these pages the header shows the name SpaceFlux as plain text, not as a heading.</p>
+
+  <div class="gallery-grid" style="margin-top: var(--space-4); grid-template-columns: minmax(0, 1fr);">
+
+    <!-- Alert detail, close approach. Anonymous view. -->
+    <figure>
+      <div class="route-frame">
+        <div class="app-header">
+          <div class="brand"><p style="font-size: 28px; line-height: 36px; font-weight: 600;">SpaceFlux</p><span class="view-name">Operator console</span></div>
+          <p class="live"><span class="live-dot" aria-hidden="true" style="animation: none;"></span><span>Live</span><time datetime="2026-09-29T18:00:00Z">18:00:00 UTC</time></p>
+          <button class="btn btn-secondary" type="button">Pause updates</button>
+          <div class="session"><p class="who">Not signed in, read only</p></div>
+        </div>
+        <nav class="route-bar" aria-label="Page"><a class="back-link" href="/">Back to the console</a></nav>
+        <div class="route-page">
+          <div class="page-head">
+            <div class="badge-row"><span class="badge approach"><svg class="icon" aria-hidden="true"><use href="#i-approach"/></svg>Close approach</span></div>
+            <h3 class="page-title">OBJECT AJ and SL-12 DEB</h3>
+            <p>Miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time>, relative speed 15.7 km/s.</p>
+            <p class="caption">Two public element sets propagated with SGP4 that come within the report distance of the screening run that found them. Not a collision probability or a conjunction assessment; distances carry an uncertainty of kilometres.</p>
+          </div>
+
+          <div class="panel">
+            <h4 class="panel-title">Acknowledgement</h4>
+            <p class="ack-state" style="margin-top: var(--space-3);"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">2026-09-29 06:02 UTC</time></p>
+            <!-- Design marker only: the acknowledge action and its note are designed with sign in and are not built yet. -->
+            <div class="slot-reserved" style="margin-top: var(--space-3);">
+              <span class="label">Reserved</span>
+              <span class="caption">Acknowledge or Unacknowledge, with an optional note, for the signed in operator.</span>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h4 class="panel-title" style="margin-bottom: var(--space-3);">Close approach</h4>
+            <dl class="detail-facts">
+              <dt>Closest approach</dt><dd><time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></dd>
+              <dt>Miss distance</dt><dd><span class="num">2 km</span></dd>
+              <dt>Relative speed</dt><dd><span class="num">15.7 km/s</span></dd>
+              <dt>Watchlist object</dt><dd><a href="/objects/57036/alerts">OBJECT AJ</a><span class="sub mono">57036, elements 1.6 d old</span></dd>
+              <dt>Other object</dt><dd><a href="/objects/27958/alerts">SL-12 DEB</a><span class="sub mono">27958, elements 4.2 d old</span></dd>
+              <dt>Screening run</dt><dd><span class="mono">2026-09-29T05:20:09Z/1</span><span class="sub">Window <time datetime="2026-09-29T05:20:09Z">2026-09-29 05:20:09</time> to <time datetime="2026-10-06T05:20:09Z">2026-10-06 05:20:09 UTC</time></span></dd>
+            </dl>
+          </div>
+
+          <div class="panel">
+            <h4 class="panel-title" style="margin-bottom: var(--space-3);">Record</h4>
+            <dl class="detail-facts">
+              <dt>Event id</dt><dd class="mono event-id">close_approach/1/2026-09-29T05:20:09Z/1/57036/27958/2026-09-30T03:34:37.588Z</dd>
+              <dt>Rules version</dt><dd><span class="num">1</span></dd>
+              <dt>Produced</dt><dd><time datetime="2026-09-29T05:20:41Z">2026-09-29 05:20:41 UTC</time><span class="sub">When the event was published</span></dd>
+              <dt>Received</dt><dd><time datetime="2026-09-29T05:21:00Z">2026-09-29 05:21:00 UTC</time><span class="sub">When the API stored it</span></dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <figcaption>Alert detail for a close approach, anonymous view. Document title: "Close approach, OBJECT AJ and SL-12 DEB, SpaceFlux". An object with no catalog name is "Object 57036" where it starts a heading or a title and "object 57036" in the middle of one: page title "Object 57036 and object 27958", document title "Close approach, object 57036 and object 27958, SpaceFlux", and in the list "Object 57036 and object 27958, miss distance 2 km at 2026-09-30 03:34:37 UTC" or "OBJECT AJ (57036) and object 27958, ...", where only a catalog name takes the number in brackets. The New alerts log keeps the list title as it is: "New alert, close approach: Object 57036 and object 27958, ...". In the Watchlist object and Other object rows the name stands alone, so it reads "Object 57036". Both object names link to that object's close approaches. The dashed box marks where the acknowledge action goes once sign in exists; it is a design marker and is not built. A signed in operator also sees "by {principal}" and the note under the state, as in the list. Times on this page always carry their date. A field the alert does not have leaves its row out; no row reads "null".</figcaption>
+    </figure>
+
+    <!-- Alert detail, space weather level. -->
+    <figure>
+      <div class="route-frame">
+        <div class="route-bar"><a class="back-link" href="/">Back to the console</a></div>
+        <div class="route-page">
+          <div class="page-head">
+            <div class="badge-row"><span class="badge outline l1"><svg class="icon" aria-hidden="true"><use href="#i-l1"/></svg>R1 Minor</span></div>
+            <h3 class="page-title">R1 level, GOES-18 X-ray flux</h3>
+            <p>R1 level from GOES-18 X-ray flux 1.06e-5 W m<sup>&minus;2</sup> (class M1.0) at <time datetime="2026-09-29T17:52:00Z">2026-09-29 17:52 UTC</time>.</p>
+            <p class="caption">Derived from this one sample; it does not mark the start of an event. Not an issued NOAA scale level.</p>
+          </div>
+
+          <div class="panel">
+            <h4 class="panel-title">Acknowledgement</h4>
+            <p class="ack-state" style="margin-top: var(--space-3);"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
+            <div class="slot-reserved" style="margin-top: var(--space-3);">
+              <span class="label">Reserved</span>
+              <span class="caption">Acknowledge or Unacknowledge, with an optional note, for the signed in operator.</span>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h4 class="panel-title" style="margin-bottom: var(--space-3);">Space weather level</h4>
+            <dl class="detail-facts">
+              <dt>State</dt><dd>Level R1, Minor</dd>
+              <dt>Before</dt><dd>Below R1</dd>
+              <dt>Change</dt><dd>State change</dd>
+              <dt>Measurement</dt><dd>GOES-18 X-ray flux 0.1-0.8nm</dd>
+              <dt>Value</dt><dd><span class="num">1.06e-5</span> W m<sup>&minus;2</sup>, class M1.0</dd>
+              <dt>Sample</dt><dd><time datetime="2026-09-29T17:52:00Z">2026-09-29 17:52 UTC</time><span class="sub">1 minute average</span></dd>
+              <dt>Newest record</dt><dd><time datetime="2026-09-29T17:52:00Z">2026-09-29 17:52 UTC</time><span class="sub">The newest record of this series when the event was published</span></dd>
+              <dt>Source</dt><dd><span class="mono">swpc.goes.xrays</span><span class="sub mono event-id">https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json</span><span class="sub">Fetched <time datetime="2026-09-29T17:57:41Z">2026-09-29 17:57:41 UTC</time></span></dd>
+            </dl>
+          </div>
+
+          <div class="panel">
+            <h4 class="panel-title" style="margin-bottom: var(--space-3);">Record</h4>
+            <dl class="detail-facts">
+              <dt>Event id</dt><dd class="mono event-id">space_weather_level/1/R/18/2026-09-29T17:52:00Z/2026-09-29T17:57:41Z</dd>
+              <dt>Rules version</dt><dd><span class="num">1</span></dd>
+              <dt>Produced</dt><dd><time datetime="2026-09-29T17:57:52Z">2026-09-29 17:57:52 UTC</time><span class="sub">When the event was published</span></dd>
+              <dt>Received</dt><dd><time datetime="2026-09-29T17:58:00Z">2026-09-29 17:58:00 UTC</time><span class="sub">When the API stored it</span></dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <figcaption>Alert detail for a space weather level (header and footer as above). Document title: "R1 level, GOES-18 X-ray flux, SpaceFlux". The page title follows the state: "{label} level, {measurement}", "Below {scale}1, {measurement}", "No data, {measurement}", "No longer primary, {measurement}" for an ended series, and "Restated as no data, {measurement}" for a restatement. A restatement's sentence reads "The {measurement} sample at {time} UTC, published as below {scale}1, is restated as no data."; every other event uses its list title, with dates. The rows depend on the event; each appears only when its field is set. State: "Level {code}, {NOAA name}", "Below {scale}1", "No data" or "No longer SWPC's primary series"; a level whose number is missing reads "Level {scale}, level number missing" and one outside 1 to 5 reads "Level {code}, outside the NOAA scale's 1 to 5", never a guessed name. Before: the previous state in the same words, left out when no earlier state was held. Change: "State change", "Revised Kp value", "Restated as no data" or "Refresh, same state" (a refresh, which the list never shows); when no earlier state was held it carries the sub line "No earlier state was held, for example after a restart." Measurement: the measurement in words. Value: the value with its unit, and the X-ray class when there is one. Sample, with its averaging period, for R and S; Interval ("{start} to {end} UTC, 3 hours") for G, which also gets the row Estimated: "SWPC calls Kp estimated; a later value can revise this interval." Newest record: the series' newest record time. For no data: Reason (the same short reasons as the scale panels) and No data since. For a restatement: Restated because of "the zero run starting {time} UTC", and no No data since row. For ended: Taken over by "GOES-{n}". For a timer refresh: Timer tick. Source: the product, the source address as plain text (never a link, since it comes from the event), and when it was fetched. Badge, title and sentence are the ones the list uses, so a level badge takes its outline form here too.</figcaption>
+    </figure>
+
+    <!-- Alert detail states. -->
+    <figure>
+      <div class="route-frame">
+        <div class="route-bar"><a class="back-link" href="/">Back to the console</a></div>
+        <div class="route-page">
+          <div class="page-head">
+            <h3 class="page-title">Alert</h3>
+            <p role="status" class="secondary">Loading the alert.</p>
+          </div>
+        </div>
+      </div>
+      <div class="route-frame">
+        <div class="route-bar"><a class="back-link" href="/">Back to the console</a></div>
+        <div class="route-page">
+          <div class="page-head state-block">
+            <h3 class="page-title">Alert</h3>
+            <p role="status" class="secondary">The alert could not be loaded.</p>
+            <button class="btn btn-secondary" type="button">Try again</button>
+          </div>
+        </div>
+      </div>
+      <div class="route-frame">
+        <div class="route-bar"><a class="back-link" href="/">Back to the console</a></div>
+        <div class="route-page">
+          <div class="page-head">
+            <h3 class="page-title">Alert not found</h3>
+            <p class="secondary">No alert with this event id is stored.</p>
+            <dl class="detail-facts" style="margin-top: var(--space-2);">
+              <dt>Event id</dt><dd class="mono event-id">space_weather_level/1/R/18/2026-09-29T17:52:00Z/2026-09-29T17:57:42Z</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <div class="route-frame">
+        <div class="route-bar"><a class="back-link" href="/">Back to the console</a></div>
+        <div class="route-page">
+          <div class="page-head">
+            <h3 class="page-title">Not an event id</h3>
+            <p class="secondary">This address does not hold an event id the API accepts: it is empty or longer than 512 characters.</p>
+          </div>
+        </div>
+      </div>
+      <figcaption>Alert detail states: loading, failed (Try again repeats the request, with the status line emptied while it is out), not found (the field is null), and an id the API refuses. The page loads once on entry; it is not refreshed by the one minute poll, so it never changes under the reader. Document titles: "Alert, SpaceFlux" while loading or failed, "Alert not found, SpaceFlux", "Not an event id, SpaceFlux". The event id is shown as text exactly as decoded from the address. A screening run stored under an event id shows its badge-free title "Screening run {run_id}", the Record panel, and the line "Screening runs are shown on the console's latest screening run panel." with no acknowledgement panel, since a run cannot be acknowledged.</figcaption>
+    </figure>
+
+    <!-- One object's close approaches. -->
+    <figure>
+      <div class="route-frame">
+        <div class="route-bar"><a class="back-link" href="/">Back to the console</a></div>
+        <div class="route-page">
+          <div class="page-head">
+            <h3 class="page-title">Close approaches of OBJECT AJ</h3>
+            <p class="caption">Catalog number <span class="mono">57036</span>. Listed whether it was the watchlist object or the other object, newest first.</p>
+          </div>
+
+          <div class="panel">
+            <h4 class="panel-title" style="margin-bottom: var(--space-3);">Catalog entry</h4>
+            <dl class="detail-facts">
+              <dt>Name</dt><dd>OBJECT AJ</dd>
+              <dt>International designator</dt><dd class="mono">2023-085AJ</dd>
+              <dt>Newest element set</dt><dd>Epoch <time datetime="2026-09-28T14:10:20.740Z">2026-09-28 14:10:20 UTC</time><span class="sub">Last fetched <time datetime="2026-09-29T05:20:09Z">2026-09-29 05:20:09 UTC</time></span></dd>
+            </dl>
+            <p class="caption" style="margin-top: var(--space-3);">This is the newest element set seen for the object, not necessarily the one a screening run used.</p>
+          </div>
+
+          <section class="panel alerts" aria-label="Close approaches, object page example">
+            <h4 class="panel-title">Close approaches</h4>
+            <p class="caption">Two public element sets propagated with SGP4 that come within the report distance of the screening run that found them. Not a collision probability or a conjunction assessment; distances carry an uncertainty of kilometres.</p>
+            <p class="visually-hidden" role="status"></p>
+            <ol class="alert-list">
+              <li class="alert-item">
+                <div class="alert-top">
+                  <span class="badge approach"><svg class="icon" aria-hidden="true"><use href="#i-approach"/></svg>Close approach</span>
+                  <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
+                </div>
+                <h5 class="alert-title"><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h5>
+                <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">06:02 UTC</time></p>
+              </li>
+            </ol>
+            <div class="list-end">
+              <p class="caption">The one stored close approach is shown.</p>
+              <p class="secondary" role="status"></p>
+            </div>
+          </section>
+        </div>
+      </div>
+      <figcaption>One object's close approaches. Document title: "Close approaches of OBJECT AJ (57036), SpaceFlux". With no catalog name, "object 57036", in lower case since it always sits mid sentence, stands in for it: "Close approaches of object 57036" as the page title and the document title, and "No close approaches of object 57036 are stored." The catalog entry comes from the same answer. The note above the list does not name a distance, since an alert does not carry its run's report distance; the console's screening panel names it. Items are the list items of the console, without the New badge, since this page loads once on entry and takes no live notices; Load older works as on the console, 20 at a time, and its lines say "close approaches". The section's accessible name in this sample is "Close approaches, object page example", so it does not repeat the name of the screening panel's "Close approaches" table region in this file; in the app the section is named by its "Close approaches" heading, which is unique there.</figcaption>
+    </figure>
+
+    <!-- Object page states. -->
+    <figure>
+      <div class="route-frame">
+        <div class="route-bar"><a class="back-link" href="/">Back to the console</a></div>
+        <div class="route-page">
+          <div class="page-head">
+            <h3 class="page-title">Object 57036</h3>
+            <p role="status" class="secondary">Loading object 57036.</p>
+          </div>
+        </div>
+      </div>
+      <div class="route-frame">
+        <div class="route-bar"><a class="back-link" href="/">Back to the console</a></div>
+        <div class="route-page">
+          <div class="page-head state-block">
+            <h3 class="page-title">Object 57036</h3>
+            <p role="status" class="secondary">Object 57036 could not be loaded.</p>
+            <button class="btn btn-secondary" type="button">Try again</button>
+          </div>
+        </div>
+      </div>
+      <div class="route-frame">
+        <div class="route-bar"><a class="back-link" href="/">Back to the console</a></div>
+        <div class="route-page">
+          <div class="page-head">
+            <h3 class="page-title">No catalog entry for object 99999</h3>
+            <p class="secondary">Object 99999 has no catalog entry, so this page cannot list its close approaches. Any that are stored still appear in the console's recent alerts.</p>
+          </div>
+        </div>
+      </div>
+      <div class="route-frame">
+        <div class="route-bar"><a class="back-link" href="/">Back to the console</a></div>
+        <div class="route-page">
+          <div class="page-head">
+            <h3 class="page-title">Not a catalog number</h3>
+            <p class="secondary">A catalog number is a whole number from 0 to 999999999.</p>
+          </div>
+        </div>
+      </div>
+      <div class="route-frame">
+        <div class="route-bar"><a class="back-link" href="/">Back to the console</a></div>
+        <div class="route-page">
+          <div class="page-head">
+            <h3 class="page-title">Close approaches of ISS (ZARYA)</h3>
+            <p class="caption">Catalog number <span class="mono">25544</span>. Listed whether it was the watchlist object or the other object, newest first.</p>
+          </div>
+          <div class="empty">
+            <strong>No close approaches of ISS (ZARYA) are stored.</strong>
+            <p class="secondary">Close approaches are stored only for pairs a screening run searched, so an empty list does not mean nothing came close.</p>
+          </div>
+        </div>
+      </div>
+      <figcaption>Object page states: loading, failed (Try again), no catalog entry (the object field is null), an address that is not a catalog number, and no stored close approaches (the catalog entry panel still shows above the empty state; left out here). A missing catalog row does not mean the object does not exist or has no close approaches: the page cannot list them without the row, and any that are stored still appear in recent alerts, so it never reads as "not found" or as no alerts. Document titles follow the page title: "Object 57036, SpaceFlux", "No catalog entry for object 99999, SpaceFlux", "Not a catalog number, SpaceFlux".</figcaption>
     </figure>
 
   </div>
