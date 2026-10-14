@@ -15,8 +15,8 @@ type Query {
   screening_current: ScreeningCurrent
   "One alert by its event_id, or null when it is not stored (REST section 4)."
   alert(event_id: String!): Alert
-  "Close approaches, and space weather events that enter, change or leave a level, newest first."
-  alerts(limit: Int, after: String): AlertPage!
+  "Close approaches, and space weather events that enter, change or leave a level, newest first. kind, when given, is close_approach or space_weather_level and keeps only that kind; any other value is an error. A next cursor pages only the kind it was returned under."
+  alerts(limit: Int, after: String, kind: String): AlertPage!
   "One catalog object, or null when it is not in the catalog (REST section 5)."
   catalog_object(norad_cat_id: Int!): CatalogObject
   "Every watchlist object, ordered by catalog number (REST section 6)."

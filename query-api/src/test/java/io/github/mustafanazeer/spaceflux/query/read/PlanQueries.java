@@ -18,6 +18,10 @@ public final class PlanQueries {
     public static final String RUN_CUT_APPROACHES = ScreeningController.CUT_APPROACHES;
     public static final String ALERTS_RECENT = AlertLists.RECENT;
     public static final String ALERTS_RECENT_AFTER = AlertLists.RECENT_AFTER;
+    public static final String ALERTS_RECENT_CLOSE_APPROACH = AlertLists.RECENT_CLOSE_APPROACH;
+    public static final String ALERTS_RECENT_CLOSE_APPROACH_AFTER = AlertLists.RECENT_CLOSE_APPROACH_AFTER;
+    public static final String ALERTS_RECENT_SPACE_WEATHER = AlertLists.RECENT_SPACE_WEATHER;
+    public static final String ALERTS_RECENT_SPACE_WEATHER_AFTER = AlertLists.RECENT_SPACE_WEATHER_AFTER;
     public static final String OBJECT_APPROACHES = AlertLists.OBJECT_APPROACHES;
     public static final String OBJECT_APPROACHES_AFTER = AlertLists.OBJECT_APPROACHES_AFTER;
 

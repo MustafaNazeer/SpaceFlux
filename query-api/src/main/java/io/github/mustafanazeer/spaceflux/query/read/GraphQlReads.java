@@ -90,8 +90,8 @@ class GraphQlReads {
     }
 
     @QueryMapping
-    Map<String, Object> alerts(@Argument Integer limit, @Argument String after) {
-        return lists.recent(limit == null ? 50 : limit, after);
+    Map<String, Object> alerts(@Argument Integer limit, @Argument String after, @Argument String kind) {
+        return lists.recent(limit == null ? 50 : limit, after, kind);
     }
 
     @SchemaMapping(typeName = "CatalogObject", field = "close_approaches")

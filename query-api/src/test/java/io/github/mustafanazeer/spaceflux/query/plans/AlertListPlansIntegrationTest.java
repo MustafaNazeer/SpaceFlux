@@ -77,6 +77,8 @@ class AlertListPlansIntegrationTest {
         List<Long> listed = api.sql(AlertListQueries.RECENT_BY_SCAN).params(Long.MAX_VALUE, Integer.MAX_VALUE)
                 .query((rs, n) -> rs.getLong(1)).list();
         long before = listed.get(listed.size() / 2);
+        long approachBefore = middleOf("close_approach");
+        long levelBefore = middleOf("space_weather_level");
         record Key(LocalDateTime tca, long seq) {
         }
         List<Key> iss = api.sql("SELECT time_of_closest_approach, alert_seq FROM close_approach "
@@ -89,6 +91,7 @@ class AlertListPlansIntegrationTest {
         String ack = "ix_alert_acknowledgement_event";
         String listedIndex = "ix_space_weather_event_listed";
         String[] eventAndAck = {"p ALL none", "e eq_ref PRIMARY", "k eq_ref PRIMARY", "x ref " + ack};
+        String[] oneKindEventAndAck = {"e eq_ref PRIMARY", "k eq_ref PRIMARY", "x ref " + ack};
         // UNION, unlike UNION ALL, removes duplicates through a temporary table of the parts' rows.
         String[] approachesEventAndAck = with(eventAndAck, "<union2,3> ALL none");
         return Stream.of(
@@ -97,6 +100,16 @@ class AlertListPlansIntegrationTest {
                 new Plan("alerts-recent-after", "api", AlertListQueries.RECENT_AFTER,
                         List.of(before, FETCH, before, FETCH, FETCH), true, "alert_seq < " + before,
                         with(eventAndAck, "c range PRIMARY alert_seq", "w range " + listedIndex + " alert_seq")),
+                new Plan("alerts-recent-close-approach", "api", AlertListQueries.RECENT_CLOSE_APPROACH,
+                        List.of(FETCH), false, null, with(oneKindEventAndAck, "c index PRIMARY")),
+                new Plan("alerts-recent-close-approach-after", "api", AlertListQueries.RECENT_CLOSE_APPROACH_AFTER,
+                        List.of(approachBefore, FETCH), false, "alert_seq < " + approachBefore,
+                        with(oneKindEventAndAck, "c range PRIMARY alert_seq")),
+                new Plan("alerts-recent-space-weather", "api", AlertListQueries.RECENT_SPACE_WEATHER,
+                        List.of(FETCH), false, null, with(oneKindEventAndAck, "w ref " + listedIndex)),
+                new Plan("alerts-recent-space-weather-after", "api", AlertListQueries.RECENT_SPACE_WEATHER_AFTER,
+                        List.of(levelBefore, FETCH), false, "alert_seq < " + levelBefore,
+                        with(oneKindEventAndAck, "w range " + listedIndex + " alert_seq")),
                 new Plan("object-approaches", "api", AlertListQueries.OBJECT_APPROACHES,
                         List.of(w, FETCH, w, FETCH, FETCH), true, null,
                         with(approachesEventAndAck, "c ref ix_close_approach_watchlist", "c ref ix_close_approach_other")),
@@ -108,6 +121,14 @@ class AlertListPlansIntegrationTest {
                                 middle.seq(), FETCH, FETCH), true, "time_of_closest_approach <= ",
                         with(approachesEventAndAck, "c range ix_close_approach_watchlist time_of_closest_approach",
                                 "c range ix_close_approach_other time_of_closest_approach")));
+    }
+
+    /** The alert_seq of the middle listed alert of one kind, as the cursor of a later page. */
+    static long middleOf(String kind) {
+        List<Long> seqs = api.sql(AlertListQueries.RECENT_BY_SCAN).params(Long.MAX_VALUE, Integer.MAX_VALUE)
+                .query((rs, n) -> kind.equals(rs.getString(3)) ? rs.getLong(1) : null).list().stream()
+                .filter(java.util.Objects::nonNull).toList();
+        return seqs.get(seqs.size() / 2);
     }
 
     static String[] with(String[] common, String... more) {
@@ -138,11 +159,18 @@ class AlertListPlansIntegrationTest {
         if (plan.bounded() != null) {
             assertThat(tree).as(plan + " range bounds").contains(plan.bounded());
         }
-        // Each UNION part stops at its LIMIT, read backward from its index; only the outer merge sorts.
+        // Each UNION part stops at its LIMIT, read backward from its index; only the outer merge sorts. One kind
+        // alone is read backward from its index in page order, so nothing is sorted.
         assertThat(tree).as(plan + " parts read in index order").contains("(reverse)");
         assertThat(tree).as(plan + " each part stops at its limit").contains("Limit: " + FETCH + " row(s)");
-        assertThat(json).as(plan + " sorts the merged parts").contains("\"using_filesort\": true");
-        assertThat(count(tree, "Sort")).as(plan + " sorts once").isEqualTo(1);
+        if (plan.maySort()) {
+            assertThat(json).as(plan + " sorts the merged parts").contains("\"using_filesort\": true");
+            assertThat(count(tree, "Sort")).as(plan + " sorts once").isEqualTo(1);
+        } else {
+            assertThat(json).as(plan + " sorts nothing").doesNotContain("\"using_filesort\": true");
+            assertThat(count(tree, "Sort")).as(plan + " sorts nothing").isZero();
+            assertThat(count(tree, "Limit: ")).as(plan + " stops once").isEqualTo(1);
+        }
 
         if (Boolean.getBoolean("spaceflux.plans.write")) {
             write(plan, json, tree);
@@ -171,6 +199,33 @@ class AlertListPlansIntegrationTest {
                     .query((rs, n) -> row(rs, 9)).list();
         }
         assertThat(walked).isEqualTo(expected);
+    }
+
+    @Test
+    void eachKindAloneReturnsThePlainScansRowsOfThatKindPageByPage() {
+        List<List<String>> all = api.sql(AlertListQueries.RECENT_BY_SCAN)
+                .params(Long.MAX_VALUE, Integer.MAX_VALUE).query((rs, n) -> row(rs, 9)).list();
+        String[][] kinds = {{"close_approach", AlertListQueries.RECENT_CLOSE_APPROACH,
+            AlertListQueries.RECENT_CLOSE_APPROACH_AFTER}, {"space_weather_level",
+                AlertListQueries.RECENT_SPACE_WEATHER, AlertListQueries.RECENT_SPACE_WEATHER_AFTER}};
+        for (String[] kind : kinds) {
+            List<List<String>> expected = all.stream().filter(r -> kind[0].equals(r.get(2))).toList();
+            assertThat(expected).as(kind[0]).hasSizeGreaterThan(2 * 7);
+            assertThat(expected).as(kind[0] + " some acknowledged").anyMatch(r -> r.get(5) != null);
+
+            int page = 7;
+            List<List<String>> walked = new ArrayList<>();
+            List<List<String>> rows = api.sql(kind[1]).params(page + 1).query((rs, n) -> row(rs, 9)).list();
+            while (true) {
+                walked.addAll(rows.subList(0, Math.min(page, rows.size())));
+                if (rows.size() <= page) {
+                    break;
+                }
+                long before = Long.parseLong(rows.get(page - 1).get(0));
+                rows = api.sql(kind[2]).params(before, page + 1).query((rs, n) -> row(rs, 9)).list();
+            }
+            assertThat(walked).as(kind[0]).isEqualTo(expected);
+        }
     }
 
     @Test

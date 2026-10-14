@@ -372,6 +372,23 @@ LIMIT ?
 
 Later pages, parameters `before`, `fetch`, `before`, `fetch`, `fetch`, where `before` is the `alert_seq` of the last row of the previous page: the same statement with `WHERE c.alert_seq < ?` in the first part and `AND w.alert_seq < ?` after `w.listed = 1` in the second.
 
+**Filtered by kind.** With `kind` set, only that kind's part runs, joined straight to `alert_event` and the latest acknowledgement, with no `UNION` and no derived table. Read backward on its own index, its rows already come in page order, so nothing is sorted and the read stops at `fetch` rows. First page, parameter `fetch`:
+
+```sql
+SELECT e.alert_seq, e.event_id, e.kind, e.payload, e.received_at,
+       k.action, k.acted_at, k.principal, k.note
+FROM close_approach c
+JOIN alert_event e ON e.alert_seq = c.alert_seq
+LEFT JOIN alert_acknowledgement k ON k.ack_id =
+    (SELECT MAX(x.ack_id) FROM alert_acknowledgement x WHERE x.event_id = e.event_id)
+ORDER BY c.alert_seq DESC
+LIMIT ?
+```
+
+For `space_weather_level` the same statement reads `space_weather_event w`, joins `e.alert_seq = w.alert_seq`, filters `WHERE w.listed = 1`, and orders by `w.alert_seq`. Later pages, parameters `before`, `fetch`: `WHERE c.alert_seq < ?`, or `AND w.alert_seq < ?` after `w.listed = 1`.
+
+**The cursor names its kind.** The whole list's cursor encodes the bare `alert_seq`, unchanged; a filtered list's cursor encodes the kind, a `|`, and the `alert_seq`. A cursor used under a different filter than the one it was returned under is refused, rather than paging a different list from a point chosen in another. Without that check, a cursor from the whole list used under `close_approach` would quietly return the close approaches older than some space weather event, and a client that had not reset its pages would show a list with a gap and no error.
+
 The cursor carries `alert_seq`, which is internal to this database and would change if it were rebuilt from a replay; a cursor is only good for the pages that follow it, so that does no harm.
 
 #### Q6, one object's approaches

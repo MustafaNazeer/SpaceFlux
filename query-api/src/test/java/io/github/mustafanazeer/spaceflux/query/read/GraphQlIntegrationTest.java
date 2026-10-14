@@ -349,6 +349,129 @@ class GraphQlIntegrationTest {
         }
     }
 
+    static JsonNode alerts(Browser b, String args) throws Exception {
+        return data(query(b, "{ alerts(" + args + ") { items { event_id kind } next } }")).get("alerts");
+    }
+
+    static String after(JsonNode page) throws Exception {
+        return "after: " + JSON.writeValueAsString(page.get("next").asString());
+    }
+
+    @Test
+    void theCloseApproachKindListsOnlyCloseApproachesAndPagesWithinThem() throws Exception {
+        String a = approach(25544, 90030, "2026-10-10T01:00:00");
+        String level = level("level", "level_change");
+        String b = approach(25544, 90031, "2026-10-10T02:00:00");
+        String c = approach(25544, 90032, "2026-10-10T03:00:00");
+        Browser browser = browser();
+
+        JsonNode one = alerts(browser, "kind: \"close_approach\", limit: 2");
+        JsonNode two = alerts(browser, "kind: \"close_approach\", limit: 1, " + after(one));
+
+        assertThat(ids(one)).containsExactly(c, b);
+        assertThat(ids(two)).containsExactly(a);
+        assertThat(ids(alerts(browser, "limit: 4"))).containsExactly(c, b, level, a);
+        for (JsonNode page : new JsonNode[] {one, two}) {
+            page.get("items").forEach(i -> assertThat(i.get("kind").asString()).isEqualTo("close_approach"));
+        }
+    }
+
+    @Test
+    void theSpaceWeatherKindListsOnlyListedLevelEventsAndPagesWithinThem() throws Exception {
+        String first = level("level", "level_change");
+        level("level", "refresh");
+        approach(25544, 90033, "2026-10-10T04:00:00");
+        level("none", "level_change");
+        String left = level("none", "level_change");
+        Browser browser = browser();
+        TestMysql.rootSql("UPDATE spaceflux.space_weather_event SET previous_state = 'level' WHERE alert_seq = "
+                + "(SELECT alert_seq FROM spaceflux.alert_event WHERE event_id = '" + left + "')");
+
+        JsonNode one = alerts(browser, "kind: \"space_weather_level\", limit: 1");
+        JsonNode two = alerts(browser, "kind: \"space_weather_level\", limit: 1, " + after(one));
+
+        assertThat(ids(one)).containsExactly(left);
+        assertThat(ids(two)).containsExactly(first);
+        assertThat(two.get("items").get(0).get("kind").asString()).isEqualTo("space_weather_level");
+    }
+
+    @Test
+    void withoutKindOrWithANullKindTheListIsEveryKind() throws Exception {
+        String a = approach(25544, 90034, "2026-10-10T05:00:00");
+        String level = level("level", "level_change");
+        Browser browser = browser();
+
+        JsonNode plain = alerts(browser, "limit: 2");
+
+        assertThat(ids(plain)).containsExactly(level, a);
+        assertThat(ids(alerts(browser, "kind: null, limit: 2"))).containsExactly(level, a);
+        assertThat(ids(alerts(browser, "limit: 1, " + after(alerts(browser, "limit: 1"))))).containsExactly(a);
+    }
+
+    @Test
+    void anUnknownKindIsAnErrorNeverTheWholeList() throws Exception {
+        Browser b = browser();
+
+        for (String kind : new String[] {"", "CLOSE_APPROACH", "close_approach ", "screening_run", "all"}) {
+            String text = query(b, "{ alerts(kind: " + JSON.writeValueAsString(kind)
+                    + ") { items { event_id } next } }").body();
+            JsonNode body = JSON.readTree(text);
+            assertThat(text).as(kind).doesNotContain("items").doesNotContain("event_id");
+            assertThat(body.get("errors")).as(kind).hasSize(1);
+            assertThat(body.get("errors").get(0).get("message").asString()).as(kind)
+                    .isEqualTo("kind is close_approach or space_weather_level.");
+            assertThat(body.get("errors").get(0).get("extensions").get("classification").asString()).as(kind)
+                    .isEqualTo("BAD_REQUEST");
+        }
+    }
+
+    @Test
+    void aCursorIsRefusedUnderAnyKindButTheOneItWasReturnedFor() throws Exception {
+        approach(25544, 90035, "2026-10-10T06:00:00");
+        level("level", "level_change");
+        approach(25544, 90036, "2026-10-10T07:00:00");
+        level("level", "level_change");
+        Browser b = browser();
+        String none = after(alerts(b, "limit: 1"));
+        String approaches = after(alerts(b, "kind: \"close_approach\", limit: 1"));
+        String levels = after(alerts(b, "kind: \"space_weather_level\", limit: 1"));
+
+        String[][] mismatches = {
+            {"kind: \"close_approach\", ", none}, {"kind: \"space_weather_level\", ", none},
+            {"", approaches}, {"kind: \"space_weather_level\", ", approaches},
+            {"", levels}, {"kind: \"close_approach\", ", levels}};
+        for (String[] m : mismatches) {
+            String q = "{ alerts(" + m[0] + "limit: 1, " + m[1] + ") { items { event_id } next } }";
+            JsonNode body = JSON.readTree(query(b, q).body());
+            assertThat(body.get("errors")).as(q).hasSize(1);
+            assertThat(body.get("errors").get(0).get("message").asString()).as(q)
+                    .isEqualTo("after was returned for a different kind; ask for the first page again.");
+            assertThat(body.get("errors").get(0).get("extensions").get("classification").asString()).as(q)
+                    .isEqualTo("BAD_REQUEST");
+        }
+        for (String[] match : new String[][] {{"", none}, {"kind: \"close_approach\", ", approaches},
+            {"kind: \"space_weather_level\", ", levels}}) {
+            assertThat(alerts(b, match[0] + "limit: 1, " + match[1]).get("items")).as(match[0]).hasSize(1);
+        }
+    }
+
+    @Test
+    void aKindCursorThatIsNotOneThisApiReturnedIsRefused() throws Exception {
+        Browser b = browser();
+
+        for (String text : new String[] {"close_approach|", "close_approach|0", "close_approach|x",
+            "close_approach|1|2", "screening_run|5", "|5", "close_approach5"}) {
+            String cursor = java.util.Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(text.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+            for (String kind : new String[] {"", "kind: \"close_approach\", "}) {
+                String q = "{ alerts(" + kind + "after: \"" + cursor + "\") { next } }";
+                JsonNode body = JSON.readTree(query(b, q).body());
+                assertThat(body.get("errors").get(0).get("message").asString()).as(text + " " + kind)
+                        .isEqualTo("after is not a cursor this API returned.");
+            }
+        }
+    }
+
     @Test
     void theListsShowTheNoteAndPrincipalOnlyToTheSignedInOperator() throws Exception {
         testObject(90020);

@@ -16,6 +16,14 @@ final class AlertListQueries {
     static final String RECENT = PlanQueries.ALERTS_RECENT;
     /** Q3, after a cursor: before, fetch, before, fetch, fetch; before is the last row's alert_seq. */
     static final String RECENT_AFTER = PlanQueries.ALERTS_RECENT_AFTER;
+    /** Q3 for close approaches only, first page: fetch. */
+    static final String RECENT_CLOSE_APPROACH = PlanQueries.ALERTS_RECENT_CLOSE_APPROACH;
+    /** Q3 for close approaches only, after a cursor: before, fetch. */
+    static final String RECENT_CLOSE_APPROACH_AFTER = PlanQueries.ALERTS_RECENT_CLOSE_APPROACH_AFTER;
+    /** Q3 for listed space weather events only, first page: fetch. */
+    static final String RECENT_SPACE_WEATHER = PlanQueries.ALERTS_RECENT_SPACE_WEATHER;
+    /** Q3 for listed space weather events only, after a cursor: before, fetch. */
+    static final String RECENT_SPACE_WEATHER_AFTER = PlanQueries.ALERTS_RECENT_SPACE_WEATHER_AFTER;
     /** Q6, first page: object, fetch, object, fetch, fetch. */
     static final String OBJECT_APPROACHES = PlanQueries.OBJECT_APPROACHES;
     /** Q6, after a cursor: object, tca, tca, seq, fetch, then the same for the other role, then fetch. */
