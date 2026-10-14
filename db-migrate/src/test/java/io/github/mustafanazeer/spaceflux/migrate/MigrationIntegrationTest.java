@@ -322,8 +322,9 @@ class MigrationIntegrationTest {
     @Test
     @Order(3)
     void theDatabaseMarksTheSpaceWeatherEventsTheAlertListShowsAndTheConsumerCannotSetTheMark() throws Exception {
-        // state, previous_state, trigger, listed: entering, changing and leaving a level, restatements and revisions
-        // included; never a refresh, and never a change between none and no data alone.
+        // state, previous_state, trigger, listed: entering, changing and leaving a level, revisions included; never a
+        // refresh, and never a change between none and no data alone. The expression is also checked on restatement
+        // shapes the alerts schema forbids; a real restatement is no_data from none and is never listed.
         String[][] cases = {
             {"level", "none", "level_change", "1"},
             {"level", "level", "level_change", "1"},

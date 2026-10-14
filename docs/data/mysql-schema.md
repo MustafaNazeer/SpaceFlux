@@ -334,7 +334,7 @@ Both return the event as stored (`payload`, the text received) with `received_at
 
 #### Q3, the recent alerts
 
-**Which events, decided on 2026-10-06.** Every `close_approach` event, and every `space_weather_level` event whose `trigger_kind` is not `refresh` and whose `state` is `level` or whose `previous_state` is `level`: entering a level, changing level, and leaving a level, revisions and restatements included. Screening run summaries, refreshes, and changes between none, no data and ended that never touch a level are left out.
+**Which events, decided on 2026-10-06.** Every `close_approach` event, and every `space_weather_level` event whose `trigger_kind` is not `refresh` and whose `state` is `level` or whose `previous_state` is `level`: entering a level, changing level, and leaving a level, Kp revisions included. Screening run summaries, refreshes, restatements (a restatement only ever turns a sample published as none into no data, so it never touches a level), and changes between none, no data and ended that never touch a level are left out.
 
 **Why it is not one scan of `alert_event`.** Each R and S series stores about twelve events an hour and G a few, nearly all of them refreshes or "none", while a listed space weather event is rare. A backward scan of `alert_event` joined to `space_weather_event` passes every one of those rows on its way to each listed one, and when no close approaches arrive (for example while ingest polls only SWPC and screening is stale) a page it cannot fill reads the whole table. So Q3 is a `UNION ALL` of two parts, each of which reads only rows it returns:
 
