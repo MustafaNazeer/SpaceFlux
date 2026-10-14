@@ -1,0 +1,47 @@
+<nav class="route-bar" aria-label="Page"><a class="back-link" routerLink="/">Back to the console</a></nav>
+<main id="main" class="route-page">
+  <div class="page-head" [class.state-block]="state().phase === 'failed' || state().phase === 'retry'">
+    <h1 class="page-title" tabindex="-1">{{ heading() }}</h1>
+    <p role="status" [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</p>
+    @if (state().phase === 'failed' || state().phase === 'retry') {
+      <button class="btn btn-secondary" type="button" [attr.aria-disabled]="state().phase === 'retry' ? 'true' : null" (click)="tryAgain()">Try again</button>
+    }
+    @if (state().result === 'no_entry') {
+      <p class="secondary">Object {{ number() }} has no catalog entry, so this page cannot list its close approaches. Any that are stored still appear in the console's recent alerts.</p>
+    }
+    @if (state().result === 'refused') {
+      <p class="secondary">A catalog number is a whole number from 0 to 999999999.</p>
+    }
+    @if (found()) {
+      <p class="caption">Catalog number <span class="mono">{{ number() }}</span>. Listed whether it was the watchlist object or the other object, newest first.</p>
+    }
+  </div>
+
+  @if (found(); as f) {
+    <section class="panel" aria-labelledby="catalog-title">
+      <h2 id="catalog-title" class="panel-title">Catalog entry</h2>
+      <app-detail-facts [facts]="catalogFacts()" />
+      <p class="caption">This is the newest element set seen for the object, not necessarily the one a screening run used.</p>
+    </section>
+
+    @if (f.items.length) {
+      <section class="panel alerts" aria-labelledby="list-title">
+        <h2 id="list-title" class="panel-title">Close approaches</h2>
+        <p class="caption">{{ note }}</p>
+        <ol class="alert-list">
+          @for (a of f.items; track a.event_id) {
+            <li class="alert-item" [attr.data-event-id]="a.event_id">
+              <app-alert-item [alert]="a" [now]="now()" />
+            </li>
+          }
+        </ol>
+        <app-list-end [count]="f.items.length" [more]="f.next !== null" [noun]="noun" [state]="older()" (loadOlder)="loadOlder()" />
+      </section>
+    } @else {
+      <div class="empty">
+        <strong>No close approaches of {{ name() }} are stored.</strong>
+        <p class="secondary">Close approaches are stored only for pairs a screening run searched, so an empty list does not mean nothing came close.</p>
+      </div>
+    }
+  }
+</main>

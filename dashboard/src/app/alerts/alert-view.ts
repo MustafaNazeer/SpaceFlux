@@ -7,6 +7,7 @@ import {
   distance,
   hm,
   measurement,
+  objectName,
   parseUtc,
   Segment,
   text,
@@ -44,7 +45,8 @@ function endedTitle(l: SpaceWeatherLevel): Segment[] {
   return out;
 }
 
-function levelTitle(l: SpaceWeatherLevel): Segment[] {
+/** The title sentence of a space weather event; `dated` puts the date on every time, as the alert page does. */
+export function levelTitle(l: SpaceWeatherLevel, dated = false): Segment[] {
   if (l.state === 'ended') {
     return endedTitle(l);
   }
@@ -72,7 +74,12 @@ function levelTitle(l: SpaceWeatherLevel): Segment[] {
     const sample = parseUtc(l.sample_time);
     if (!Number.isNaN(start) && !Number.isNaN(end)) {
       const sameDay = dateOf(start) === dateOf(end);
-      out.push(text(', '), at(start, dateHm), text(' to '), at(end, sameDay ? hm : dateHm, ' UTC'));
+      out.push(
+        text(', '),
+        at(start, dateHm),
+        text(' to '),
+        at(end, sameDay && !dated ? hm : dateHm, ' UTC'),
+      );
     } else if (!Number.isNaN(sample)) {
       out.push(text(' at '), at(sample, dateHm, ' UTC'));
     }
@@ -96,12 +103,13 @@ function levelTitle(l: SpaceWeatherLevel): Segment[] {
 
 function approachTitle(alert: Alert): Segment[] {
   const c = alert.close_approach!;
-  const who = (o: { name: string | null; catalog_number: number }) =>
-    `${o.name ?? 'Object'} (${o.catalog_number})`;
+  // An unnamed object is "object {number}", capitalised only where it starts the title.
+  const who = (o: { name: string | null; catalog_number: number }, first: boolean) =>
+    objectName(o.name, o.catalog_number, { mid: !first, numbered: true });
   const tca = parseUtc(c.time_of_closest_approach);
   return [
     text(
-      `${who(c.watchlist_object)} and ${who(c.other_object)}, miss distance ${distance(c.miss_distance_m)} at `,
+      `${who(c.watchlist_object, true)} and ${who(c.other_object, false)}, miss distance ${distance(c.miss_distance_m)} at `,
     ),
     Number.isNaN(tca) ? text(c.time_of_closest_approach) : at(tca, dateHms, ' UTC'),
   ];

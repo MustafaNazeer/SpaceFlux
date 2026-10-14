@@ -35,6 +35,8 @@ import { dateHm, dateOf, datetimeAttr, hm, parseUtc } from '../format';
 export class AckState {
   readonly ack = input.required<Acknowledgement | null>();
   readonly showNote = input(false);
+  /** Puts the date on the time even when it is today, as the alert page does with every time. */
+  readonly dated = input(false);
   private readonly now = inject(Clock).now;
 
   protected readonly view = computed(() => {
@@ -50,7 +52,7 @@ export class AckState {
       datetime: Number.isNaN(ms) ? null : datetimeAttr(ms),
       time: Number.isNaN(ms)
         ? ''
-        : `${dateOf(ms) === dateOf(this.now()) ? hm(ms) : dateHm(ms)} UTC`,
+        : `${dateOf(ms) === dateOf(this.now()) && !this.dated() ? hm(ms) : dateHm(ms)} UTC`,
     };
   });
 }

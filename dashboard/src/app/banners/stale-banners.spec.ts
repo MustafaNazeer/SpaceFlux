@@ -22,13 +22,17 @@ import {
   refreshBanner,
   screeningBanner,
 } from './banner-view';
-import { StaleBanners } from './stale-banners';
+import { StaleBanners, StaleLineMemory } from './stale-banners';
 
 const squash = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
 const weather = (root: object) =>
   dataOf<SpaceWeatherCurrentData>(SPACE_WEATHER_CURRENT, root).space_weather_current;
 const screening = (root: object) =>
   dataOf<ScreeningCurrentData>(SCREENING_QUERY, root).screening_current;
+
+/** A frame drawn, then the task after it: when a first visit fills in the set it starts from. */
+const afterPaint = () =>
+  new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve)));
 
 async function render(banners: BannerView[]): Promise<HTMLElement> {
   const fixture = TestBed.createComponent(StaleBanners);
@@ -47,6 +51,143 @@ describe('StaleBanners', () => {
       'Stale, 55 min. GOES-18 ≥10 MeV proton flux: newest record at 17:05 UTC, age limit 40 min. The S scale reads no data from 17:45 UTC until a current record arrives.',
     );
     expect(banners[0].querySelector('use')?.getAttribute('href')).toBe('#i-clock');
+  });
+
+  describe('on the first visit to the console in a page load (F43)', () => {
+    const STALE_LINE = 'GOES-18 \u226510 MeV proton flux is stale; the S scale reads no data.';
+    async function firstVisit(banners: BannerView[]) {
+      const fixture = TestBed.createComponent(StaleBanners);
+      fixture.componentRef.setInput('banners', banners);
+      await fixture.whenStable();
+      const el = fixture.nativeElement as HTMLElement;
+      return { fixture, status: () => squash(el.querySelector('[role="status"]')?.textContent) };
+    }
+
+    it('draws the line empty, then speaks the stale set it starts from once a frame is drawn, as a direct load does', async () => {
+      const { fixture, status } = await firstVisit(feedBanners(weather(SPACE_WEATHER_MIXED)));
+      expect(status()).toBe('');
+      await afterPaint();
+      await fixture.whenStable();
+      expect(status()).toBe(STALE_LINE);
+    });
+
+    it('stays silent when it starts from no banners', async () => {
+      const { fixture, status } = await firstVisit([]);
+      await afterPaint();
+      await fixture.whenStable();
+      expect(status()).toBe('');
+    });
+
+    it('does not speak the set again while only the ages change, and says when the notices clear', async () => {
+      const stale = feedBanners(weather(SPACE_WEATHER_MIXED));
+      const { fixture, status } = await firstVisit(stale);
+      await afterPaint();
+      await fixture.whenStable();
+      const line = (fixture.nativeElement as HTMLElement).querySelector('[role="status"]')!;
+      const node = line.firstChild;
+      fixture.componentRef.setInput('banners', [{ ...stale[0], lead: 'Stale, 56 min.' }]);
+      await fixture.whenStable();
+      expect(line.firstChild).toBe(node);
+      expect(status()).toBe(STALE_LINE);
+      fixture.componentRef.setInput('banners', []);
+      await fixture.whenStable();
+      expect(status()).toBe('No stale notices remain.');
+    });
+
+    it('speaks a change made before the frame is drawn once, as the change it is', async () => {
+      const { fixture, status } = await firstVisit([]);
+      fixture.componentRef.setInput('banners', feedBanners(weather(SPACE_WEATHER_MIXED)));
+      await fixture.whenStable();
+      expect(status()).toBe(STALE_LINE);
+      const line = (fixture.nativeElement as HTMLElement).querySelector('[role="status"]')!;
+      const node = line.firstChild;
+      await afterPaint();
+      await fixture.whenStable();
+      expect(line.firstChild).toBe(node);
+    });
+
+    it('leaves the line as it was spoken when the set clears before the frame is drawn', async () => {
+      const { fixture, status } = await firstVisit(feedBanners(weather(SPACE_WEATHER_MIXED)));
+      fixture.componentRef.setInput('banners', []);
+      await fixture.whenStable();
+      expect(status()).toBe('No stale notices remain.');
+      await afterPaint();
+      await fixture.whenStable();
+      expect(status()).toBe('No stale notices remain.');
+    });
+
+    it('remembers an empty line when the console is left before the frame is drawn', async () => {
+      const { fixture } = await firstVisit(feedBanners(weather(SPACE_WEATHER_MIXED)));
+      fixture.destroy();
+      await afterPaint();
+      expect(TestBed.inject(StaleLineMemory).left?.announcement.text).toBe('');
+    });
+
+    it('starts from the set without speaking it on a return after that visit', async () => {
+      const stale = feedBanners(weather(SPACE_WEATHER_MIXED));
+      const first = await firstVisit(stale);
+      await afterPaint();
+      await first.fixture.whenStable();
+      first.fixture.destroy();
+      const back = await firstVisit([{ ...stale[0], lead: 'Stale, 70 min.' }]);
+      await afterPaint();
+      await back.fixture.whenStable();
+      expect(back.status()).toBe('');
+      back.fixture.componentRef.setInput('banners', []);
+      await back.fixture.whenStable();
+      expect(back.status()).toBe('No stale notices remain.');
+    });
+  });
+
+  describe('on a return to the console', () => {
+    async function shown(banners: BannerView[]) {
+      const fixture = TestBed.createComponent(StaleBanners);
+      fixture.componentRef.setInput('banners', banners);
+      await fixture.whenStable();
+      const el = fixture.nativeElement as HTMLElement;
+      return {
+        fixture,
+        status: () => squash(el.querySelector('[role="status"]')?.textContent),
+      };
+    }
+    const stale = () => feedBanners(weather(SPACE_WEATHER_MIXED));
+
+    it('stays silent when the set is the one shown when the console was left', async () => {
+      const left = await shown(stale());
+      left.fixture.destroy();
+      const back = await shown([{ ...stale()[0], lead: 'Stale, 70 min.' }]);
+      expect(back.status()).toBe('');
+      await afterPaint();
+      await back.fixture.whenStable();
+      expect(back.status()).toBe('');
+    });
+
+    it('speaks a set that changed while away', async () => {
+      const left = await shown([]);
+      left.fixture.destroy();
+      const back = await shown(stale());
+      expect(back.status()).toBe(
+        'GOES-18 \u226510 MeV proton flux is stale; the S scale reads no data.',
+      );
+    });
+
+    it('says the stale notices cleared while away', async () => {
+      const left = await shown(stale());
+      left.fixture.destroy();
+      const back = await shown([]);
+      expect(back.status()).toBe('No stale notices remain.');
+    });
+
+    it('compares with the set at the latest leave, not an older one', async () => {
+      const first = await shown(stale());
+      first.fixture.destroy();
+      const second = await shown(stale());
+      second.fixture.componentRef.setInput('banners', []);
+      await second.fixture.whenStable();
+      second.fixture.destroy();
+      const back = await shown([]);
+      expect(back.status()).toBe('');
+    });
   });
 
   it('keeps the visible banners out of the live region, which speaks only when the set of stale feeds changes', async () => {
@@ -220,6 +361,7 @@ describe('StaleBanners', () => {
 
     it('does not announce a recovery on pause or on resume, only once the stale notices clear after it', async () => {
       const { set, status } = setup();
+      await set([]);
       await set([refresh]);
       expect(squash(status().textContent)).toBe(FAILED);
       await set([paused]);

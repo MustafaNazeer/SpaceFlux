@@ -1,40 +1,56 @@
-import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal } from '@angular/core';
-
-import { RecentAlerts } from './alerts/recent-alerts';
 import {
-  Failures,
-  feedBanners,
-  pausedBanner,
-  refreshBanner,
-  screeningBanner,
-} from './banners/banner-view';
-import { StaleBanners } from './banners/stale-banners';
-import { Clock } from './data/clock';
+  afterNextRender,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  ElementRef,
+  inject,
+  Injector,
+  linkedSignal,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ViewportScroller } from '@angular/common';
+import {
+  NavigationCancel,
+  NavigationEnd,
+  NavigationError,
+  NavigationStart,
+  Router,
+  RouterOutlet,
+} from '@angular/router';
+
+import { Failures } from './banners/banner-view';
 import { DashboardData } from './data/dashboard-data';
 import { datetimeAttr, hms, parseUtc } from './format';
 import { IconSprite } from './icons/icon-sprite';
-import { PassesPanel } from './passes/passes-panel';
-import { Screening } from './screening/screening';
+import { RouteFocus } from './route-focus';
 import { SessionService } from './session/session.service';
-import { SpaceWeather } from './space-weather/space-weather';
+
+/** The path of a URL without its query string or fragment, so a filter change is not a page change. */
+export function pathOf(url: string): string {
+  return url.split(/[?#]/)[0];
+}
 
 @Component({
   selector: 'app-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconSprite, StaleBanners, SpaceWeather, Screening, PassesPanel, RecentAlerts],
+  imports: [IconSprite, RouterOutlet],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
 export class App {
   protected readonly data = inject(DashboardData);
   protected readonly session = inject(SessionService).state;
-  protected readonly now = inject(Clock).now;
+  private readonly router = inject(Router);
+  private readonly path = signal(pathOf(this.router.url));
+
+  /** The console is the page at /; its header name is the page's h1, and only it has the skip links. */
+  protected readonly onConsole = computed(() => this.path() === '/');
 
   protected readonly spaceWeather = computed(
     () => this.data.spaceWeather.data()?.space_weather_current,
   );
-  protected readonly screening = computed(() => this.data.screening.data()?.screening_current);
-  protected readonly alerts = this.data.recentAlerts;
 
   /** Browser time of each query's newest failed refresh. */
   private readonly failures = computed<Failures>(() => ({
@@ -78,6 +94,45 @@ export class App {
     computation: (isLive, previous) => (previous?.value ?? false) || isLive,
   });
 
+  constructor() {
+    const host: HTMLElement = inject(ElementRef).nativeElement;
+    const injector = inject(Injector);
+    const scroller = inject(ViewportScroller);
+    const focus = inject(RouteFocus);
+    let first = true;
+    let fromHistory = false;
+    this.router.events.pipe(takeUntilDestroyed()).subscribe((event) => {
+      if (event instanceof NavigationStart) {
+        fromHistory = event.navigationTrigger === 'popstate';
+        focus.start(this.router.url, document.activeElement);
+        return;
+      }
+      if (event instanceof NavigationCancel || event instanceof NavigationError) {
+        focus.abandon();
+        return;
+      }
+      if (!(event instanceof NavigationEnd)) {
+        return;
+      }
+      const path = pathOf(event.urlAfterRedirects);
+      const changed = path !== this.path() && !first;
+      this.path.set(path);
+      first = false;
+      // A new page takes focus once it has settled (RouteFocus). History keeps its own scroll position.
+      focus.end(event.urlAfterRedirects, changed, fromHistory);
+      if (!changed) {
+        return;
+      }
+      if (!fromHistory) {
+        afterNextRender(() => scroller.scrollToPosition([0, 0]), { injector });
+      }
+      if (path === '/') {
+        // The console's list and its h1 come from data the app already holds, so it has settled at once.
+        focus.settled(host, injector);
+      }
+    });
+  }
+
   protected togglePause(): void {
     if (this.data.paused()) {
       this.data.resume();
@@ -85,14 +140,4 @@ export class App {
       this.data.pause();
     }
   }
-
-  /** Paused first, else a failed refresh first, then the stale feeds and the stale screening run. */
-  protected readonly banners = computed(() => {
-    const asOf = this.spaceWeather()?.as_of;
-    const lead = this.data.paused()
-      ? pausedBanner(true, asOf, this.failures())
-      : refreshBanner(this.failures(), asOf);
-    const run = screeningBanner(this.screening(), this.now());
-    return [...(lead ? [lead] : []), ...feedBanners(this.spaceWeather()), ...(run ? [run] : [])];
-  });
 }

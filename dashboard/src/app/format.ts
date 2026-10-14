@@ -46,6 +46,22 @@ export function at(ms: number, label: (ms: number) => string, suffix = ''): Segm
   return { kind: 'time', datetime: datetimeAttr(ms), label: label(ms) + suffix };
 }
 
+/**
+ * A catalog object as the dashboard names it: its catalog name, followed by its catalog number in parentheses when
+ * `numbered`, or "Object {number}" when the catalog has none. `mid` is for a name inside a sentence, where an
+ * unnamed object is "object {number}".
+ */
+export function objectName(
+  name: string | null,
+  catalogNumber: number | null,
+  { mid = false, numbered = false }: { mid?: boolean; numbered?: boolean } = {},
+): string {
+  if (name === null) {
+    return `${mid ? 'object' : 'Object'} ${catalogNumber}`;
+  }
+  return numbered ? `${name} (${catalogNumber})` : name;
+}
+
 /** "8 min", "6 h 0 min", or "31 h" from a duration in milliseconds. */
 export function duration(ms: number): string {
   const minutes = Math.max(0, Math.floor(ms / 60_000));

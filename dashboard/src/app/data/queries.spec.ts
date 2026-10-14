@@ -15,7 +15,11 @@ import {
 import { respond, SCHEMA } from '../../testing/graphql';
 import * as fixtures from '../../testing/fixtures';
 import {
+  ALERT_DETAIL,
   ALERT_STORED,
+  kindOf,
+  OBJECT_ALERTS,
+  OBJECT_ALERTS_PAGE,
   RECENT_ALERTS,
   RECENT_ALERTS_PAGE,
   SCREENING_CURRENT,
@@ -102,6 +106,8 @@ const DOCUMENTS: [string, DocumentNode, Record<string, unknown>][] = [
   ['RecentAlerts', RECENT_ALERTS, { limit: RECENT_ALERTS_PAGE }],
   ['WatchlistPasses', WATCHLIST_PASSES, {}],
   ['AlertStored', ALERT_STORED, {}],
+  ['AlertDetail', ALERT_DETAIL, { event_id: 'x' }],
+  ['ObjectAlerts', OBJECT_ALERTS, { norad_cat_id: 57036, limit: OBJECT_ALERTS_PAGE }],
 ];
 
 /** The root type an operation starts from; the server's cost calculator treats Subscription as a root like Query. */
@@ -168,6 +174,38 @@ describe('dashboard queries', () => {
     );
   });
 
+  it('selects the same item fields on an object page as on the console, so both lists render alike', () => {
+    const items = (doc: DocumentNode, path: string[]) => {
+      let set = operation(doc).selectionSet;
+      for (const name of path) {
+        set = fields(set).find((f) => f.name.value === name)!.selectionSet!;
+      }
+      return JSON.stringify(shape(set));
+    };
+    expect(items(OBJECT_ALERTS, ['catalog_object', 'close_approaches', 'items'])).toBe(
+      items(RECENT_ALERTS, ['alerts', 'items']),
+    );
+  });
+
+  it('passes kind and after to the alerts list, and an object page asks for a nested page the API allows', () => {
+    const args = fields(operation(RECENT_ALERTS).selectionSet)[0].arguments!.map(
+      (a) => a.name.value,
+    );
+    expect(args.sort()).toEqual(['after', 'kind', 'limit']);
+    expect(OBJECT_ALERTS_PAGE).toBeGreaterThanOrEqual(1);
+    expect(OBJECT_ALERTS_PAGE).toBeLessThanOrEqual(50);
+  });
+
+  it('knows the two kinds the API filters by, and nothing else', () => {
+    expect(kindOf('close_approach')).toBe('close_approach');
+    expect(kindOf('space_weather_level')).toBe('space_weather_level');
+    expect(kindOf(null)).toBeNull();
+    expect(kindOf('')).toBeNull();
+    for (const bad of ['Close_Approach', 'screening_run', 'all', ' close_approach']) {
+      expect(kindOf(bad)).toBeUndefined();
+    }
+  });
+
   it('asks for a recent alerts page the API allows (1 to 200)', () => {
     expect(RECENT_ALERTS_PAGE).toBeGreaterThanOrEqual(1);
     expect(RECENT_ALERTS_PAGE).toBeLessThanOrEqual(200);
@@ -189,6 +227,18 @@ describe('dashboard queries', () => {
       [RECENT_ALERTS, fixtures.ALERTS_OPERATOR, { limit: RECENT_ALERTS_PAGE }],
       [RECENT_ALERTS, fixtures.ALERTS_EMPTY, { limit: RECENT_ALERTS_PAGE }],
       [RECENT_ALERTS, fixtures.ALERTS_ENDED, { limit: RECENT_ALERTS_PAGE }],
+      [ALERT_DETAIL, fixtures.ALERT_APPROACH, { event_id: 'x' }],
+      [ALERT_DETAIL, fixtures.ALERT_R_LEVEL, { event_id: 'x' }],
+      [ALERT_DETAIL, fixtures.ALERT_G_LEVEL, { event_id: 'x' }],
+      [ALERT_DETAIL, fixtures.ALERT_RESTATEMENT, { event_id: 'x' }],
+      [ALERT_DETAIL, fixtures.ALERT_SCREENING_RUN, { event_id: 'x' }],
+      [ALERT_DETAIL, { alert: null }, { event_id: 'x' }],
+      [
+        OBJECT_ALERTS,
+        fixtures.catalogObjectAj({ null: { items: [fixtures.APPROACH_ITEM], next: null } }),
+        { norad_cat_id: 57036, limit: OBJECT_ALERTS_PAGE },
+      ],
+      [OBJECT_ALERTS, { catalog_object: null }, { norad_cat_id: 99999, limit: OBJECT_ALERTS_PAGE }],
       [WATCHLIST_PASSES, fixtures.PASSES_CLIPPED_START, {}],
       [WATCHLIST_PASSES, fixtures.PASSES_CLIPPED_BOTH, {}],
       [WATCHLIST_PASSES, fixtures.PASSES_STOPPED, {}],

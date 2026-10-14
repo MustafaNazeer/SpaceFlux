@@ -4,36 +4,75 @@
   gap: var(--space-3);
   align-content: start;
 }
-.alert-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-3);
-}
-.alert-item {
-  background: var(--surface-2);
-  border: 1px solid var(--border-subtle);
-  border-left: 2px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-2);
-}
-.alert-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-2);
-}
-.alert-item h3 {
-  margin: 0;
-  font-size: 14px;
-  line-height: 22px;
-  font-weight: 500;
-}
 .empty {
   margin-bottom: 0;
+}
+
+.kind-filter {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.kind-filter legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+}
+.kind-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.kind-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--duration-instant) var(--ease-standard);
+}
+.kind-option input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+.kind-option .icon {
+  display: none;
+  width: 14px;
+  height: 14px;
+}
+.kind-option:hover {
+  background: var(--surface-3);
+}
+.kind-option:has(input:checked) {
+  background: var(--surface-3);
+  color: var(--text-primary);
+  border-color: var(--accent-active);
+}
+.kind-option:has(input:checked) .icon {
+  display: inline-block;
+}
+.kind-option:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.held-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
 }

@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 
 import { Clock } from '../data/clock';
 import { SCREENING_CURRENT as QUERY, ScreeningCurrentData } from '../data/queries';
@@ -35,6 +36,10 @@ async function render(
 }
 
 describe('Screening', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+  });
+
   it('shows a loading status before the first answer', async () => {
     expect(squash((await render(undefined)).textContent)).toContain(
       'Loading the latest screening run.',

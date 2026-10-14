@@ -1,7 +1,13 @@
 import { Alert } from '../data/queries';
 import { Segment } from '../format';
 import { AlertList } from './alert-list';
-import { groupAnnouncement, pausedAnnouncement } from './notice-announcement';
+import { ListNoun, NOUNS } from './list-end';
+import {
+  awayAnnouncement,
+  groupAnnouncement,
+  heldAnnouncement,
+  pausedAnnouncement,
+} from './notice-announcement';
 
 /** One paragraph of the live log, spoken once when it is added. */
 export interface LogEntry {
@@ -12,9 +18,10 @@ export interface LogEntry {
 }
 
 /**
- * Decides what the live log says. Alerts are queued as they are listed and spoken together at the next flush, one
- * entry per flush, and only those the shown list holds. Each event_id is spoken at most once. Old entries are
- * trimmed to `kept` only once the page has drawn them, so no entry is removed before it was spoken.
+ * Decides what the live log says. Alerts are queued as they are listed and spoken together at the next flush, at
+ * most one entry for each wording per flush, and only those the shown list holds. Each event_id is spoken at most
+ * once. Old entries are trimmed to `kept` only once the page has drawn them, so no entry is removed before it was
+ * spoken.
  */
 export class Announcer {
   private queued: Alert[] = [];
@@ -40,10 +47,12 @@ export class Announcer {
   }
 
   /**
-   * Speaks the queued alerts the list shows, in its order, as one entry. With no list shown yet nothing is spoken
-   * and the queue is held; alerts the list does not hold are dropped unspoken. True when an entry was added.
+   * Speaks the queued alerts the list shows, in its order. Those the held list's bar holds (`waiting`, the bar's
+   * event_ids, absent while the list is not held) are worded as waiting above the list, with the bar's count; the
+   * rest are worded as listed. One entry for each wording, the listed ones first. With no list shown yet nothing is
+   * spoken and the queue is held; alerts the list does not hold are dropped unspoken. True when an entry was added.
    */
-  flush(list: AlertList | undefined): boolean {
+  flush(list: AlertList | undefined, waiting?: ReadonlySet<string>): boolean {
     if (!list) {
       return false;
     }
@@ -52,18 +61,53 @@ export class Announcer {
     );
     this.queued = [];
     const shown = list.items.filter((a) => queued.has(a.event_id));
-    return shown.length > 0 && this.add(groupAnnouncement(shown), shown);
+    const listed = shown.filter((a) => !waiting?.has(a.event_id));
+    const held = shown.filter((a) => waiting?.has(a.event_id));
+    if (listed.length) {
+      this.add(groupAnnouncement(listed), listed);
+    }
+    if (held.length) {
+      this.add(heldAnnouncement(held, waiting!.size), held);
+    }
+    return shown.length > 0;
   }
 
   /**
    * One summary entry for the alerts the first refresh after a pause added, `more` when it could not count them
-   * all. The summary covers any of them still queued, so no flush speaks them again. True when an entry was added.
+   * all, naming what the list holds. The summary covers any of them still queued, so no flush speaks them again.
+   * True when an entry was added.
    */
-  paused(alerts: Alert[], more: boolean): boolean {
+  paused(alerts: Alert[], more: boolean, noun: ListNoun = NOUNS.all): boolean {
     const fresh = alerts.filter((a) => !this.spoken.has(a.event_id));
     const covered = new Set(fresh.map((a) => a.event_id));
     this.queued = this.queued.filter((a) => !covered.has(a.event_id));
-    return fresh.length > 0 && this.add(pausedAnnouncement(fresh.length, more), fresh);
+    return fresh.length > 0 && this.add(pausedAnnouncement(fresh.length, more, noun), fresh);
+  }
+
+  /**
+   * The console is no longer shown: nothing it drew is kept, so a return draws only what is added after it. Gives
+   * back the queued alerts not yet spoken, so the return can count them.
+   */
+  leave(): Alert[] {
+    const unspoken = this.queued.filter((a) => !this.spoken.has(a.event_id));
+    this.queued = [];
+    this.entries = [];
+    return unspoken;
+  }
+
+  /**
+   * One summary entry for alerts that arrived while the console was not shown, leaving out any already spoken,
+   * naming what the list holds; `more` when the count can be short. They count as spoken from then on. Returns the
+   * alerts it covers.
+   */
+  away(alerts: Alert[], more = false, noun: ListNoun = NOUNS.all): Alert[] {
+    const fresh = alerts.filter((a) => !this.spoken.has(a.event_id));
+    const covered = new Set(fresh.map((a) => a.event_id));
+    this.queued = this.queued.filter((a) => !covered.has(a.event_id));
+    if (fresh.length) {
+      this.add(awayAnnouncement(fresh.length, more, noun), fresh);
+    }
+    return fresh;
   }
 
   /** The page has drawn every entry up to this id. */

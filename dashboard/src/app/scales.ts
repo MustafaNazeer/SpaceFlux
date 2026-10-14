@@ -24,8 +24,12 @@ export function levelBadge(scale: string, level: number, form: 'solid' | 'outlin
 
 export const NONE_BADGE: BadgeView = { classes: 'outline none', icon: 'i-none', text: 'none' };
 export const NO_DATA_BADGE: BadgeView = { classes: 'nodata', icon: 'i-nodata', text: 'No data' };
-/** An R or S series that another satellite replaced: the no data treatment with its own word. */
-export const ENDED_BADGE: BadgeView = { classes: 'nodata', icon: 'i-nodata', text: 'Ended' };
+/** An R or S series that another satellite replaced: the no data treatment with its own words. */
+export const ENDED_BADGE: BadgeView = {
+  classes: 'nodata',
+  icon: 'i-nodata',
+  text: 'No longer primary',
+};
 export const APPROACH_BADGE: BadgeView = {
   classes: 'approach',
   icon: 'i-approach',

@@ -4,6 +4,7 @@ import { dataOf } from '../../testing/graphql';
 import { ALERTS_ANONYMOUS } from '../../testing/fixtures';
 import { AlertList, noticeAlert } from './alert-list';
 import { Announcer, pollAdded } from './announcer';
+import { NOUNS } from './list-end';
 
 const RECORDED = ALERTS_ANONYMOUS.alerts.items as unknown as Record<string, unknown>[];
 
@@ -23,6 +24,125 @@ const listOf = (alerts: Alert[]): AlertList => ({ items: alerts, more: false });
 const ids = (alerts: Alert[]) => alerts.map((a) => a.event_id);
 
 describe('Announcer', () => {
+  const waiting = (...alerts: Alert[]) => new Set(ids(alerts));
+
+  it('words the entry as waiting above the list for the alerts the bar holds (F30)', () => {
+    const a = new Announcer(5);
+    a.queue([alert(4)]);
+    a.flush(listOf([alert(4), alert(0)]), waiting(alert(4)));
+    expect(plain(a.entries[0].segments)).toMatch(/^New alert waiting above the list, G4 Severe: /);
+    a.queue([alert(5), alert(7)]);
+    a.flush(listOf([alert(7), alert(5), alert(4)]), waiting(alert(7), alert(5), alert(4)));
+    expect(plain(a.entries[1].segments)).toMatch(
+      /^2 more new alerts waiting above the list, 3 in all\. The top one, /,
+    );
+  });
+
+  it('takes the total from the alerts the bar holds, not from what was spoken as waiting', () => {
+    const a = new Announcer(5);
+    a.queue([alert(5)]);
+    a.flush(listOf([alert(5), alert(4), alert(1)]), waiting(alert(5), alert(4), alert(1)));
+    expect(plain(a.entries[0].segments)).toMatch(
+      /^1 more new alert waiting above the list, 3 in all\. The new one, close approach: /,
+    );
+    a.queue([alert(9)]);
+    a.flush(listOf([alert(9), alert(5)]), waiting(alert(9)));
+    expect(plain(a.entries[1].segments)).toMatch(/^New alert waiting above the list\. Below G1/);
+  });
+
+  it('starts the count of waiting alerts over once the bar is empty (F39)', () => {
+    const a = new Announcer(5);
+    a.queue([alert(4)]);
+    a.flush(listOf([alert(4)]), waiting(alert(4)));
+    a.queue([alert(5), alert(7)]);
+    a.flush(listOf([alert(7), alert(5), alert(4)]), waiting(alert(7), alert(5)));
+    expect(plain(a.entries[1].segments)).toMatch(
+      /^2 new alerts waiting above the list\. The top one, /,
+    );
+    a.queue([alert(8)]);
+    a.flush(listOf([alert(8), alert(7)]));
+    a.queue([alert(9)]);
+    a.flush(listOf([alert(9), alert(8)]), waiting(alert(9)));
+    expect(plain(a.entries[3].segments)).toMatch(/^New alert waiting above the list\. Below G1/);
+  });
+
+  it('words an alert already in a held list as listed, not as waiting (F40)', () => {
+    const a = new Announcer(5);
+    a.queue([alert(4)]);
+    a.flush(listOf([alert(4), alert(0)]), waiting());
+    expect(plain(a.entries[0].segments)).toMatch(/^New alert, G4 Severe: /);
+    expect(a.entries[0].eventIds).toEqual(['a4']);
+  });
+
+  it('words the listed alerts of a group plainly, then those the bar holds as waiting (F40)', () => {
+    const a = new Announcer(5);
+    a.queue([alert(4), alert(1), alert(5)]);
+    expect(a.flush(listOf([alert(5), alert(4), alert(1), alert(0)]), waiting(alert(5)))).toBe(true);
+    expect(a.entries.map((e) => e.eventIds)).toEqual([['a4', 'a1'], ['a5']]);
+    expect(plain(a.entries[0].segments)).toMatch(/^2 new alerts\. Top of the list, G4 Severe: /);
+    expect(plain(a.entries[1].segments)).toMatch(
+      /^New alert waiting above the list, close approach: /,
+    );
+    a.queue([alert(5)]);
+    expect(a.flush(listOf([alert(5), alert(4)]), waiting(alert(5)))).toBe(false);
+  });
+
+  it('gives the waiting part of a group the total the bar shows when others already wait there (F39, F40)', () => {
+    const a = new Announcer(5);
+    a.queue([alert(7)]);
+    a.flush(listOf([alert(7), alert(0)]), waiting(alert(7)));
+    a.queue([alert(4), alert(1), alert(5), alert(9)]);
+    expect(
+      a.flush(
+        listOf([alert(5), alert(9), alert(7), alert(4), alert(1), alert(0)]),
+        waiting(alert(5), alert(9), alert(7)),
+      ),
+    ).toBe(true);
+    expect(a.entries.map((e) => e.eventIds)).toEqual([['a7'], ['a4', 'a1'], ['a5', 'a9']]);
+    expect(plain(a.entries[1].segments)).toBe(
+      '2 new alerts. Top of the list, G4 Severe: G4 level from SWPC estimated planetary Kp 7.67, 2024-05-10 15:00 to 18:00 UTC.',
+    );
+    expect(plain(a.entries[2].segments)).toBe(
+      '2 more new alerts waiting above the list, 3 in all. The top one, close approach: OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC.',
+    );
+  });
+
+  it('names what the list holds in the away and paused summaries', () => {
+    const a = new Announcer(5);
+    a.away([alert(1), alert(2)], false, NOUNS.close_approach);
+    a.away([alert(3)], true, NOUNS.space_weather_level);
+    a.paused([alert(6)], false, NOUNS.close_approach);
+    expect(a.entries.map((e) => plain(e.segments))).toEqual([
+      '2 close approaches arrived while you were away.',
+      '1 or more space weather alerts arrived while you were away.',
+      '1 close approach arrived while paused.',
+    ]);
+  });
+
+  it('on leaving gives back what was queued and not spoken, and draws nothing of what was spoken before', () => {
+    const a = new Announcer(5);
+    a.queue([alert(1)]);
+    a.flush(listOf([alert(1)]));
+    a.queue([alert(2), alert(1)]);
+    expect(ids(a.leave())).toEqual(['a2']);
+    expect(a.entries).toEqual([]);
+    expect(a.waiting).toBe(false);
+  });
+
+  it('sums up what arrived while away once, never an alert already spoken, and never speaks them again', () => {
+    const a = new Announcer(5);
+    a.queue([alert(1)]);
+    a.flush(listOf([alert(1)]));
+    a.leave();
+    expect(ids(a.away([alert(1), alert(2), alert(3)]))).toEqual(['a2', 'a3']);
+    expect(a.entries.map((e) => plain(e.segments))).toEqual([
+      '2 alerts arrived while you were away.',
+    ]);
+    expect(a.queue([alert(2)])).toBe(false);
+    expect(a.away([alert(1)])).toEqual([]);
+    expect(a.entries.length).toBe(1);
+  });
+
   it('covers 7 alerts queued before one flush with one grouped entry naming the newest', () => {
     const a = new Announcer(5);
     const seven = [0, 1, 2, 3, 4, 5, 6].map(alert);

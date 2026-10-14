@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { Badge } from '../badge/badge';
 import { PassesData } from '../data/passes-data';
@@ -12,7 +13,7 @@ const CLIPPED_BADGE: BadgeView = { classes: 'clipped', icon: 'i-clipped', text: 
 @Component({
   selector: 'app-passes-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Badge],
+  imports: [Badge, RouterLink],
   templateUrl: './passes-panel.html',
   styleUrl: './passes-panel.css',
 })

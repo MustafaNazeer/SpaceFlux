@@ -1,34 +1,49 @@
 <aside id="alerts" class="panel alerts" aria-labelledby="alerts-title" tabindex="-1">
   <h2 id="alerts-title" class="section-title">Recent alerts</h2>
-  <p role="status" [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</p>
-  @if (page(); as p) {
-    @if (p.items.length) {
-      <ol class="alert-list">
-        @for (item of views(); track item.view.eventId) {
-          <li class="alert-item">
-            <div class="alert-top">
-              @if (item.view.badge; as b) {
-                <app-badge [badge]="b" />
-              }
-              <span class="caption"><app-segments [segments]="item.view.received" /></span>
-            </div>
-            <h3><app-segments [segments]="item.view.title" /></h3>
-            @if (item.view.acknowledgeable) {
-              <app-ack-state [ack]="item.alert.acknowledgement" [showNote]="true" />
-            }
+  <fieldset class="kind-filter">
+    <legend class="label">Show</legend>
+    <div class="kind-options">
+      @for (o of options; track o.value) {
+        <label class="kind-option"><input type="radio" name="kind" [value]="o.value" [checked]="selected() === o.value" (change)="pick(o.value)" /><svg class="icon" aria-hidden="true"><use href="#i-check" /></svg>{{ o.label }}</label>
+      }
+    </div>
+  </fieldset>
+  <p role="status" [class]="page() || !status() ? 'visually-hidden' : 'secondary'">{{ status() }}</p>
+  @if (drawn(); as d) {
+    @if (d.held.length) {
+      <div class="held-bar" (focusin)="focusIn()" (focusout)="focusOut()">
+        <span>@if (d.held.length === 1) {1 new alert is waiting. It joins the list when focus leaves it.} @else {{{ d.held.length }} new alerts are waiting. They join the list when focus leaves it.}</span>
+        <button class="btn btn-secondary" type="button" (mousedown)="$event.preventDefault()" (click)="showHeld()">Show new alerts</button>
+      </div>
+    }
+    @if (d.items.length) {
+      <ol class="alert-list" (focusin)="focusIn()" (focusout)="focusOut()">
+        @for (item of views(); track item.alert.event_id) {
+          <li class="alert-item {{ item.border }}" [class.is-new]="newIds().has(item.alert.event_id)" [attr.data-event-id]="item.alert.event_id">
+            <app-alert-item [alert]="item.alert" [now]="now()" [isNew]="newIds().has(item.alert.event_id)" />
           </li>
         }
       </ol>
-      @if (p.more) {
-        <p class="caption">Showing the {{ p.items.length }} newest.</p>
-      }
+      <app-list-end [count]="d.items.length" [more]="d.more" [noun]="noun()" [state]="older()" (loadOlder)="pressOlder()" />
     } @else {
       <div class="empty">
-        <strong>No alerts are stored yet.</strong>
-        <p class="secondary">
-          Close approaches, and each change into, between or out of a derived space weather level, are listed here
-          newest first. Changes between none and no data are not listed; the space weather panels show the current state.
-        </p>
+        @switch (selected()) {
+          @case ('close_approach') {
+            <strong>No close approaches are stored yet.</strong>
+            <p class="secondary">A close approach is listed when a screening run finds a searched pair within its report distance. Only searched pairs are covered, so an empty list does not mean nothing came close.</p>
+          }
+          @case ('space_weather_level') {
+            <strong>No space weather alerts are stored yet.</strong>
+            <p class="secondary">Each change into, between or out of a derived space weather level is listed here newest first. Changes between none and no data are not listed; the space weather panels show the current state.</p>
+          }
+          @default {
+            <strong>No alerts are stored yet.</strong>
+            <p class="secondary">
+              Close approaches, and each change into, between or out of a derived space weather level, are listed here
+              newest first. Changes between none and no data are not listed; the space weather panels show the current state.
+            </p>
+          }
+        }
       </div>
     }
   }

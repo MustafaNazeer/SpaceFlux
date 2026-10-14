@@ -1,6 +1,9 @@
 import { Alert, AlertNotice } from '../data/queries';
 
-/** What the recent alerts panel shows: at most one page, newest first, and whether older alerts exist. */
+/**
+ * What the recent alerts panel shows, newest first, and whether older alerts exist: at most one page until an older
+ * page is loaded, and never cut after that.
+ */
 export interface AlertList {
   items: Alert[];
   more: boolean;
@@ -19,6 +22,16 @@ interface Pending {
 export interface LiveList {
   readonly poll?: { items: Alert[]; next: string | null };
   readonly pending: readonly Pending[];
+  /**
+   * Set once Load older is used: the alerts below the poll's page, newest first, and the cursor after the oldest of
+   * them. From then on the list is never cut, so nothing the viewer has seen leaves it.
+   */
+  readonly older?: Older;
+}
+
+export interface Older {
+  readonly items: readonly Alert[];
+  readonly next: string | null;
 }
 
 export const EMPTY_LIVE: LiveList = { pending: [] };
@@ -63,21 +76,70 @@ export function withPoll(list: LiveList, page: { items: Alert[]; next: string | 
     .filter((p) => !listed.has(p.alert.event_id))
     .map((p) => ({ ...p, missedBy: p.missedBy + 1 }))
     .filter((p) => p.missedBy < 2);
-  return { poll: page, pending };
+  if (!list.older) {
+    return { poll: page, pending };
+  }
+  // Alerts the new page pushed off its end were below none of it, so they move to the top of the older ones.
+  const pushedOff = (list.poll?.items ?? []).filter((a) => !listed.has(a.event_id));
+  const kept = new Set(pushedOff.map((a) => a.event_id));
+  const older = {
+    items: [...pushedOff, ...list.older.items.filter((a) => !kept.has(a.event_id))],
+    next: list.older.next,
+  };
+  return { poll: page, pending, older };
 }
 
-/** The panel's list: pending notices, then the poll's items, one entry per event_id, cut to the page size. */
+/**
+ * Starts showing older alerts: the list stops being cut, and `next` is the cursor after the oldest alert shown, the
+ * poll's last item once the cut is lifted. Unchanged when older alerts are already shown.
+ */
+export function withOlderStarted(list: LiveList): LiveList {
+  if (!list.poll || list.older) {
+    return list;
+  }
+  return { ...list, older: { items: [], next: list.poll.next } };
+}
+
+/** Adds an older page below the oldest alert shown, with the cursor after it. */
+export function withOlderPage(
+  list: LiveList,
+  page: { items: Alert[]; next: string | null },
+): LiveList {
+  if (!list.older) {
+    return list;
+  }
+  const items = [...list.older.items, ...page.items];
+  return { ...list, older: { items, next: page.next } };
+}
+
+/** Back to the first page, as on a filter change or a return to the console. */
+export function withoutOlder(list: LiveList): LiveList {
+  if (!list.older) {
+    return list;
+  }
+  const { older: _, ...rest } = list;
+  return rest;
+}
+
+/**
+ * The panel's list: pending notices, then the poll's items, then any older pages, one entry per event_id. Cut to
+ * the page size until an older page is asked for, and never cut after that.
+ */
 export function shown(list: LiveList, pageSize: number): AlertList | undefined {
   if (!list.poll) {
     return undefined;
   }
   const seen = new Set<string>();
   const all: Alert[] = [];
-  for (const alert of [...list.pending.map((p) => p.alert), ...list.poll.items]) {
+  const older = list.older?.items ?? [];
+  for (const alert of [...list.pending.map((p) => p.alert), ...list.poll.items, ...older]) {
     if (!seen.has(alert.event_id)) {
       seen.add(alert.event_id);
       all.push(alert);
     }
+  }
+  if (list.older) {
+    return { items: all, more: list.older.next !== null };
   }
   return {
     items: all.slice(0, pageSize),

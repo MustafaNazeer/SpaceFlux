@@ -8,7 +8,17 @@ import {
 } from '../data/queries';
 import { dataOf } from '../../testing/graphql';
 import { ALERTS_ANONYMOUS } from '../../testing/fixtures';
-import { EMPTY_LIVE, LiveList, noticeAlert, shown, withNotice, withPoll } from './alert-list';
+import {
+  EMPTY_LIVE,
+  LiveList,
+  noticeAlert,
+  shown,
+  withNotice,
+  withOlderPage,
+  withOlderStarted,
+  withoutOlder,
+  withPoll,
+} from './alert-list';
 
 const PAGE = 20;
 const RECORDED = ALERTS_ANONYMOUS.alerts.items as unknown as Record<string, unknown>[];
@@ -116,5 +126,63 @@ describe('alert list', () => {
   it('builds a list item from a notice with the notice fields unchanged', () => {
     const n = notice(5);
     expect(noticeAlert(n)).toEqual({ ...n, screening_run: null, acknowledgement: null });
+  });
+
+  describe('older pages', () => {
+    /** n recorded alerts under the ids a/0, a/1, ..., newest first. */
+    const run = (prefix: string, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        ...RECORDED[i % RECORDED.length],
+        event_id: `${prefix}/${i}`,
+      }));
+
+    it('lifts the cut when Load older starts, and pages after the poll cursor, the oldest alert then shown', () => {
+      const first = withPoll(EMPTY_LIVE, page(run('a', PAGE), 'MjA'));
+      const pushed = add(add(first, notice(5, 'new/1')).list, notice(4, 'new/2')).list;
+      expect(shown(pushed, PAGE)!.items.length).toBe(PAGE);
+      expect(ids(shown(pushed, PAGE)!.items).at(-1)).toBe('a/17');
+
+      const started = withOlderStarted(pushed);
+      expect(started.older).toEqual({ items: [], next: 'MjA' });
+      const all = shown(started, PAGE)!;
+      expect(all.items.length).toBe(PAGE + 2);
+      expect(ids(all.items).at(-1)).toBe('a/19');
+      expect(all.more).toBe(true);
+
+      const paged = withOlderPage(started, page(run('b', 3), null));
+      const after = shown(paged, PAGE)!;
+      expect(ids(after.items).slice(-4)).toEqual(['a/19', 'b/0', 'b/1', 'b/2']);
+      expect(after.more).toBe(false);
+    });
+
+    it('never cuts the list once an older page is loaded: what a refresh pushes off the page moves below it', () => {
+      const first = withPoll(EMPTY_LIVE, page(run('a', 4), 'NA'));
+      const paged = withOlderPage(withOlderStarted(first), page(run('b', 2), 'Ng'));
+      const before = ids(shown(paged, 4)!.items);
+      expect(before).toEqual(['a/0', 'a/1', 'a/2', 'a/3', 'b/0', 'b/1']);
+
+      const fresh = [...run('n', 2), ...run('a', 2)];
+      const refreshed = withPoll(paged, page(fresh, 'Mg'));
+      const after = shown(refreshed, 4)!;
+      expect(ids(after.items)).toEqual(['n/0', 'n/1', ...before]);
+      expect(after.more).toBe(true);
+      expect(refreshed.older?.next).toBe('Ng');
+    });
+
+    it('goes back to the first page, cut to its size again', () => {
+      const first = withPoll(EMPTY_LIVE, page(run('a', 4), 'NA'));
+      const paged = withOlderPage(withOlderStarted(first), page(run('b', 2), null));
+      const back = withoutOlder(paged);
+      expect(back.older).toBeUndefined();
+      expect(ids(shown(back, 4)!.items)).toEqual(['a/0', 'a/1', 'a/2', 'a/3']);
+      expect(withoutOlder(first)).toBe(first);
+    });
+
+    it('leaves the list alone when Load older starts before the first poll, or again while older pages show', () => {
+      expect(withOlderStarted(EMPTY_LIVE)).toBe(EMPTY_LIVE);
+      const started = withOlderStarted(withPoll(EMPTY_LIVE, page(run('a', 2), 'Mg')));
+      expect(withOlderStarted(started)).toBe(started);
+      expect(withOlderPage(EMPTY_LIVE, page(run('b', 1)))).toBe(EMPTY_LIVE);
+    });
   });
 });

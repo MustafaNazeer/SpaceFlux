@@ -13,6 +13,8 @@ import screeningRunCut from '../../../schemas/alerts/examples/valid-screening-ru
 import screeningRun from '../../../schemas/alerts/examples/valid-screening-run.json';
 import screeningRunStack from '../../../schemas/alerts/examples/valid-screening-run-stack.json';
 import passesReference from '../../../query-api/src/test/resources/passes/reference-passes.json';
+import gpObjectAj from '../../../orbit-core/src/test/resources/celestrak/gp-catnr-57036.json';
+import rRestatement from '../../../schemas/alerts/examples/valid-r-restatement.json';
 
 import { parseUtc } from '../app/format';
 
@@ -449,3 +451,54 @@ export const PASSES_STOPPED = {
 };
 
 export const PASSES_EMPTY_WATCHLIST = { watchlist: [] };
+
+/** alert(event_id) for the committed close approach example, seen anonymously; received_at as in ALERTS_ANONYMOUS. */
+export const ALERT_APPROACH = {
+  alert: {
+    ...closeApproach,
+    received_at: '2026-09-30T18:50:28.104512Z',
+    acknowledgement: ANONYMOUS_ACK,
+  },
+};
+
+/** alert(event_id) for the committed R1 level example; received_at as in ALERTS_ANONYMOUS. */
+export const ALERT_R_LEVEL = {
+  alert: { ...rLevel, received_at: '2026-09-30T18:50:28.311090Z', acknowledgement: null },
+};
+
+/** alert(event_id) for the committed G4 level example (an estimated Kp interval). */
+export const ALERT_G_LEVEL = {
+  alert: { ...gLevel, received_at: '2026-09-30T18:50:28.270554Z', acknowledgement: null },
+};
+
+/** alert(event_id) for the committed restatement example (no data, restated after a zero run). Composed receive time. */
+export const ALERT_RESTATEMENT = {
+  alert: { ...rRestatement, received_at: '2026-09-30T20:42:39.004211Z', acknowledgement: null },
+};
+
+/** alert(event_id) for the committed screening run example. */
+export const ALERT_SCREENING_RUN = {
+  alert: { ...screeningRun, received_at: '2026-09-30T18:50:28.120931Z', acknowledgement: null },
+};
+
+/**
+ * catalog_object(57036) built from the recorded CelesTrak capture gp-catnr-57036.json (orbit-core test resources,
+ * captured 2026-09-29T05:20:09Z, its last_fetched_at here), with `pages` of close approaches by cursor: the first
+ * page under `null`. The epoch is the capture's EPOCH read as UTC, written as the API writes DATETIME(6).
+ */
+export function catalogObjectAj(pages: Record<string, { items: object[]; next: string | null }>) {
+  const [gp] = gpObjectAj;
+  return {
+    catalog_object: {
+      norad_cat_id: gp.NORAD_CAT_ID,
+      object_name: gp.OBJECT_NAME,
+      object_id: gp.OBJECT_ID,
+      epoch: `${gp.EPOCH}Z`,
+      last_fetched_at: '2026-09-29T05:20:09.000000Z',
+      close_approaches: (args: { after?: string | null }) => pages[args.after ?? 'null'],
+    },
+  };
+}
+
+/** The close approach example as an item of an object's list. */
+export const APPROACH_ITEM = ALERTS_ANONYMOUS.alerts.items[5];

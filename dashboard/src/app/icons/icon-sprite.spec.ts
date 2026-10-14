@@ -22,6 +22,7 @@ describe('IconSprite', () => {
       'i-check',
       'i-clipped',
       'i-open',
+      'i-new',
     ]);
   });
 });

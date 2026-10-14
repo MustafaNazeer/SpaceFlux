@@ -32,5 +32,17 @@ exports[`dashboard queries > reports the measured numbers, so a change that near
     40,
     35,
   ],
+  [
+    "AlertDetail",
+    4,
+    67,
+    60,
+  ],
+  [
+    "ObjectAlerts",
+    6,
+    59,
+    886,
+  ],
 ]
 `;

@@ -63,8 +63,8 @@
           <tbody>
             @for (a of v.approaches; track a.event_id) {
               <tr>
-                <td>{{ objectName(a.close_approach.watchlist_object) }}<span class="sub mono">{{ a.close_approach.watchlist_object.catalog_number }}, elements {{ days(a.close_approach.watchlist_object.element_age_days) }} old</span></td>
-                <td>{{ objectName(a.close_approach.other_object) }}<span class="sub mono">{{ a.close_approach.other_object.catalog_number }}, elements {{ days(a.close_approach.other_object.element_age_days) }} old</span></td>
+                <td><a [routerLink]="['/objects', a.close_approach.watchlist_object.catalog_number, 'alerts']">{{ objectName(a.close_approach.watchlist_object) }}</a><span class="sub mono">{{ a.close_approach.watchlist_object.catalog_number }}, elements {{ days(a.close_approach.watchlist_object.element_age_days) }} old</span></td>
+                <td><a [routerLink]="['/objects', a.close_approach.other_object.catalog_number, 'alerts']">{{ objectName(a.close_approach.other_object) }}</a><span class="sub mono">{{ a.close_approach.other_object.catalog_number }}, elements {{ days(a.close_approach.other_object.element_age_days) }} old</span></td>
                 <td><time [attr.datetime]="time(a.close_approach.time_of_closest_approach).datetime">{{ time(a.close_approach.time_of_closest_approach).label }} UTC</time></td>
                 <td class="num"><span class="num">{{ distance(a.close_approach.miss_distance_m) }}</span></td>
                 <td class="num"><span class="num">{{ kmPerS(a.close_approach.relative_speed_m_per_s) }}</span></td>

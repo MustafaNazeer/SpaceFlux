@@ -1,0 +1,24 @@
+<div class="page">
+  <app-stale-banners [banners]="banners()" />
+
+  <main id="main" class="primary-col" tabindex="-1">
+    <app-space-weather [current]="spaceWeather()" [failedAt]="data.spaceWeather.failedAt()" [paused]="data.paused()" />
+    <app-screening [current]="screening()" [now]="now()" [failedAt]="data.screening.failedAt()" [paused]="data.paused()" />
+    <app-passes-panel />
+  </main>
+
+  <app-recent-alerts
+    [page]="data.recentAlerts()"
+    [kind]="data.kind()"
+    [log]="data.log()"
+    (logRendered)="data.logRendered($event)"
+    [now]="now()"
+    [failedAt]="data.alerts.failedAt()"
+    [paused]="data.paused()"
+    [older]="data.older()"
+    [arrived]="data.arrivedAway()"
+    (heldChange)="data.setHeld($event)"
+    (kindChange)="setKind($event)"
+    (loadOlder)="data.loadOlder()"
+  />
+</div>

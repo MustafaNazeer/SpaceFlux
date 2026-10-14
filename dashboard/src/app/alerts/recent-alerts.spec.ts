@@ -1,8 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 
 import { Clock } from '../data/clock';
 import {
   Alert,
+  AlertKind,
   ALERT_STORED,
   AlertStoredData,
   RECENT_ALERTS,
@@ -80,6 +82,10 @@ function items(el: HTMLElement): HTMLElement[] {
 }
 
 describe('RecentAlerts', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+  });
+
   it('is the skip link target and shows a loading status before the first answer', async () => {
     const el = await render(undefined);
     expect(el.querySelector('aside#alerts')?.getAttribute('tabindex')).toBe('-1');
@@ -120,7 +126,7 @@ describe('RecentAlerts', () => {
     );
   });
 
-  it('shows acknowledgement state only on alerts that can be acknowledged, with no controls', async () => {
+  it('shows acknowledgement state only on alerts that can be acknowledged, with no control but the title link', async () => {
     const el = await render(ALERTS_ANONYMOUS);
     const list = items(el);
     expect(list.map((li) => squash(li.querySelector('.ack-state')?.textContent))).toEqual([
@@ -132,7 +138,11 @@ describe('RecentAlerts', () => {
       'Acknowledged 19:02 UTC',
     ]);
     expect(list[5].querySelector('.ack-state use')?.getAttribute('href')).toBe('#i-check');
-    expect(el.querySelectorAll('button, form, textarea, input').length).toBe(0);
+    expect(el.querySelector('ol')!.querySelectorAll('button, form, textarea, input').length).toBe(
+      0,
+    );
+    expect(list.map((li) => li.querySelectorAll('a').length)).toEqual([1, 1, 1, 1, 1, 1]);
+    expect(list.every((li) => li.querySelector('a')?.classList.contains('title-link'))).toBe(true);
   });
 
   it('shows no principal or note to an anonymous viewer, since the API sends none', async () => {
@@ -152,8 +162,16 @@ describe('RecentAlerts', () => {
   });
 
   it('says when more alerts exist than the page shows', async () => {
-    expect(squash((await render(ALERTS_ANONYMOUS)).textContent)).toContain('Showing the 6 newest.');
-    expect(squash((await render(ALERTS_OPERATOR)).textContent)).not.toContain('Showing the');
+    const more = await render(ALERTS_ANONYMOUS);
+    expect(squash(more.querySelector('.list-end-row .caption')?.textContent)).toBe(
+      '6 shown, newest first',
+    );
+    expect(squash(more.querySelector('.list-end-row button')?.textContent)).toBe('Load older');
+    const all = await render(ALERTS_OPERATOR);
+    expect(all.querySelector('.list-end-row')).toBeNull();
+    expect(squash(all.querySelector('.list-end-line')?.textContent)).toBe(
+      'The one stored alert is shown.',
+    );
   });
 
   it('says nothing is stored yet for an empty list', async () => {
@@ -164,10 +182,10 @@ describe('RecentAlerts', () => {
     expect(el.querySelector('ol')).toBeNull();
   });
 
-  it('shows an ended series with the Ended badge and who took over, never as quiet', async () => {
+  it('shows an ended series with the No longer primary badge and who took over, never as quiet', async () => {
     const [ended, endedUnknown, screeningRun] = items(await render(ALERTS_ENDED));
     const badge = ended.querySelector('.badge')!;
-    expect(squash(badge.textContent)).toBe('Ended');
+    expect(squash(badge.textContent)).toBe('No longer primary');
     expect(badge.classList).toContain('nodata');
     expect(badge.querySelector('use')?.getAttribute('href')).toBe('#i-nodata');
     expect(squash(ended.querySelector('h3')?.textContent)).toBe(
@@ -210,13 +228,18 @@ describe('RecentAlerts', () => {
     ).nativeElement as HTMLElement;
     const li = items(el);
     expect(li.length).toBe(7);
-    expect(li[0].innerHTML).toBe(li[2].innerHTML);
+    // The same markup but for the event id in the title link's address.
+    const markup = (e: HTMLElement) => e.innerHTML.replace(/href="[^"]*"/g, 'href');
+    expect(markup(li[0])).toBe(markup(li[2]));
+    expect(li[0].querySelector('a')?.getAttribute('href')).toBe('/alerts/new%2F1');
     expect(squash(li[0].querySelector('.ack-state')?.textContent)).toBe('Not acknowledged');
   });
 
   it('says more alerts exist when notices push the page past its size', async () => {
     const el = await mount({ items: pageOf(ALERTS_OPERATOR).items, more: true });
-    expect(squash(el.nativeElement.textContent)).toContain('Showing the 1 newest.');
+    expect(squash(el.nativeElement.querySelector('.list-end-row .caption')?.textContent)).toBe(
+      '1 shown, newest first',
+    );
   });
 
   it('speaks each entry once, in a polite log after the list, and keeps earlier entries in place', async () => {
@@ -288,5 +311,498 @@ describe('RecentAlerts', () => {
   it('has an empty log when nothing new has arrived', async () => {
     const el = await render(ALERTS_ANONYMOUS);
     expect(el.querySelector('[role="log"]')?.textContent?.trim()).toBe('');
+  });
+
+  describe('filter, New badge, holding and Load older', () => {
+    const tick = () => new Promise((r) => setTimeout(r));
+    const alert = (id: string, from = 0): Alert => ({
+      ...(RECORDED[from] as unknown as Alert),
+      event_id: id,
+    });
+    const listOf = (ids: string[], more = false): AlertList => ({
+      items: ids.map((id) => alert(id)),
+      more,
+    });
+
+    async function panel(list: AlertList | undefined, kind: AlertKind | null = null) {
+      TestBed.inject(Clock).set(NOW);
+      const fixture = TestBed.createComponent(RecentAlerts);
+      fixture.componentRef.setInput('page', list);
+      fixture.componentRef.setInput('kind', kind);
+      fixture.componentRef.setInput('now', NOW);
+      await fixture.whenStable();
+      const el = fixture.nativeElement as HTMLElement;
+      const set = async (name: string, value: unknown) => {
+        fixture.componentRef.setInput(name, value);
+        await fixture.whenStable();
+      };
+      return { fixture, el, set };
+    }
+    const shownIds = (el: HTMLElement) => items(el).map((li) => li.dataset['eventId']);
+    const newIds = (el: HTMLElement) =>
+      items(el)
+        .filter((li) => li.querySelector('.badge.new'))
+        .map((li) => li.dataset['eventId']);
+
+    it('offers All, Close approaches and Space weather as radios under the legend Show, the current one checked', async () => {
+      const { el, fixture, set } = await panel(listOf(['a']), 'close_approach');
+      const fieldset = el.querySelector('fieldset.kind-filter')!;
+      expect(squash(fieldset.querySelector('legend')?.textContent)).toBe('Show');
+      const radios = Array.from(fieldset.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
+      expect(radios.map((r) => squash(r.closest('label')?.textContent))).toEqual([
+        'All',
+        'Close approaches',
+        'Space weather',
+      ]);
+      expect(radios.map((r) => r.checked)).toEqual([false, true, false]);
+      expect(new Set(radios.map((r) => r.name)).size).toBe(1);
+      expect(
+        radios.every(
+          (r) => r.closest('label')!.querySelector('use')?.getAttribute('href') === '#i-check',
+        ),
+      ).toBe(true);
+
+      const picked: (AlertKind | null)[] = [];
+      fixture.componentInstance.kindChange.subscribe((k) => picked.push(k));
+      radios[2].click();
+      radios[0].click();
+      expect(picked).toEqual(['space_weather_level', null]);
+      await set('kind', null);
+      expect(radios.map((r) => r.checked)).toEqual([true, false, false]);
+    });
+
+    it('says what it is loading, what failed and what is empty under each filter', async () => {
+      const cases: [AlertKind | null, string, string, string][] = [
+        [
+          null,
+          'Loading recent alerts.',
+          'Recent alerts could not be loaded. The page tries again at the next refresh.',
+          'No alerts are stored yet.',
+        ],
+        [
+          'close_approach',
+          'Loading close approaches.',
+          'Close approaches could not be loaded. The page tries again at the next refresh.',
+          'No close approaches are stored yet.',
+        ],
+        [
+          'space_weather_level',
+          'Loading space weather alerts.',
+          'Space weather alerts could not be loaded. The page tries again at the next refresh.',
+          'No space weather alerts are stored yet.',
+        ],
+      ];
+      for (const [kind, loading, failed, empty] of cases) {
+        const { el, set } = await panel(undefined, kind);
+        const status = () => squash(el.querySelector('aside > [role="status"]')?.textContent);
+        expect(status()).toBe(loading);
+        await set('failedAt', NOW);
+        expect(status()).toBe(failed);
+        await set('page', { items: [], more: false });
+        expect(squash(el.querySelector('.empty strong')?.textContent)).toBe(empty);
+      }
+      const { el } = await panel({ items: [], more: false }, 'close_approach');
+      expect(squash(el.querySelector('.empty p')?.textContent)).toBe(
+        'A close approach is listed when a screening run finds a searched pair within its report distance. Only searched pairs are covered, so an empty list does not mean nothing came close.',
+      );
+    });
+
+    it('links each title to the alert page, the event id as one encoded path segment', async () => {
+      const { el } = await panel(
+        pageOf(ALERTS_ANONYMOUS) && { items: pageOf(ALERTS_ANONYMOUS).items, more: false },
+      );
+      const link = items(el)[5].querySelector('h3 a.title-link')!;
+      expect(link.getAttribute('href')).toBe(
+        '/alerts/close_approach%2F1%2F2026-09-29T05:20:09Z%2F1%2F57036%2F27958%2F2026-09-30T03:34:37.588Z',
+      );
+    });
+
+    it('marks an alert New only once it joins above the top while shown, never on the first list, and clears it after 10 minutes', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        const { el, set } = await panel(listOf(['a', 'b']));
+        expect(newIds(el)).toEqual([]);
+        await set('page', listOf(['n1', 'a', 'b']));
+        expect(newIds(el)).toEqual(['n1']);
+        const li = items(el)[0];
+        expect(li.classList).toContain('is-new');
+        expect(li.classList).toContain('plain');
+        expect(squash(li.querySelector('.badge.new')?.textContent)).toBe('New');
+        expect(li.querySelector('.badge.new use')?.getAttribute('href')).toBe('#i-new');
+        expect(el.querySelector('[role="log"]')?.textContent?.trim()).toBe('');
+
+        await set('page', listOf(['n1', 'a', 'b', 'c'], false));
+        expect(newIds(el)).toEqual(['n1']);
+        vi.advanceTimersByTime(10 * 60_000);
+        await vi.waitFor(async () => {
+          await set('now', NOW);
+          expect(newIds(el)).toEqual([]);
+        });
+        expect(items(el)[0].classList).not.toContain('is-new');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('gives a New close approach the plain border and a New level its alert color', async () => {
+      const { el, set } = await panel({ items: [alert('a', 5)], more: false });
+      await set('page', { items: [alert('lvl', 4), alert('ca', 5), alert('a', 5)], more: false });
+      const [lvl, ca] = items(el);
+      expect(lvl.classList).toContain('l4');
+      expect(ca.classList).toContain('approach');
+    });
+
+    it('marks nothing New in the first list under a new filter', async () => {
+      const { el, set } = await panel(listOf(['a']));
+      await set('kind', 'close_approach');
+      await set('page', undefined);
+      await set('page', listOf(['c1', 'c2']));
+      expect(newIds(el)).toEqual([]);
+    });
+
+    it('does not trim or reorder while focus is inside the list, shows the held bar, and joins them when focus leaves', async () => {
+      const { el, set } = await panel(listOf(['a', 'b', 'c']));
+      const link = items(el)[1].querySelector<HTMLElement>('a.title-link')!;
+      link.focus();
+      expect(document.activeElement).toBe(link);
+      await set('page', listOf(['n2', 'n1', 'a', 'b']));
+      expect(shownIds(el)).toEqual(['a', 'b', 'c']);
+      const bar = el.querySelector('.held-bar')!;
+      expect(squash(bar.querySelector('span')?.textContent)).toBe(
+        '2 new alerts are waiting. They join the list when focus leaves it.',
+      );
+      expect(bar.getAttribute('role')).toBeNull();
+      expect(bar.hasAttribute('aria-live')).toBe(false);
+      expect(document.activeElement).toBe(link);
+
+      link.blur();
+      await tick();
+      await set('now', NOW);
+      expect(shownIds(el)).toEqual(['n2', 'n1', 'a', 'b']);
+      expect(el.querySelector('.held-bar')).toBeNull();
+      expect(newIds(el)).toEqual(['n2', 'n1']);
+    });
+
+    it('says one new alert is waiting in the singular', async () => {
+      const { el, set } = await panel(listOf(['a']));
+      items(el)[0].querySelector<HTMLElement>('a')!.focus();
+      await set('page', listOf(['n1', 'a']));
+      expect(squash(el.querySelector('.held-bar span')?.textContent)).toBe(
+        '1 new alert is waiting. It joins the list when focus leaves it.',
+      );
+      (document.activeElement as HTMLElement).blur();
+      await tick();
+    });
+
+    it("adds the held alerts on Show new alerts and moves focus to the first one's title link", async () => {
+      const { el, set } = await panel(listOf(['a', 'b']));
+      items(el)[0].querySelector<HTMLElement>('a')!.focus();
+      await set('page', listOf(['n2', 'n1', 'a', 'b']));
+      const button = el.querySelector<HTMLButtonElement>('.held-bar button')!;
+      expect(squash(button.textContent)).toBe('Show new alerts');
+      const down = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+      button.dispatchEvent(down);
+      expect(down.defaultPrevented).toBe(true);
+      button.click();
+      await set('now', NOW);
+      await tick();
+      expect(shownIds(el)).toEqual(['n2', 'n1', 'a', 'b']);
+      expect(document.activeElement).toBe(items(el)[0].querySelector('a.title-link'));
+      (document.activeElement as HTMLElement).blur();
+      await tick();
+    });
+
+    it('holds the list while a form is open, even with focus elsewhere', async () => {
+      const { el, set } = await panel(listOf(['a', 'b']));
+      await set('formOpen', true);
+      await set('page', listOf(['n1', 'a']));
+      expect(shownIds(el)).toEqual(['a', 'b']);
+      expect(el.querySelector('.held-bar')).not.toBeNull();
+      await set('formOpen', false);
+      expect(shownIds(el)).toEqual(['n1', 'a']);
+    });
+
+    it('stays held when focus leaves while a form is open, and joins once the form closes', async () => {
+      const { el, set } = await panel(listOf(['a', 'b']));
+      const link = items(el)[0].querySelector<HTMLElement>('a')!;
+      await set('formOpen', true);
+      link.focus();
+      link.blur();
+      await tick();
+      await set('page', listOf(['n1', 'a', 'b']));
+      expect(shownIds(el)).toEqual(['a', 'b']);
+      await set('formOpen', false);
+      expect(shownIds(el)).toEqual(['n1', 'a', 'b']);
+    });
+
+    it('stays held when the form closes with focus still inside the list', async () => {
+      const { el, set } = await panel(listOf(['a', 'b']));
+      await set('formOpen', true);
+      items(el)[0].querySelector<HTMLElement>('a')!.focus();
+      await set('page', listOf(['n1', 'a', 'b']));
+      await set('formOpen', false);
+      expect(shownIds(el)).toEqual(['a', 'b']);
+      (document.activeElement as HTMLElement).blur();
+      await tick();
+      await set('now', NOW);
+      expect(shownIds(el)).toEqual(['n1', 'a', 'b']);
+    });
+
+    it('keeps adding an older page below while held', async () => {
+      const { el, set } = await panel(listOf(['a', 'b'], true));
+      items(el)[0].querySelector<HTMLElement>('a')!.focus();
+      await set('page', listOf(['a', 'b', 'c', 'd'], false));
+      expect(shownIds(el)).toEqual(['a', 'b', 'c', 'd']);
+      expect(el.querySelector('.held-bar')).toBeNull();
+      (document.activeElement as HTMLElement).blur();
+      await tick();
+    });
+
+    it('moves focus to the first added title link when a press reaches the end, or to the end line when it added none', async () => {
+      const { el, fixture, set } = await panel(listOf(['a', 'b'], true));
+      const pressed: number[] = [];
+      fixture.componentInstance.loadOlder.subscribe(() => pressed.push(1));
+      const button = el.querySelector<HTMLButtonElement>('.list-end button')!;
+      button.focus();
+      button.click();
+      expect(pressed).toEqual([1]);
+      await set('older', { phase: 'loading', added: 0, firstAdded: null, end: false, seq: 1 });
+      expect(squash(el.querySelector('.list-end [role="status"]')?.textContent)).toBe(
+        'Loading older alerts.',
+      );
+      fixture.componentRef.setInput('page', listOf(['a', 'b', 'c', 'd'], true));
+      await set('older', { phase: 'loaded', added: 2, firstAdded: 'c', end: false, seq: 1 });
+      expect(document.activeElement).toBe(el.querySelector('.list-end button'));
+      expect(squash(el.querySelector('.list-end [role="status"]')?.textContent)).toBe(
+        '2 older alerts loaded.',
+      );
+
+      fixture.componentRef.setInput('page', listOf(['a', 'b', 'c', 'd', 'e'], false));
+      await set('older', { phase: 'loaded', added: 1, firstAdded: 'e', end: true, seq: 2 });
+      await tick();
+      expect(el.querySelector('.list-end button')).toBeNull();
+      expect(document.activeElement).toBe(items(el)[4].querySelector('a.title-link'));
+      expect(squash(el.querySelector('.list-end-line')?.textContent)).toBe(
+        'All 5 stored alerts are shown, newest first.',
+      );
+
+      (document.activeElement as HTMLElement).blur();
+      await tick();
+      const other = await panel(listOf(['a'], true));
+      other.fixture.componentRef.setInput('page', listOf(['a'], false));
+      await other.set('older', { phase: 'loaded', added: 0, firstAdded: null, end: true, seq: 1 });
+      await tick();
+      expect(document.activeElement).toBe(other.el.querySelector('.list-end-line'));
+    });
+
+    it('puts the result of a filter change in the status line once its first answer is drawn (F28)', async () => {
+      const { el, fixture, set } = await panel(listOf(['a']));
+      const status = () => squash(el.querySelector('aside > [role="status"]')?.textContent);
+      const change = async (kind: AlertKind | null, page: AlertList | undefined) => {
+        fixture.componentRef.setInput('kind', kind);
+        await set('page', page);
+      };
+      expect(status()).toBe('');
+
+      await change('close_approach', undefined);
+      expect(status()).toBe('Loading close approaches.');
+      await set('page', {
+        items: Array.from({ length: 7 }, (_, i) => alert(`c${i}`, 5)),
+        more: false,
+      });
+      expect(status()).toBe('All 7 stored close approaches are shown, newest first.');
+      const end = el.querySelector('.list-end-line')!;
+      expect(end.getAttribute('role')).toBeNull();
+      expect(end.hasAttribute('aria-live')).toBe(false);
+      await set('page', { items: [alert('c9', 5), alert('c0', 5)], more: false });
+      expect(status()).toBe('');
+
+      await change('space_weather_level', undefined);
+      await set(
+        'page',
+        listOf(
+          Array.from({ length: 20 }, (_, i) => `s${i}`),
+          true,
+        ),
+      );
+      expect(status()).toBe(
+        '20 space weather alerts shown, newest first. Older ones can be loaded.',
+      );
+      el.querySelector<HTMLButtonElement>('.list-end button')!.click();
+      await set('now', NOW);
+      expect(status()).toBe('');
+
+      await change(null, undefined);
+      await set('page', { items: [], more: false });
+      expect(status()).toBe('No alerts are stored yet.');
+
+      await change('close_approach', undefined);
+      await set('page', { items: [alert('c1', 5)], more: false });
+      expect(status()).toBe('The one stored close approach is shown.');
+    });
+
+    it('keeps the filter result visually hidden, and empties it silently once the drawn list changes (F37)', async () => {
+      const { el, fixture, set } = await panel(listOf(['a']));
+      const line = () => el.querySelector<HTMLElement>('aside > [role="status"]')!;
+      const sevenApproaches = () => ({
+        items: Array.from({ length: 7 }, (_, i) => alert(`c${i}`, 5)),
+        more: false,
+      });
+      fixture.componentRef.setInput('kind', 'close_approach');
+      await set('page', undefined);
+      expect(line().className).toBe('secondary');
+      await set('page', sevenApproaches());
+      expect(squash(line().textContent)).toBe(
+        'All 7 stored close approaches are shown, newest first.',
+      );
+      expect(line().className).toBe('visually-hidden');
+
+      // A later answer that draws the same list leaves the result as it is.
+      await set('page', sevenApproaches());
+      expect(squash(line().textContent)).toBe(
+        'All 7 stored close approaches are shown, newest first.',
+      );
+
+      // A live close approach joins the list: the result would now be false, so it goes.
+      const joined = sevenApproaches();
+      await set('page', { ...joined, items: [alert('c8', 5), ...joined.items] });
+      expect(squash(line().textContent)).toBe('');
+      expect(line().className).toBe('visually-hidden');
+      expect(squash(el.querySelector('.list-end-line')?.textContent)).toBe(
+        'All 8 stored close approaches are shown, newest first.',
+      );
+    });
+
+    it('empties the filter result when only whether older alerts exist changes (F37)', async () => {
+      const { el, fixture, set } = await panel(listOf(['a']));
+      const status = () => squash(el.querySelector('aside > [role="status"]')?.textContent);
+      fixture.componentRef.setInput('kind', 'close_approach');
+      await set('page', undefined);
+      const approaches = [alert('c1', 5), alert('c0', 5)];
+      await set('page', { items: approaches, more: false });
+      expect(status()).toBe('All 2 stored close approaches are shown, newest first.');
+      await set('page', { items: approaches, more: true });
+      expect(status()).toBe('');
+    });
+
+    it('empties the filter result when alerts held above the list join it (F37)', async () => {
+      const { el, fixture, set } = await panel(listOf(['a']));
+      const status = () => squash(el.querySelector('aside > [role="status"]')?.textContent);
+      fixture.componentRef.setInput('kind', 'close_approach');
+      await set('page', undefined);
+      await set('page', { items: [alert('c1', 5), alert('c0', 5)], more: false });
+      expect(status()).toBe('All 2 stored close approaches are shown, newest first.');
+      const link = items(el)[0].querySelector<HTMLElement>('a.title-link')!;
+      link.focus();
+      await fixture.whenStable();
+      await set('page', { items: [alert('c2', 5), alert('c1', 5), alert('c0', 5)], more: false });
+      expect(el.querySelector('.held-bar')).not.toBeNull();
+      expect(items(el).length).toBe(2);
+      expect(status()).toBe('All 2 stored close approaches are shown, newest first.');
+      el.querySelector<HTMLButtonElement>('.held-bar button')!.click();
+      await fixture.whenStable();
+      await tick();
+      expect(items(el).length).toBe(3);
+      expect(status()).toBe('');
+    });
+
+    it('marks the alerts that arrived while the console was not shown as New', async () => {
+      const { el, set } = await panel(listOf(['away/2', 'away/1', 'a']));
+      expect(newIds(el)).toEqual([]);
+      await set('arrived', new Set(['away/1', 'away/2']));
+      expect(newIds(el)).toEqual(['away/2', 'away/1']);
+    });
+
+    it('tells the console the alerts the hold began with, and when the list is no longer held', async () => {
+      const { el, fixture, set } = await panel(listOf(['a', 'b']));
+      const held: (string[] | null)[] = [];
+      fixture.componentInstance.heldChange.subscribe((h) =>
+        held.push(h && h.map((a) => a.event_id)),
+      );
+      const link = items(el)[0].querySelector<HTMLElement>('a.title-link')!;
+      link.focus();
+      await fixture.whenStable();
+      expect(held).toEqual([['a', 'b']]);
+      await set('page', listOf(['n', 'a', 'b']));
+      expect(held).toEqual([['a', 'b']]);
+      link.blur();
+      await tick();
+      await fixture.whenStable();
+      expect(held).toEqual([['a', 'b'], null]);
+    });
+
+    it('tells the console the list is no longer held once the filter changes', async () => {
+      const { el, fixture } = await panel(listOf(['a', 'b']));
+      const held: (string[] | null)[] = [];
+      fixture.componentInstance.heldChange.subscribe((h) =>
+        held.push(h && h.map((a) => a.event_id)),
+      );
+      items(el)[0].querySelector<HTMLElement>('a.title-link')!.focus();
+      await fixture.whenStable();
+      fixture.componentRef.setInput('kind', 'close_approach');
+      await fixture.whenStable();
+      expect(held).toEqual([['a', 'b'], null]);
+    });
+
+    it('keeps the focused link where it was on screen when the held bar appears (F31)', async () => {
+      const { el, set } = await panel(listOf(['a', 'b', 'c']));
+      const link = items(el)[2].querySelector<HTMLElement>('a.title-link')!;
+      link.focus();
+      // The bar is drawn above the list, so without it the link would move down by the bar's height.
+      vi.spyOn(link, 'getBoundingClientRect').mockImplementation(
+        () => ({ top: el.querySelector('.held-bar') ? 414 : 300 }) as DOMRect,
+      );
+      const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined);
+      try {
+        await set('page', listOf(['n1', 'a', 'b', 'c']));
+        await tick();
+        expect(el.querySelector('.held-bar')).not.toBeNull();
+        expect(scrollBy).toHaveBeenCalledTimes(1);
+        expect(scrollBy).toHaveBeenCalledWith({ top: 114, left: 0, behavior: 'instant' });
+        await set('page', listOf(['n2', 'n1', 'a', 'b', 'c']));
+        await tick();
+        expect(scrollBy).toHaveBeenCalledTimes(1);
+      } finally {
+        scrollBy.mockRestore();
+        link.blur();
+        await tick();
+      }
+    });
+
+    it('does not scroll for the held bar when focus is outside the list', async () => {
+      const { el, set } = await panel(listOf(['a', 'b']));
+      const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined);
+      try {
+        await set('formOpen', true);
+        await set('page', listOf(['n1', 'a', 'b']));
+        await tick();
+        expect(el.querySelector('.held-bar')).not.toBeNull();
+        expect(scrollBy).not.toHaveBeenCalled();
+      } finally {
+        scrollBy.mockRestore();
+      }
+    });
+
+    it('leaves no focus timer behind once destroyed', async () => {
+      const { el, fixture } = await panel(listOf(['a']));
+      const link = items(el)[0].querySelector<HTMLElement>('a.title-link')!;
+      link.focus();
+      const timeouts = vi.spyOn(globalThis, 'setTimeout');
+      link.blur();
+      const handle = timeouts.mock.results.at(-1)?.value;
+      timeouts.mockRestore();
+      expect(handle).toBeDefined();
+      const cleared = vi.spyOn(globalThis, 'clearTimeout');
+      fixture.destroy();
+      expect(cleared).toHaveBeenCalledWith(handle);
+      cleared.mockRestore();
+    });
+
+    it('names the kind at the end of a filtered list', async () => {
+      const { el } = await panel({ items: [alert('c1', 5)], more: false }, 'close_approach');
+      expect(squash(el.querySelector('.list-end-line')?.textContent)).toBe(
+        'The one stored close approach is shown.',
+      );
+    });
   });
 });

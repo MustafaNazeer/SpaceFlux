@@ -402,6 +402,197 @@ details.disclosure[open] > summary {
   color: var(--text-secondary);
 }
 
+/* Alert lists, on the console and on an object's page */
+.alert-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+.alert-item {
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+.alert-item.is-new {
+  transition: border-left-color var(--duration-slow) var(--ease-standard);
+}
+.alert-item.is-new.l1 {
+  border-left-color: var(--alert-1);
+}
+.alert-item.is-new.l2 {
+  border-left-color: var(--alert-2);
+}
+.alert-item.is-new.l3 {
+  border-left-color: var(--alert-3);
+}
+.alert-item.is-new.l4 {
+  border-left-color: var(--alert-4);
+}
+.alert-item.is-new.l5 {
+  border-left-color: var(--alert-5);
+}
+.alert-item.is-new.approach,
+.alert-item.is-new.plain {
+  border-left-color: var(--border-strong);
+}
+.alert-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+.alert-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.alert-item .alert-title {
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 500;
+}
+.badge.new {
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+.badge.new .icon {
+  width: 8px;
+  height: 8px;
+}
+a.title-link {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  /* Room for the focus ring when a link is scrolled to the window's edge. */
+  scroll-margin-block: var(--space-2);
+}
+a.title-link:hover {
+  color: var(--accent-hover);
+}
+
+.list-end {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+.list-end-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+/* Alert pages */
+.route-bar {
+  padding: var(--space-3) var(--space-5) 0;
+}
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+}
+.back-link::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  margin-left: var(--space-1);
+}
+.route-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  max-width: 800px;
+  padding: var(--space-4) var(--space-5) var(--space-6);
+}
+.page-head {
+  display: grid;
+  gap: var(--space-2);
+}
+.state-block {
+  justify-items: start;
+}
+.page-title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.route-page .panel {
+  display: grid;
+  gap: var(--space-3);
+}
+.panel .panel-title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 600;
+}
+.detail-facts {
+  display: grid;
+  grid-template-columns: minmax(144px, max-content) minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+.detail-facts dt {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 22px;
+}
+.detail-facts dd {
+  margin: 0;
+  color: var(--text-primary);
+  min-width: 0;
+}
+.detail-facts dd .sub {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+.event-id {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .route-bar,
+  .route-page {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+  .page-title {
+    font-size: 22px;
+    line-height: 30px;
+  }
+  .detail-facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0 var(--space-4);
+  }
+  .detail-facts dd + dt {
+    margin-top: var(--space-2);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

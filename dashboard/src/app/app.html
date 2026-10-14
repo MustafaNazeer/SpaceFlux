@@ -1,11 +1,17 @@
 <app-icon-sprite />
 
-<a class="skip-link" href="#main">Skip to space weather</a>
-<a class="skip-link" href="#alerts">Skip to recent alerts</a>
+@if (onConsole()) {
+  <a class="skip-link" href="#main">Skip to space weather</a>
+  <a class="skip-link" href="#alerts">Skip to recent alerts</a>
+}
 
 <header class="app-header">
   <div class="brand">
-    <h1>SpaceFlux</h1>
+    @if (onConsole()) {
+      <h1 tabindex="-1">SpaceFlux</h1>
+    } @else {
+      <p class="brand-name">SpaceFlux</p>
+    }
     <span class="view-name">Operator console</span>
   </div>
   <p class="live" [class]="'live is-' + live().state">
@@ -35,24 +41,7 @@
   </div>
 </header>
 
-<div class="page">
-  <app-stale-banners [banners]="banners()" />
-
-  <main id="main" class="primary-col" tabindex="-1">
-    <app-space-weather [current]="spaceWeather()" [failedAt]="data.spaceWeather.failedAt()" [paused]="data.paused()" />
-    <app-screening [current]="screening()" [now]="now()" [failedAt]="data.screening.failedAt()" [paused]="data.paused()" />
-    <app-passes-panel />
-  </main>
-
-  <app-recent-alerts
-    [page]="alerts()"
-    [log]="data.log()"
-    (logRendered)="data.logRendered($event)"
-    [now]="now()"
-    [failedAt]="data.alerts.failedAt()"
-    [paused]="data.paused()"
-  />
-</div>
+<router-outlet />
 
 <footer class="app-footer">
   <p>

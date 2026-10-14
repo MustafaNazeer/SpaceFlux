@@ -3,7 +3,14 @@ import { Segment } from '../format';
 import { dataOf } from '../../testing/graphql';
 import { ALERTS_ANONYMOUS, ALERTS_ENDED } from '../../testing/fixtures';
 import { noticeAlert } from './alert-list';
-import { groupAnnouncement, noticeAnnouncement, pausedAnnouncement } from './notice-announcement';
+import { NOUNS } from './list-end';
+import {
+  awayAnnouncement,
+  groupAnnouncement,
+  heldAnnouncement,
+  noticeAnnouncement,
+  pausedAnnouncement,
+} from './notice-announcement';
 
 const plain = (segments: Segment[]) =>
   segments.map((s) => (s.kind === 'text' ? s.text : s.kind === 'time' ? s.label : s.unit)).join('');
@@ -178,5 +185,83 @@ describe('pausedAnnouncement', () => {
   it('says or more when the refresh could not count every alert', () => {
     expect(plain(pausedAnnouncement(20, true))).toBe('20 or more alerts arrived while paused.');
     expect(plain(pausedAnnouncement(20, false))).toBe('20 alerts arrived while paused.');
+  });
+
+  it('names what the list holds under its filter', () => {
+    expect(plain(pausedAnnouncement(1, false, NOUNS.close_approach))).toBe(
+      '1 close approach arrived while paused.',
+    );
+    expect(plain(pausedAnnouncement(2, false, NOUNS.close_approach))).toBe(
+      '2 close approaches arrived while paused.',
+    );
+    expect(plain(pausedAnnouncement(20, true, NOUNS.space_weather_level))).toBe(
+      '20 or more space weather alerts arrived while paused.',
+    );
+    expect(plain(pausedAnnouncement(1, false, NOUNS.space_weather_level))).toBe(
+      '1 space weather alert arrived while paused.',
+    );
+  });
+});
+
+describe('held and away announcements', () => {
+  const alertOf = (e: Record<string, unknown>) => {
+    const { acknowledgement: _, ...alert } = e;
+    return noticeAlert(dataOf<AlertStoredData>(ALERT_STORED, { alert_stored: alert }).alert_stored);
+  };
+
+  it('says a held alert waits above the list rather than that it is listed (F30)', () => {
+    expect(plain(heldAnnouncement([alertOf(closeApproach)]))).toBe(
+      'New alert waiting above the list, close approach: OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC.',
+    );
+    expect(plain(heldAnnouncement([alertOf(gLevel), alertOf(closeApproach)]))).toBe(
+      '2 new alerts waiting above the list. The top one, G4 Severe: G4 level from SWPC estimated planetary Kp 7.67, 2024-05-10 15:00 to 18:00 UTC.',
+    );
+    expect(plain(heldAnnouncement([alertOf(gLevel)]))).not.toMatch(/Top of the list/);
+  });
+
+  it('gives a later held entry the total the bar shows, so it matches the bar (F39)', () => {
+    expect(plain(heldAnnouncement([alertOf(gLevel), alertOf(closeApproach)], 3))).toBe(
+      '2 more new alerts waiting above the list, 3 in all. The top one, G4 Severe: G4 level from SWPC estimated planetary Kp 7.67, 2024-05-10 15:00 to 18:00 UTC.',
+    );
+    expect(plain(heldAnnouncement([alertOf(closeApproach)], 1))).toBe(
+      plain(heldAnnouncement([alertOf(closeApproach)])),
+    );
+    expect(plain(heldAnnouncement([alertOf(gLevel), alertOf(closeApproach)], 2))).toBe(
+      plain(heldAnnouncement([alertOf(gLevel), alertOf(closeApproach)])),
+    );
+  });
+
+  it('names a single later held alert the new one, in a sentence of its own', () => {
+    expect(plain(heldAnnouncement([alertOf(closeApproach)], 3))).toBe(
+      '1 more new alert waiting above the list, 3 in all. The new one, close approach: OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC.',
+    );
+    expect(plain(heldAnnouncement([alertOf(gLevel)], 2))).toBe(
+      '1 more new alert waiting above the list, 2 in all. The new one, G4 Severe: G4 level from SWPC estimated planetary Kp 7.67, 2024-05-10 15:00 to 18:00 UTC.',
+    );
+    // A level left keeps its own sentence, since the title carries the level it left.
+    expect(plain(heldAnnouncement([alertOf(gNone)], 3))).toBe(
+      '1 more new alert waiting above the list, 3 in all. The new one. Below G1: SWPC estimated planetary Kp 3.67, 2024-05-12 06:00 to 09:00 UTC, after G3.',
+    );
+  });
+
+  it('counts the alerts that arrived while the console was not shown', () => {
+    expect(plain(awayAnnouncement(1))).toBe('1 alert arrived while you were away.');
+    expect(plain(awayAnnouncement(3))).toBe('3 alerts arrived while you were away.');
+  });
+
+  it('names what the list holds, and says or more when the count can be short', () => {
+    expect(plain(awayAnnouncement(1, false, NOUNS.close_approach))).toBe(
+      '1 close approach arrived while you were away.',
+    );
+    expect(plain(awayAnnouncement(2, false, NOUNS.close_approach))).toBe(
+      '2 close approaches arrived while you were away.',
+    );
+    expect(plain(awayAnnouncement(4, false, NOUNS.space_weather_level))).toBe(
+      '4 space weather alerts arrived while you were away.',
+    );
+    expect(plain(awayAnnouncement(3, true))).toBe('3 or more alerts arrived while you were away.');
+    expect(plain(awayAnnouncement(20, true, NOUNS.close_approach))).toBe(
+      '20 or more close approaches arrived while you were away.',
+    );
   });
 });

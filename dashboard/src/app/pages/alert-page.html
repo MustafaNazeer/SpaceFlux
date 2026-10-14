@@ -1,0 +1,50 @@
+<nav class="route-bar" aria-label="Page"><a class="back-link" routerLink="/">Back to the console</a></nav>
+<main id="main" class="route-page">
+  <div class="page-head" [class.state-block]="state().phase === 'failed' || state().phase === 'retry'">
+    @if (view()?.badge; as b) {
+      <div class="badge-row"><app-badge [badge]="b" /></div>
+    }
+    <h1 class="page-title" tabindex="-1">{{ heading() }}</h1>
+    <p role="status" [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</p>
+    @if (state().phase === 'failed' || state().phase === 'retry') {
+      <button class="btn btn-secondary" type="button" [attr.aria-disabled]="state().phase === 'retry' ? 'true' : null" (click)="tryAgain()">Try again</button>
+    }
+    @if (state().result === 'not_found') {
+      <p class="secondary">No alert with this event id is stored.</p>
+      <app-detail-facts [facts]="idFact()" />
+    }
+    @if (state().result === 'refused') {
+      <p class="secondary">This address does not hold an event id the API accepts: it is empty or longer than 512 characters.</p>
+    }
+    @if (view(); as v) {
+      @if (v.sentence) {
+        <p><app-segments [segments]="v.sentence" /></p>
+      }
+      @if (v.caption) {
+        <p class="caption">{{ v.caption }}</p>
+      }
+      @if (v.screeningRun) {
+        <p class="secondary">{{ screeningRunNote }}</p>
+      }
+    }
+  </div>
+
+  @if (view(); as v) {
+    @if (v.acknowledgeable && alert(); as a) {
+      <section class="panel" aria-labelledby="ack-title">
+        <h2 id="ack-title" class="panel-title">Acknowledgement</h2>
+        <div><app-ack-state [ack]="a.acknowledgement" [showNote]="true" [dated]="true" /></div>
+      </section>
+    }
+    @if (v.kindPanel; as k) {
+      <section class="panel" aria-labelledby="kind-title">
+        <h2 id="kind-title" class="panel-title">{{ k.title }}</h2>
+        <app-detail-facts [facts]="k.facts" />
+      </section>
+    }
+    <section class="panel" aria-labelledby="record-title">
+      <h2 id="record-title" class="panel-title">Record</h2>
+      <app-detail-facts [facts]="v.record" />
+    </section>
+  }
+</main>

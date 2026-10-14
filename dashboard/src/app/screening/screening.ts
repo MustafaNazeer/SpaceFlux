@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import { AckState } from '../ack/ack-state';
 import { Badge } from '../badge/badge';
@@ -12,6 +13,7 @@ import {
   duration,
   kmPerS,
   kmPlain,
+  objectName,
   parseUtc,
   separation,
 } from '../format';
@@ -69,7 +71,7 @@ function time(iso: string): TimeView {
 @Component({
   selector: 'app-screening',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [AckState, Badge],
+  imports: [AckState, Badge, RouterLink],
   templateUrl: './screening.html',
   styleUrl: './screening.css',
 })
@@ -140,6 +142,6 @@ export class Screening {
   });
 
   protected objectName(o: ScreenedObject): string {
-    return o.name ?? `Object ${o.catalog_number}`;
+    return objectName(o.name, o.catalog_number);
   }
 }

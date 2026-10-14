@@ -20,6 +20,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       <symbol id="i-check" viewBox="0 0 16 16"><path d="M3 8.5 6.5 12 13 4.5" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" /></symbol>
       <symbol id="i-clipped" viewBox="0 0 16 16"><path d="M5 1.75v12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /><path d="M5 3.5a4.5 4.5 0 0 1 0 9" fill="none" stroke="currentColor" stroke-width="1.5" /></symbol>
       <symbol id="i-open" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5" /></symbol>
+      <symbol id="i-new" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" fill="currentColor" /></symbol>
     </svg>
   `,
 })

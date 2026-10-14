@@ -23,7 +23,7 @@
     @for (o of v.objects; track o.catalogNumber) {
       <div class="pass-object">
         <div class="subhead">
-          <h3 [id]="'passes-' + o.catalogNumber">{{ o.name }} <span class="mono">{{ o.catalogNumber }}</span></h3>
+          <h3 [id]="'passes-' + o.catalogNumber"><a [routerLink]="['/objects', o.catalogNumber, 'alerts']">{{ o.name }}</a>&ngsp;<span class="mono">{{ o.catalogNumber }}</span></h3>
           @if (o.count) {
             <span class="caption">{{ o.count }}</span>
           }

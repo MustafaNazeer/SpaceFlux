@@ -1,5 +1,5 @@
 import { Pass, PassPoint, WatchlistPassesObject } from '../data/queries';
-import { count, dateHms, dateOf, datetimeAttr, days, hms, parseUtc } from '../format';
+import { count, dateHms, dateOf, datetimeAttr, days, hms, objectName, parseUtc } from '../format';
 import { BadgeView } from '../scales';
 
 export interface TimeView {
@@ -164,7 +164,7 @@ export function passRow(p: Pass): PassRow {
 export function objectView(o: WatchlistPassesObject): ObjectView {
   const base = {
     catalogNumber: o.catalog_number,
-    name: o.name ?? `Object ${o.catalog_number}`,
+    name: objectName(o.name, o.catalog_number),
     count: null,
     badge: null,
     reason: '',

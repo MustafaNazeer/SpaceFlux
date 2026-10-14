@@ -269,59 +269,225 @@ export interface RecentAlertsData {
 
 export const RECENT_ALERTS_PAGE = 20;
 
-export const RECENT_ALERTS: TypedDocumentNode<RecentAlertsData, { limit: number }> = gql`
-  query RecentAlerts($limit: Int!) {
-    alerts(limit: $limit) {
+/** The values of the alerts query's kind argument; null asks for every kind (docs/api/graphql.md). */
+export type AlertKind = 'close_approach' | 'space_weather_level';
+
+/** A kind from the address or a radio value, or null for every kind; anything else is not a kind. */
+export function kindOf(value: string | null | undefined): AlertKind | null | undefined {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  return value === 'close_approach' || value === 'space_weather_level' ? value : undefined;
+}
+
+export interface RecentAlertsVariables {
+  limit: number;
+  kind?: AlertKind | null;
+  after?: string | null;
+}
+
+// One alert as a list shows it, on the console and on an object's page.
+const LIST_ITEM = `
+  kind
+  event_id
+  received_at
+  space_weather_level {
+    scale
+    state
+    derived_level
+    derived_label
+    previous_state
+    previous_derived_level
+    trigger
+    satellite
+    value
+    unit
+    xray_class
+    interval_start
+    interval_end
+    sample_time
+    no_data_since
+    no_data_reason
+    ended_by_satellite
+  }
+  close_approach {
+    run_id
+    watchlist_object {
+      catalog_number
+      name
+      element_age_days
+    }
+    other_object {
+      catalog_number
+      name
+      element_age_days
+    }
+    time_of_closest_approach
+    miss_distance_m
+    relative_speed_m_per_s
+  }
+  screening_run {
+    run_id
+  }
+  acknowledgement {
+    action
+    acted_at
+    principal
+    note
+  }
+`;
+
+// A cursor pages only the kind it was returned under, so a filter change always asks for the first page again.
+export const RECENT_ALERTS: TypedDocumentNode<RecentAlertsData, RecentAlertsVariables> = gql`
+  query RecentAlerts($limit: Int!, $kind: String, $after: String) {
+    alerts(limit: $limit, kind: $kind, after: $after) {
       items {
-        kind
-        event_id
-        received_at
-        space_weather_level {
-          scale
-          state
-          derived_level
-          derived_label
-          previous_state
-          previous_derived_level
-          trigger
-          satellite
-          value
-          unit
-          xray_class
-          interval_start
-          interval_end
-          sample_time
-          no_data_since
-          no_data_reason
-          ended_by_satellite
-        }
-        close_approach {
-          run_id
-          watchlist_object {
-            catalog_number
-            name
-            element_age_days
-          }
-          other_object {
-            catalog_number
-            name
-            element_age_days
-          }
-          time_of_closest_approach
-          miss_distance_m
-          relative_speed_m_per_s
-        }
-        screening_run {
-          run_id
-        }
-        acknowledgement {
-          action
-          acted_at
-          principal
-          note
-        }
+        ${LIST_ITEM}
       }
       next
+    }
+  }
+`;
+
+export interface SpaceWeatherLevelDetail extends SpaceWeatherLevel {
+  product: string;
+  derived_from: string;
+  estimated: boolean;
+  band: string | null;
+  channel: string | null;
+  time_tag: string | null;
+  averaging_period_s: number | null;
+  fetched_at: string | null;
+  source_url: string | null;
+  freshness_reference: string | null;
+  restated_by_time_tag: string | null;
+  timer_refresh_at: string | null;
+}
+
+export interface CloseApproachDetail extends CloseApproach {
+  window_start: string;
+  window_end: string;
+}
+
+/** One stored event with every field its page shows. */
+export interface AlertDetail extends Alert {
+  rules_version: number;
+  produced_at: string;
+  space_weather_level: SpaceWeatherLevelDetail | null;
+  close_approach: CloseApproachDetail | null;
+  screening_run: { run_id: string; window_start: string; window_end: string } | null;
+}
+
+export interface AlertDetailData {
+  alert: AlertDetail | null;
+}
+
+export const ALERT_DETAIL: TypedDocumentNode<AlertDetailData, { event_id: string }> = gql`
+  query AlertDetail($event_id: String!) {
+    alert(event_id: $event_id) {
+      kind
+      rules_version
+      event_id
+      produced_at
+      received_at
+      space_weather_level {
+        scale
+        product
+        state
+        derived_level
+        derived_label
+        previous_state
+        previous_derived_level
+        trigger
+        derived_from
+        estimated
+        satellite
+        band
+        channel
+        value
+        unit
+        xray_class
+        time_tag
+        interval_start
+        interval_end
+        sample_time
+        averaging_period_s
+        fetched_at
+        source_url
+        freshness_reference
+        no_data_since
+        no_data_reason
+        restated_by_time_tag
+        timer_refresh_at
+        ended_by_satellite
+      }
+      close_approach {
+        run_id
+        window_start
+        window_end
+        watchlist_object {
+          catalog_number
+          name
+          element_age_days
+        }
+        other_object {
+          catalog_number
+          name
+          element_age_days
+        }
+        time_of_closest_approach
+        miss_distance_m
+        relative_speed_m_per_s
+      }
+      screening_run {
+        run_id
+        window_start
+        window_end
+      }
+      acknowledgement {
+        action
+        acted_at
+        principal
+        note
+      }
+    }
+  }
+`;
+
+/** The page size of an object's close approaches, the API's default for a nested list. */
+export const OBJECT_ALERTS_PAGE = 20;
+
+export interface ObjectAlertsData {
+  catalog_object: {
+    norad_cat_id: number;
+    object_name: string | null;
+    object_id: string | null;
+    epoch: string | null;
+    last_fetched_at: string | null;
+    close_approaches: RecentAlertsData['alerts'];
+  } | null;
+}
+
+export interface ObjectAlertsVariables {
+  norad_cat_id: number;
+  limit: number;
+  after?: string | null;
+}
+
+export const OBJECT_ALERTS: TypedDocumentNode<ObjectAlertsData, ObjectAlertsVariables> = gql`
+  query ObjectAlerts($norad_cat_id: Int!, $limit: Int!, $after: String) {
+    catalog_object(norad_cat_id: $norad_cat_id) {
+      norad_cat_id
+      object_name
+      object_id
+      epoch
+      last_fetched_at
+      close_approaches(limit: $limit, after: $after) {
+        items {
+          ${LIST_ITEM}
+        }
+        next
+      }
     }
   }
 `;
