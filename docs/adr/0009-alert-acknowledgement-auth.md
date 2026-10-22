@@ -124,6 +124,14 @@ Settled before the endpoint was built; the [REST API](../api/rest.md) page, sect
 * **The cookie is `Secure` in every profile**, the local one included, until a browser is shown to refuse it from `http://localhost` (Consequences); tests handle cookies themselves.
 * **The bcrypt strength** is measured on the local machine and set to the cost nearest one second per check; the measurement is repeated on the cloud environment before acknowledgement is enabled there. The password encoder is bcrypt only, at that same strength, so the check run for an unknown username, which hashes with the encoder's own strength, costs as much as a wrong password; a test shows the encoder hashes at the configured strength, and a hash at any other strength is refused.
 
+### Amendment, 2026-10-22: what counts as activity
+
+Accepted on 2026-10-22, when the dashboard gained sign in and acknowledgement.
+
+* **The idle timeout counts any request.** Tomcat resets a session's idle time whenever a request carrying its cookie reaches code that looks up the session, and the security filter chain does that on every request, reads included (both the absolute lifetime filter and Spring Security's concurrent session filter look it up). The dashboard refreshes every minute while it is not paused, so an open console stays signed in until the 8 hour limit, sign out, or a newer login. The 30 minutes end a session only when no request arrives: the dashboard is closed, paused, asleep, or offline.
+* **The session check gives the latest end.** `GET /api/auth/session` also returns `expires_at`, the login instant plus 8 hours, so the dashboard can warn before the absolute limit even after a reload. It is the latest end, not a promise: idle time, a newer login, or a logout can end the session sooner. The idle limit has no field; the dashboard counts it from the last request it sent and warns before it, with a way to keep the session.
+* **An unattended console is accepted.** Someone at an unlocked machine with a signed in console can acknowledge or unacknowledge alerts until one of those limits. I accept this: there is one operator, the session can only append acknowledgement rows that record who acted and when, and every read is public anyway. Signing out, the screen lock, and the 8 hour lifetime bound it. It is decided again if more operators or a more powerful write are added.
+
 ## Options considered
 
 The requirement check that led to the choice.
