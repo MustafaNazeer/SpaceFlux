@@ -8,6 +8,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -113,9 +114,48 @@ class AuthIntegrationTest {
         HttpResponse<String> r = get("/api/auth/session");
 
         assertProblem(r, 401);
+        assertThat(sameParts(r)).isEqualTo(NOT_SIGNED_IN);
         assertThat(Browser.setCookie(r, SESSION)).isNull();
         assertThat(Browser.setCookie(r, "JSESSIONID")).isNull();
         assertThat(Browser.setCookie(r, "XSRF-TOKEN")).isNotNull();
+    }
+
+    static final JsonNode NOT_SIGNED_IN = JSON.readTree("{\"title\": \"Unauthorized\", \"status\": 401, "
+            + "\"detail\": \"No operator is signed in.\", \"instance\": \"/api/auth/session\"}");
+
+    /** RFC 3339 with six fraction digits, written without the API's own formatter. */
+    static String micros(Instant t) {
+        return t.truncatedTo(ChronoUnit.SECONDS).toString().replace("Z", String.format(".%06dZ", t.getNano() / 1000));
+    }
+
+    @Test
+    void theSessionCheckGivesTheUsernameAndTheEndEightHoursAfterTheLogin() throws Exception {
+        Browser b = signedIn();
+        Instant at = (Instant) serverSession(b.cookies.get(SESSION)).getAttribute(SessionLifetimeFilter.SIGNED_IN_AT);
+
+        HttpResponse<String> r = b.get("/api/auth/session");
+
+        assertThat(r.statusCode()).isEqualTo(200);
+        JsonNode body = JSON.readTree(r.body());
+        List<String> fields = new ArrayList<>();
+        body.propertyNames().forEach(fields::add);
+        assertThat(fields).containsExactlyInAnyOrder("username", "expires_at");
+        assertThat(body.get("username").asString()).isEqualTo(OPERATOR);
+        assertThat(body.get("expires_at").asString()).isEqualTo(micros(at.plus(Duration.ofHours(8))));
+    }
+
+    @Test
+    void theEndIsTheLoginTimePlusEightHoursCutToTheMicrosecond() throws Exception {
+        Browser b = signedIn();
+        Instant login = Instant.now().truncatedTo(ChronoUnit.SECONDS).minus(Duration.ofHours(1)).plusNanos(123_456_789);
+        serverSession(b.cookies.get(SESSION)).setAttribute(SessionLifetimeFilter.SIGNED_IN_AT, login);
+        String expected = login.truncatedTo(ChronoUnit.SECONDS).plus(Duration.ofHours(8)).toString()
+                .replace("Z", ".123456Z");
+
+        HttpResponse<String> r = b.get("/api/auth/session");
+
+        assertThat(r.statusCode()).isEqualTo(200);
+        assertThat(JSON.readTree(r.body()).get("expires_at").asString()).isEqualTo(expected);
     }
 
     @Test
@@ -278,12 +318,40 @@ class AuthIntegrationTest {
 
         session.setAttribute(SessionLifetimeFilter.SIGNED_IN_AT, at.minus(Duration.ofHours(8)));
 
-        assertProblem(b.get("/api/auth/session"), 401);
+        HttpResponse<String> r = b.get("/api/auth/session");
+        assertProblem(r, 401);
+        assertThat(sameParts(r)).isEqualTo(NOT_SIGNED_IN);
     }
 
     @Test
     void anIdleSessionEndsAfterThirtyMinutes() throws Exception {
         assertThat(serverSession(signedIn().cookies.get(SESSION)).getMaxInactiveInterval()).isEqualTo(1800);
+    }
+
+    // Tomcat ends a session once its whole idle seconds reach the limit, so with a 2 s limit a request 1.2 s in
+    // keeps it alive and a check 2.4 s after login passes only if that request reset the timer.
+    @Test
+    void aReadWithTheSessionCookieResetsTheIdleTimer() throws Exception {
+        Browser b = signedIn();
+        serverSession(b.cookies.get(SESSION)).setMaxInactiveInterval(2);
+
+        Thread.sleep(1_200);
+        assertThat(b.get("/api/watchlist").statusCode()).isEqualTo(200);
+        Thread.sleep(1_200);
+
+        HttpResponse<String> session = b.get("/api/auth/session");
+        assertThat(session.statusCode()).isEqualTo(200);
+        assertThat(JSON.readTree(session.body()).get("username").asString()).isEqualTo(OPERATOR);
+    }
+
+    @Test
+    void aSessionWithNoRequestPastTheIdleLimitEnds() throws Exception {
+        Browser b = signedIn();
+        serverSession(b.cookies.get(SESSION)).setMaxInactiveInterval(2);
+
+        Thread.sleep(2_500);
+
+        assertProblem(b.get("/api/auth/session"), 401);
     }
 
     @Test

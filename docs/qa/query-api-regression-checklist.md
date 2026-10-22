@@ -303,7 +303,7 @@ rm -f "$jar" "$out"
 
 Holds when all of these are true:
 
-1. `session before` is `401`, `login` is `204`, and `session after` is `200` with `{"username":"..."}` naming the operator.
+1. `session before` is `401`, `login` is `204`, and `session after` is `200` with `{"username":"...","expires_at":"..."}` naming the operator, with `expires_at` 8 hours after the login.
 2. `alert` prints an event id. If it prints nothing, no acknowledgeable alert is stored yet; wait for a screening run or a space weather level and run Q5 again.
 3. `first` is `201` with a body holding `event_id`, `action`, `principal`, `acted_at`, and the note `regression check`.
 4. `same again` is `409`.

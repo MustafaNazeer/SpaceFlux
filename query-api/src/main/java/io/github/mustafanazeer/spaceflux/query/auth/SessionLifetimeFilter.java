@@ -34,14 +34,19 @@ final class SessionLifetimeFilter extends OncePerRequestFilter {
         request.getSession().setAttribute(SIGNED_IN_AT, clock.instant());
     }
 
+    /** When the session ends at the latest: its login time plus the lifetime, or null when it has no login time. */
+    static Instant endOf(HttpSession session) {
+        return session.getAttribute(SIGNED_IN_AT) instanceof Instant at ? at.plus(LIFETIME) : null;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         HttpSession session = request.getSession(false);
         if (session != null) {
             // Only a login creates a session, so one without a login time is ended too.
-            Object signedInAt = session.getAttribute(SIGNED_IN_AT);
-            if (!(signedInAt instanceof Instant at) || !clock.instant().isBefore(at.plus(LIFETIME))) {
+            Instant end = endOf(session);
+            if (end == null || !clock.instant().isBefore(end)) {
                 session.invalidate();
                 SecurityContextHolder.clearContext();
             }

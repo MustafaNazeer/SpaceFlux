@@ -86,4 +86,21 @@ class SessionLifetimeFilterTest {
 
         assertThat(request.getSession(false).getAttribute(SessionLifetimeFilter.SIGNED_IN_AT)).isEqualTo(NOW);
     }
+
+    @Test
+    void aSessionEndsEightHoursAfterItsRecordedLoginTime() {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute(SessionLifetimeFilter.SIGNED_IN_AT, NOW);
+
+        assertThat(SessionLifetimeFilter.endOf(session)).isEqualTo(Instant.parse("2026-10-05T20:00:00Z"));
+    }
+
+    @Test
+    void aSessionWithNoRecordedLoginTimeHasNoEnd() {
+        MockHttpSession session = new MockHttpSession();
+        assertThat(SessionLifetimeFilter.endOf(session)).isNull();
+
+        session.setAttribute(SessionLifetimeFilter.SIGNED_IN_AT, NOW.toString());
+        assertThat(SessionLifetimeFilter.endOf(session)).isNull();
+    }
 }
