@@ -11,10 +11,10 @@ interface Ready {
 /**
  * Where focus goes after an in app page change. The new page tells this service when it has settled (its first load
  * answered, failed or was not needed), and only then does focus move, so a screen reader starts on the page's real
- * title rather than on a heading that is about to change (F29). On a history navigation back to a page, the link
- * that left it takes focus if it is still there, matched by its href, else the h1 (F33). Focus never scrolls; a
+ * title rather than on a heading that is about to change. On a history navigation back to a page, the link
+ * that left it takes focus if it is still there, matched by its href, else the h1. Focus never scrolls; a
  * history navigation keeps its own scroll position, except that a returned link outside the window is brought just
- * into view (F38). A page no longer in the document never takes or releases the focus a change waits for.
+ * into view. A page no longer in the document never takes or releases the focus a change waits for.
  */
 @Injectable({ providedIn: 'root' })
 export class RouteFocus {
@@ -99,7 +99,7 @@ export class RouteFocus {
         }
         link.focus({ preventScroll: true });
         // The browser restores the scroll position before the page is drawn again, so it can leave the link out
-        // of view (F38).
+        // of view.
         const { top, bottom } = link.getBoundingClientRect();
         if (top < 0 || bottom > window.innerHeight) {
           link.scrollIntoView({ block: 'nearest', behavior: 'instant' });

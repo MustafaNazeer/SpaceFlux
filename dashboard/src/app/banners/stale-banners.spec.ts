@@ -53,7 +53,7 @@ describe('StaleBanners', () => {
     expect(banners[0].querySelector('use')?.getAttribute('href')).toBe('#i-clock');
   });
 
-  describe('on the first visit to the console in a page load (F43)', () => {
+  describe('on the first visit to the console in a page load', () => {
     const STALE_LINE = 'GOES-18 \u226510 MeV proton flux is stale; the S scale reads no data.';
     async function firstVisit(banners: BannerView[]) {
       const fixture = TestBed.createComponent(StaleBanners);

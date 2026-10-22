@@ -51,7 +51,7 @@ const LIST_NAMES: Record<'' | AlertKind, { loading: string; failed: string; empt
 };
 
 /**
- * The status line once the first answer for a new filter is drawn (F28): the end line, the count with a pointer to
+ * The status line once the first answer for a new filter is drawn: the end line, the count with a pointer to
  * Load older while older alerts exist, or the empty state's lead.
  */
 export function filterResult(count: number, more: boolean, kind: AlertKind | null): string {
@@ -68,7 +68,7 @@ export function filterResult(count: number, more: boolean, kind: AlertKind | nul
 /**
  * Recent alerts, newest first, with their acknowledgement state, a filter by kind and Load older. Read only. While
  * focus is inside the list (or in the bar that offers what is waiting) or a form is open, the list is held: it never
- * trims or reorders, and new alerts wait in a bar above it (F21).
+ * trims or reorders, and new alerts wait in a bar above it.
  */
 @Component({
   selector: 'app-recent-alerts',
@@ -248,7 +248,7 @@ export class RecentAlerts {
   /**
    * After a filter change, waits for the first answer under the new filter and puts its result in the status line.
    * The first list the panel shows is not a filter change and says nothing. The result is emptied, silently, the
-   * next time the drawn list changes, so it never stays behind as a count that is no longer true (F37).
+   * next time the drawn list changes, so it never stays behind as a count that is no longer true.
    */
   private watchFilterResult(): void {
     let lastKind: AlertKind | null | undefined;
@@ -277,7 +277,7 @@ export class RecentAlerts {
 
   /**
    * The held bar is drawn above the list, so when it appears with focus in the list the window scrolls by what the
-   * bar added, and the focused item stays where it was on screen (F31). Measured before the bar is drawn (effects
+   * bar added, and the focused item stays where it was on screen. Measured before the bar is drawn (effects
    * run ahead of the view they belong to) and again after.
    */
   private keepFocusInPlace(): void {

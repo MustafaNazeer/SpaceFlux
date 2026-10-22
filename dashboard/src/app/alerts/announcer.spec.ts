@@ -26,7 +26,7 @@ const ids = (alerts: Alert[]) => alerts.map((a) => a.event_id);
 describe('Announcer', () => {
   const waiting = (...alerts: Alert[]) => new Set(ids(alerts));
 
-  it('words the entry as waiting above the list for the alerts the bar holds (F30)', () => {
+  it('words the entry as waiting above the list for the alerts the bar holds', () => {
     const a = new Announcer(5);
     a.queue([alert(4)]);
     a.flush(listOf([alert(4), alert(0)]), waiting(alert(4)));
@@ -50,7 +50,7 @@ describe('Announcer', () => {
     expect(plain(a.entries[1].segments)).toMatch(/^New alert waiting above the list\. Below G1/);
   });
 
-  it('starts the count of waiting alerts over once the bar is empty (F39)', () => {
+  it('starts the count of waiting alerts over once the bar is empty', () => {
     const a = new Announcer(5);
     a.queue([alert(4)]);
     a.flush(listOf([alert(4)]), waiting(alert(4)));
@@ -66,7 +66,7 @@ describe('Announcer', () => {
     expect(plain(a.entries[3].segments)).toMatch(/^New alert waiting above the list\. Below G1/);
   });
 
-  it('words an alert already in a held list as listed, not as waiting (F40)', () => {
+  it('words an alert already in a held list as listed, not as waiting', () => {
     const a = new Announcer(5);
     a.queue([alert(4)]);
     a.flush(listOf([alert(4), alert(0)]), waiting());
@@ -74,7 +74,7 @@ describe('Announcer', () => {
     expect(a.entries[0].eventIds).toEqual(['a4']);
   });
 
-  it('words the listed alerts of a group plainly, then those the bar holds as waiting (F40)', () => {
+  it('words the listed alerts of a group plainly, then those the bar holds as waiting', () => {
     const a = new Announcer(5);
     a.queue([alert(4), alert(1), alert(5)]);
     expect(a.flush(listOf([alert(5), alert(4), alert(1), alert(0)]), waiting(alert(5)))).toBe(true);
@@ -87,7 +87,7 @@ describe('Announcer', () => {
     expect(a.flush(listOf([alert(5), alert(4)]), waiting(alert(5)))).toBe(false);
   });
 
-  it('gives the waiting part of a group the total the bar shows when others already wait there (F39, F40)', () => {
+  it('gives the waiting part of a group the total the bar shows when others already wait there', () => {
     const a = new Announcer(5);
     a.queue([alert(7)]);
     a.flush(listOf([alert(7), alert(0)]), waiting(alert(7)));

@@ -253,7 +253,7 @@ export class ObjectPage {
   }
 
   /**
-   * The first load has answered, failed, or was not needed: a page change waiting for it moves focus now (F29).
+   * The first load has answered, failed, or was not needed: a page change waiting for it moves focus now.
    * Try again is removed once its request answers, so focus goes to the page title rather than to the body.
    */
   private afterLoad(phase: 'loading' | 'retry'): void {

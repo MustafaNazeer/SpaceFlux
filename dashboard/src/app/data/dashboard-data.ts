@@ -376,7 +376,7 @@ export class DashboardData {
   private flush(): void {
     this.groupTimer = undefined;
     const list = this.recentAlerts();
-    // What waits is what the held list leaves out, so it matches the bar above the list (F40).
+    // What waits is what the held list leaves out, so it matches the bar above the list.
     const waiting =
       this.frozen && list
         ? new Set(holdList(this.frozen, list.items).held.map((a) => a.event_id))

@@ -79,7 +79,7 @@ export class ConsolePage {
         }
         this.data.showKind(kind);
       });
-    // The log region is in the page from the first render, so a summary added after it is spoken (F32).
+    // The log region is in the page from the first render, so a summary added after it is spoken.
     afterNextRender(() => this.data.enterConsole());
     inject(DestroyRef).onDestroy(() => this.data.leaveConsole());
   }

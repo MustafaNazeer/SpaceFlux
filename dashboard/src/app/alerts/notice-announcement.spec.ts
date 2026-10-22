@@ -209,7 +209,7 @@ describe('held and away announcements', () => {
     return noticeAlert(dataOf<AlertStoredData>(ALERT_STORED, { alert_stored: alert }).alert_stored);
   };
 
-  it('says a held alert waits above the list rather than that it is listed (F30)', () => {
+  it('says a held alert waits above the list rather than that it is listed', () => {
     expect(plain(heldAnnouncement([alertOf(closeApproach)]))).toBe(
       'New alert waiting above the list, close approach: OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC.',
     );
@@ -219,7 +219,7 @@ describe('held and away announcements', () => {
     expect(plain(heldAnnouncement([alertOf(gLevel)]))).not.toMatch(/Top of the list/);
   });
 
-  it('gives a later held entry the total the bar shows, so it matches the bar (F39)', () => {
+  it('gives a later held entry the total the bar shows, so it matches the bar', () => {
     expect(plain(heldAnnouncement([alertOf(gLevel), alertOf(closeApproach)], 3))).toBe(
       '2 more new alerts waiting above the list, 3 in all. The top one, G4 Severe: G4 level from SWPC estimated planetary Kp 7.67, 2024-05-10 15:00 to 18:00 UTC.',
     );

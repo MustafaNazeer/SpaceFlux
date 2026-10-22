@@ -70,8 +70,8 @@ export class StaleBanners {
 
   /**
    * The first set of banners is drawn unspoken. On a return to the console it stays unspoken, so nothing said before
-   * is repeated (F32), unless it differs from the set shown when the console was left, as a change made meanwhile.
-   * On the first visit in a page load nothing has been said yet, so it is spoken once a frame has been drawn (F43).
+   * is repeated, unless it differs from the set shown when the console was left, as a change made meanwhile.
+   * On the first visit in a page load nothing has been said yet, so it is spoken once a frame has been drawn.
    * A later change is spoken as usual.
    */
   private readonly announcement = linkedSignal<Spoken[], Announcement>({

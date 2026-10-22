@@ -81,8 +81,8 @@ export function pausedAnnouncement(count: number, more = false, noun = NOUNS.all
 }
 
 /**
- * One log entry for alerts that wait above a held list, in list order (F30). `total` is how many the bar holds,
- * these included, so an entry while others already wait gives the count the bar shows (F39).
+ * One log entry for alerts that wait above a held list, in list order. `total` is how many the bar holds,
+ * these included, so an entry while others already wait gives the count the bar shows.
  */
 export function heldAnnouncement(alerts: Alert[], total = alerts.length): Segment[] {
   if (total > alerts.length) {

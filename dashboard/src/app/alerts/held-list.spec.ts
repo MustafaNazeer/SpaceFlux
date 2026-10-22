@@ -6,7 +6,7 @@ const RECORDED = ALERTS_ANONYMOUS.alerts.items as unknown as Alert[];
 const alert = (id: string, from = 0): Alert => ({ ...RECORDED[from], event_id: id });
 const ids = (items: Alert[]) => items.map((a) => a.event_id);
 
-describe('holdList (F21)', () => {
+describe('holdList', () => {
   const frozen = [alert('a'), alert('b'), alert('c')];
 
   it('keeps the held alerts in place and counts what arrived above them', () => {

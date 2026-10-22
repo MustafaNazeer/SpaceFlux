@@ -152,7 +152,7 @@ export class AlertPage {
   }
 
   /**
-   * The first load has answered, failed, or was not needed: a page change waiting for it moves focus now (F29).
+   * The first load has answered, failed, or was not needed: a page change waiting for it moves focus now.
    * After Try again, focus moves to the title once the answer replaces the button.
    */
   private settled(phase: 'loading' | 'retry'): void {

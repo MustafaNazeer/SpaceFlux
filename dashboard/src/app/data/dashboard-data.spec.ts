@@ -651,7 +651,7 @@ describe('DashboardData', () => {
   /** Holds the list as drawn now, as the panel does when focus enters it. */
   const hold = (data: DashboardData) => data.setHeld(data.recentAlerts()!.items);
 
-  it('starts the waiting count over for a new hold, even when nothing was spoken in between (F39)', async () => {
+  it('starts the waiting count over for a new hold, even when nothing was spoken in between', async () => {
     const { data, socket } = await loaded();
     hold(data);
     socket.next(notice(5, 'held/1'));
@@ -690,7 +690,7 @@ describe('DashboardData', () => {
     expect(said(data)).toEqual([expect.stringMatching(/^New alert, close approach: /)]);
   });
 
-  it('words an alert that joined the list before the hold began as listed, not as waiting (F40)', async () => {
+  it('words an alert that joined the list before the hold began as listed, not as waiting', async () => {
     const { data, socket } = await loaded();
     socket.next(notice(4, 'joined/1'));
     await vi.advanceTimersByTimeAsync(500);

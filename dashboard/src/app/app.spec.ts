@@ -501,7 +501,7 @@ describe('App', () => {
       recentKinds();
     });
 
-    it('moves focus to a routed page h1 only once its first load settles, and at once for refused input (F29)', async () => {
+    it('moves focus to a routed page h1 only once its first load settles, and at once for refused input', async () => {
       const fixture = await start({ status: 401, body: {} });
       recentKinds();
       await settle(fixture);
@@ -548,7 +548,7 @@ describe('App', () => {
       http.match(GRAPHQL_PATH).forEach((p) => answer(p));
     });
 
-    it('on history Back focuses the link that opened the page, without a scroll jump (F33)', async () => {
+    it('on history Back focuses the link that opened the page, without a scroll jump', async () => {
       const fixture = await start({ status: 401, body: {} });
       recentKinds();
       await settle(fixture);
@@ -595,7 +595,7 @@ describe('App', () => {
       http.match(GRAPHQL_PATH).forEach((p) => answer(p));
     });
 
-    it('adds nothing to the log while another page is shown; on return it sums up once and marks those alerts New (F32)', async () => {
+    it('adds nothing to the log while another page is shown; on return it sums up once and marks those alerts New', async () => {
       const fixture = await start({ status: 401, body: {} });
       http.match(GRAPHQL_PATH).forEach((p) => answer(p));
       await settle(fixture);
@@ -639,7 +639,7 @@ describe('App', () => {
       http.match(GRAPHQL_PATH).forEach((p) => answer(p));
     });
 
-    it('speaks the stale notices on a first visit to the console after a page opened directly, not again on a return (F43)', async () => {
+    it('speaks the stale notices on a first visit to the console after a page opened directly, not again on a return', async () => {
       const alertPage = `/alerts/${encodeURIComponent(ALERT_APPROACH.alert.event_id)}`;
       const fixture = await start({ status: 401, body: {} }, alertPage);
       http.match(GRAPHQL_PATH).forEach((p) => answer(p));

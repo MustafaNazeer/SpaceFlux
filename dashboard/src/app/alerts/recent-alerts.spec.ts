@@ -595,7 +595,7 @@ describe('RecentAlerts', () => {
       expect(document.activeElement).toBe(other.el.querySelector('.list-end-line'));
     });
 
-    it('puts the result of a filter change in the status line once its first answer is drawn (F28)', async () => {
+    it('puts the result of a filter change in the status line once its first answer is drawn', async () => {
       const { el, fixture, set } = await panel(listOf(['a']));
       const status = () => squash(el.querySelector('aside > [role="status"]')?.textContent);
       const change = async (kind: AlertKind | null, page: AlertList | undefined) => {
@@ -641,7 +641,7 @@ describe('RecentAlerts', () => {
       expect(status()).toBe('The one stored close approach is shown.');
     });
 
-    it('keeps the filter result visually hidden, and empties it silently once the drawn list changes (F37)', async () => {
+    it('keeps the filter result visually hidden, and empties it silently once the drawn list changes', async () => {
       const { el, fixture, set } = await panel(listOf(['a']));
       const line = () => el.querySelector<HTMLElement>('aside > [role="status"]')!;
       const sevenApproaches = () => ({
@@ -673,7 +673,7 @@ describe('RecentAlerts', () => {
       );
     });
 
-    it('empties the filter result when only whether older alerts exist changes (F37)', async () => {
+    it('empties the filter result when only whether older alerts exist changes', async () => {
       const { el, fixture, set } = await panel(listOf(['a']));
       const status = () => squash(el.querySelector('aside > [role="status"]')?.textContent);
       fixture.componentRef.setInput('kind', 'close_approach');
@@ -685,7 +685,7 @@ describe('RecentAlerts', () => {
       expect(status()).toBe('');
     });
 
-    it('empties the filter result when alerts held above the list join it (F37)', async () => {
+    it('empties the filter result when alerts held above the list join it', async () => {
       const { el, fixture, set } = await panel(listOf(['a']));
       const status = () => squash(el.querySelector('aside > [role="status"]')?.textContent);
       fixture.componentRef.setInput('kind', 'close_approach');
@@ -744,7 +744,7 @@ describe('RecentAlerts', () => {
       expect(held).toEqual([['a', 'b'], null]);
     });
 
-    it('keeps the focused link where it was on screen when the held bar appears (F31)', async () => {
+    it('keeps the focused link where it was on screen when the held bar appears', async () => {
       const { el, set } = await panel(listOf(['a', 'b', 'c']));
       const link = items(el)[2].querySelector<HTMLElement>('a.title-link')!;
       link.focus();

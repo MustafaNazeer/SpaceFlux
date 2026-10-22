@@ -144,7 +144,7 @@ describe('RouteFocus', () => {
     expect(document.activeElement).toBe(link(root, '/to/51'));
   });
 
-  describe('bringing the returned link into view (F38)', () => {
+  describe('bringing the returned link into view', () => {
     function at(top: number): { root: HTMLElement; scroll: ReturnType<typeof vi.fn> } {
       const root = page('/to/1');
       const a = link(root, '/to/1');

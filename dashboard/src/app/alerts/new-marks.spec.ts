@@ -7,7 +7,7 @@ const alert = (id: string): Alert => ({ ...RECORDED[0], event_id: id });
 const list = (...ids: string[]) => ids.map(alert);
 const marked = (m: NewMarks) => [...m.ids()].sort();
 
-describe('NewMarks (F23)', () => {
+describe('NewMarks', () => {
   let marks: NewMarks;
 
   beforeEach(() => {
@@ -40,7 +40,7 @@ describe('NewMarks (F23)', () => {
     expect(marked(marks)).toEqual([]);
   });
 
-  it('marks every shown alert the previous list did not hold once all of it has left the list (F41)', () => {
+  it('marks every shown alert the previous list did not hold once all of it has left the list', () => {
     marks.observe(list('a', 'b'), '');
     marks.observe(list('n1', 'n2', 'n3'), '');
     expect(marked(marks)).toEqual(['n1', 'n2', 'n3']);

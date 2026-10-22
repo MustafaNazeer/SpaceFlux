@@ -37,7 +37,7 @@ export class NewMarks {
     if (!previous) {
       return;
     }
-    // Above the newest alert the previous list held that is still listed; every shown alert once none is (F41).
+    // Above the newest alert the previous list held that is still listed; every shown alert once none is.
     const at = items.findIndex((a) => previous.ids.has(a.event_id));
     const above = at < 0 ? items : items.slice(0, at);
     this.mark(above.map((a) => a.event_id));
