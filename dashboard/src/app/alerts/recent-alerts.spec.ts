@@ -1,5 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { provideApollo } from 'apollo-angular';
+
+import { ACK_PATH } from '../ack/ack-api';
+import { apolloOptions } from '../data/graphql';
+import { SESSION_PATH, SessionService } from '../session/session.service';
+import { provideFakeSocket } from '../../testing/fake-socket';
+import { signedIn } from '../../testing/acks';
 
 import { Clock } from '../data/clock';
 import {
@@ -83,7 +92,15 @@ function items(el: HTMLElement): HTMLElement[] {
 
 describe('RecentAlerts', () => {
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideApollo(apolloOptions),
+        provideFakeSocket(),
+      ],
+    });
   });
 
   it('is the skip link target and shows a loading status before the first answer', async () => {
@@ -152,6 +169,7 @@ describe('RecentAlerts', () => {
   });
 
   it('shows the principal and note the API returns to the signed in operator', async () => {
+    await signedIn(TestBed.inject(HttpTestingController));
     const [item] = items(await render(ALERTS_OPERATOR));
     expect(squash(item.querySelector('.ack-state')?.textContent)).toBe(
       'Acknowledged 19:02 UTC by operator',
@@ -216,7 +234,9 @@ describe('RecentAlerts', () => {
     const shown = await render(ALERTS_EMPTY);
     const kept = shown.querySelector('[role="status"]')!;
     expect(kept.textContent?.trim()).toBe('');
-    expect(kept.classList).toContain('visually-hidden');
+    // The live element keeps one style; a child holds the text and its shown or hidden styling.
+    expect(kept.className).toBe('status-line');
+    expect(kept.firstElementChild?.className).toBe('visually-hidden');
   });
 
   it('renders an alert added by a notice exactly as the list renders the same alert', async () => {
@@ -228,8 +248,9 @@ describe('RecentAlerts', () => {
     ).nativeElement as HTMLElement;
     const li = items(el);
     expect(li.length).toBe(7);
-    // The same markup but for the event id in the title link's address.
-    const markup = (e: HTMLElement) => e.innerHTML.replace(/href="[^"]*"/g, 'href');
+    // The same markup but for the event id in the title link's address and the title's own id.
+    const markup = (e: HTMLElement) =>
+      e.innerHTML.replace(/href="[^"]*"/g, 'href').replace(/alert-title-\d+/g, 'alert-title');
     expect(markup(li[0])).toBe(markup(li[2]));
     expect(li[0].querySelector('a')?.getAttribute('href')).toBe('/alerts/new%2F1');
     expect(squash(li[0].querySelector('.ack-state')?.textContent)).toBe('Not acknowledged');
@@ -394,7 +415,8 @@ describe('RecentAlerts', () => {
       ];
       for (const [kind, loading, failed, empty] of cases) {
         const { el, set } = await panel(undefined, kind);
-        const status = () => squash(el.querySelector('aside > [role="status"]')?.textContent);
+        const status = () =>
+          squash(el.querySelector('.filter-area > [role="status"]')?.textContent);
         expect(status()).toBe(loading);
         await set('failedAt', NOW);
         expect(status()).toBe(failed);
@@ -597,7 +619,7 @@ describe('RecentAlerts', () => {
 
     it('puts the result of a filter change in the status line once its first answer is drawn', async () => {
       const { el, fixture, set } = await panel(listOf(['a']));
-      const status = () => squash(el.querySelector('aside > [role="status"]')?.textContent);
+      const status = () => squash(el.querySelector('.filter-area > [role="status"]')?.textContent);
       const change = async (kind: AlertKind | null, page: AlertList | undefined) => {
         fixture.componentRef.setInput('kind', kind);
         await set('page', page);
@@ -643,19 +665,21 @@ describe('RecentAlerts', () => {
 
     it('keeps the filter result visually hidden, and empties it silently once the drawn list changes', async () => {
       const { el, fixture, set } = await panel(listOf(['a']));
-      const line = () => el.querySelector<HTMLElement>('aside > [role="status"]')!;
+      const line = () => el.querySelector<HTMLElement>('.filter-area > [role="status"]')!;
+      const shown = () => line().firstElementChild!.className;
       const sevenApproaches = () => ({
         items: Array.from({ length: 7 }, (_, i) => alert(`c${i}`, 5)),
         more: false,
       });
       fixture.componentRef.setInput('kind', 'close_approach');
       await set('page', undefined);
-      expect(line().className).toBe('secondary');
+      expect(line().className).toBe('status-line');
+      expect(shown()).toBe('secondary');
       await set('page', sevenApproaches());
       expect(squash(line().textContent)).toBe(
         'All 7 stored close approaches are shown, newest first.',
       );
-      expect(line().className).toBe('visually-hidden');
+      expect(shown()).toBe('visually-hidden');
 
       // A later answer that draws the same list leaves the result as it is.
       await set('page', sevenApproaches());
@@ -667,7 +691,7 @@ describe('RecentAlerts', () => {
       const joined = sevenApproaches();
       await set('page', { ...joined, items: [alert('c8', 5), ...joined.items] });
       expect(squash(line().textContent)).toBe('');
-      expect(line().className).toBe('visually-hidden');
+      expect(shown()).toBe('visually-hidden');
       expect(squash(el.querySelector('.list-end-line')?.textContent)).toBe(
         'All 8 stored close approaches are shown, newest first.',
       );
@@ -675,7 +699,7 @@ describe('RecentAlerts', () => {
 
     it('empties the filter result when only whether older alerts exist changes', async () => {
       const { el, fixture, set } = await panel(listOf(['a']));
-      const status = () => squash(el.querySelector('aside > [role="status"]')?.textContent);
+      const status = () => squash(el.querySelector('.filter-area > [role="status"]')?.textContent);
       fixture.componentRef.setInput('kind', 'close_approach');
       await set('page', undefined);
       const approaches = [alert('c1', 5), alert('c0', 5)];
@@ -687,7 +711,7 @@ describe('RecentAlerts', () => {
 
     it('empties the filter result when alerts held above the list join it', async () => {
       const { el, fixture, set } = await panel(listOf(['a']));
-      const status = () => squash(el.querySelector('aside > [role="status"]')?.textContent);
+      const status = () => squash(el.querySelector('.filter-area > [role="status"]')?.textContent);
       fixture.componentRef.setInput('kind', 'close_approach');
       await set('page', undefined);
       await set('page', { items: [alert('c1', 5), alert('c0', 5)], more: false });
@@ -803,6 +827,119 @@ describe('RecentAlerts', () => {
       expect(squash(el.querySelector('.list-end-line')?.textContent)).toBe(
         'The one stored close approach is shown.',
       );
+    });
+  });
+
+  describe('for the signed in operator', () => {
+    const tick = () => new Promise((r) => setTimeout(r));
+    let http: HttpTestingController;
+
+    beforeEach(async () => {
+      http = TestBed.inject(HttpTestingController);
+      const loaded = TestBed.inject(SessionService).load();
+      http.expectOne(SESSION_PATH).flush({ username: 'operator' });
+      await loaded;
+    });
+
+    const alert = (id: string, from: number): Alert => ({
+      ...(RECORDED[from] as unknown as Alert),
+      event_id: id,
+    });
+
+    async function panel(list: AlertList) {
+      TestBed.inject(Clock).set(NOW);
+      const fixture = TestBed.createComponent(RecentAlerts);
+      fixture.componentRef.setInput('page', list);
+      fixture.componentRef.setInput('now', NOW);
+      document.body.appendChild(fixture.nativeElement);
+      await fixture.whenStable();
+      const el = fixture.nativeElement as HTMLElement;
+      const set = async (name: string, value: unknown) => {
+        fixture.componentRef.setInput(name, value);
+        await fixture.whenStable();
+      };
+      return { fixture, el, set };
+    }
+    const shownIds = (el: HTMLElement) => items(el).map((li) => li.dataset['eventId']);
+
+    it('offers the acknowledge controls on the alerts that can be acknowledged, and on no other', async () => {
+      const el = await render(ALERTS_ANONYMOUS);
+      expect(items(el).map((li) => squash(li.querySelector('.ack-main')?.textContent))).toEqual([
+        '',
+        'Acknowledge',
+        'Acknowledge',
+        '',
+        'Acknowledge',
+        'Unacknowledge',
+      ]);
+      expect(items(el).map((li) => li.querySelectorAll('[role="status"]').length)).toEqual([
+        0, 1, 1, 0, 1, 1,
+      ]);
+    });
+
+    it('holds the list while an acknowledgement request is out, even with focus elsewhere, and reports the new state', async () => {
+      const { fixture, el, set } = await panel({
+        items: [alert('a', 5), alert('b', 1)],
+        more: false,
+      });
+      const changes: unknown[] = [];
+      fixture.componentInstance.ackChange.subscribe((c) => changes.push(c));
+      const button = items(el)[0].querySelector<HTMLButtonElement>('.ack-main')!;
+      button.click();
+      await fixture.whenStable();
+      const req = http.expectOne((r) => r.url === ACK_PATH);
+      (document.activeElement as HTMLElement | null)?.blur();
+      await tick();
+      await set('page', { items: [alert('n1', 2), alert('a', 5), alert('b', 1)], more: false });
+      expect(shownIds(el)).toEqual(['a', 'b']);
+      expect(el.querySelector('.held-bar')).not.toBeNull();
+      req.flush(
+        {
+          event_id: 'a',
+          action: 'unacknowledge',
+          principal: 'operator',
+          acted_at: '2026-09-30T19:59:00Z',
+        },
+        { status: 201, statusText: 'Created' },
+      );
+      for (let i = 0; i < 3; i++) {
+        await tick();
+        await fixture.whenStable();
+      }
+      expect(changes).toEqual([
+        {
+          eventId: 'a',
+          ack: {
+            action: 'unacknowledge',
+            acted_at: '2026-09-30T19:59:00Z',
+            principal: 'operator',
+            note: null,
+          },
+        },
+      ]);
+      // Focus was outside the list when the request ended, so the waiting alert joins.
+      expect(shownIds(el)).toEqual(['n1', 'a', 'b']);
+      fixture.destroy();
+    });
+
+    it('holds the list while a note form is open, even with focus elsewhere', async () => {
+      const { fixture, el, set } = await panel({
+        items: [alert('a', 1), alert('b', 2)],
+        more: false,
+      });
+      const details = items(el)[0].querySelector('details')!;
+      details.open = true;
+      details.dispatchEvent(new Event('toggle'));
+      await fixture.whenStable();
+      await set('page', { items: [alert('n1', 2), alert('a', 1), alert('b', 2)], more: false });
+      expect(shownIds(el)).toEqual(['a', 'b']);
+      details.open = false;
+      details.dispatchEvent(new Event('toggle'));
+      await fixture.whenStable();
+      await tick();
+      await fixture.whenStable();
+      expect(shownIds(el)).toEqual(['n1', 'a', 'b']);
+      fixture.destroy();
     });
   });
 });

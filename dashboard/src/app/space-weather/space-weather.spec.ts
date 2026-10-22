@@ -178,6 +178,9 @@ describe('SpaceWeather', () => {
     expect(squash(status.textContent)).toBe(
       'The current levels could not be loaded. The page tries again at the next refresh.',
     );
+    // The live element keeps one style; a child holds the text and its shown or hidden styling.
+    expect(status.className).toBe('status-line');
+    expect(status.firstElementChild?.className).toBe('secondary');
   });
 
   it('says a failed load waits for updates to resume while they are paused', async () => {

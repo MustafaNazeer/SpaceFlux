@@ -6,7 +6,7 @@
     }
   </div>
 
-  <p role="status" [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</p>
+  <p class="status-line" role="status"><span [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</span></p>
   @if (view(); as v) {
     <dl class="run-meta">
       <div>

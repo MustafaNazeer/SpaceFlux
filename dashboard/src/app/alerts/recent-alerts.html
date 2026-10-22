@@ -1,5 +1,6 @@
 <aside id="alerts" class="panel alerts" aria-labelledby="alerts-title" tabindex="-1">
   <h2 id="alerts-title" class="section-title">Recent alerts</h2>
+  <div class="filter-area">
   <fieldset class="kind-filter">
     <legend class="label">Show</legend>
     <div class="kind-options">
@@ -8,7 +9,8 @@
       }
     </div>
   </fieldset>
-  <p role="status" [class]="page() || !status() ? 'visually-hidden' : 'secondary'">{{ status() }}</p>
+  <p class="status-line" role="status"><span [class]="page() || !status() ? 'visually-hidden' : 'secondary'">{{ status() }}</span></p>
+  </div>
   @if (drawn(); as d) {
     @if (d.held.length) {
       <div class="held-bar" (focusin)="focusIn()" (focusout)="focusOut()">
@@ -20,7 +22,7 @@
       <ol class="alert-list" (focusin)="focusIn()" (focusout)="focusOut()">
         @for (item of views(); track item.alert.event_id) {
           <li class="alert-item {{ item.border }}" [class.is-new]="newIds().has(item.alert.event_id)" [attr.data-event-id]="item.alert.event_id">
-            <app-alert-item [alert]="item.alert" [now]="now()" [isNew]="newIds().has(item.alert.event_id)" />
+            <app-alert-item [alert]="item.alert" [now]="now()" [isNew]="newIds().has(item.alert.event_id)" [actions]="true" (ackChange)="ackChange.emit($event)" />
           </li>
         }
       </ol>

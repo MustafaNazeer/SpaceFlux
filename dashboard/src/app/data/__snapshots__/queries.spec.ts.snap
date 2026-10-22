@@ -44,5 +44,11 @@ exports[`dashboard queries > reports the measured numbers, so a change that near
     59,
     886,
   ],
+  [
+    "Acknowledgements",
+    3,
+    180,
+    140,
+  ],
 ]
 `;

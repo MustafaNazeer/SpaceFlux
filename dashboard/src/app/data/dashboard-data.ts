@@ -5,6 +5,7 @@ import {
   inject,
   Injectable,
   InjectionToken,
+  effect,
   Signal,
   signal,
 } from '@angular/core';
@@ -12,24 +13,31 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { OperationVariables, TypedDocumentNode } from '@apollo/client';
 import { Apollo, QueryRef } from 'apollo-angular';
 
+import { AckApi } from '../ack/ack-api';
+import { supersedes, withoutOperator } from '../ack/note';
+import { OperatorFields } from '../ack/operator-fields';
 import {
   EMPTY_LIVE,
   LiveList,
   noticeAlert,
   shown,
+  withAcknowledgements,
   withNotice,
   withOlderPage,
   withOlderStarted,
   withoutOlder,
+  withoutOperatorFields,
   withPoll,
 } from '../alerts/alert-list';
 import { Announcer, LogEntry, pollAdded } from '../alerts/announcer';
 import { holdList } from '../alerts/held-list';
 import { NOUNS, OLDER_IDLE, OlderState } from '../alerts/list-end';
 import { parseUtc } from '../format';
+import { SessionService } from '../session/session.service';
 import { POLL_INTERVAL_MS } from './graphql';
 import { LiveAlerts } from './live-alerts';
 import {
+  Acknowledgement,
   Alert,
   AlertKind,
   AlertNotice,
@@ -54,6 +62,8 @@ export interface Live<T> {
 interface Watched<T> extends Live<T> {
   /** Forgets the answer and the failure, as when the query starts over with other variables. */
   reset(): void;
+  /** Rewrites the answer held, as when operator fields are dropped. */
+  update(change: (data: T) => T): void;
 }
 
 /** The filter in the address the page was opened at, so a link to a filtered console asks for that kind first. */
@@ -130,14 +140,26 @@ export class DashboardData {
     SPACE_WEATHER_CURRENT,
     {},
   );
-  readonly screening = this.watch<ScreeningCurrentData, Record<string, never>>(
+  private readonly screeningQuery = this.watch<ScreeningCurrentData, Record<string, never>>(
     SCREENING_CURRENT,
     {},
+    undefined,
+    (d) => this.screeningAcks(d, (ack, id) => this.arriving(ack, id)),
   );
+  readonly screening: Live<ScreeningCurrentData> = this.screeningQuery;
   private readonly alertsQuery = this.watch<RecentAlertsData, RecentAlertsVariables>(
     RECENT_ALERTS,
     { limit: RECENT_ALERTS_PAGE, kind: this.kindState() },
     (d) => this.polled(d.alerts),
+    (d) => ({
+      alerts: {
+        ...d.alerts,
+        items: d.alerts.items.map((a) => {
+          const ack = this.arriving(a.acknowledgement, a.event_id);
+          return ack === a.acknowledgement ? a : { ...a, acknowledgement: ack };
+        }),
+      },
+    }),
   );
   readonly alerts: Live<RecentAlertsData> = this.alertsQuery;
 
@@ -153,9 +175,149 @@ export class DashboardData {
   /** The alerts the return summary covered, which the console marks New. Empty until the console is shown again. */
   readonly arrivedAway = this.arrivedState.asReadonly();
 
+  private readonly session = inject(SessionService);
+  private readonly ackApi = inject(AckApi);
+  private readonly operatorFields = inject(OperatorFields);
+  /** Rows this page wrote or read again, kept over older answers until a refresh brings an equal or newer one. */
+  private readonly localAcks = new Map<string, Acknowledgement | null>();
+  /** Bumped on each sign in and each clear, so an older acknowledgement read never lands after a newer one. */
+  private ackGeneration = 0;
+
   constructor() {
     this.live.start((n) => this.notice(n));
     this.destroyRef.onDestroy(() => clearTimeout(this.groupTimer));
+    const stops = [
+      this.session.onSignedIn(() => void this.readAcknowledgements()),
+      this.session.onOperatorCleared(() => this.clearOperatorFields()),
+    ];
+    this.destroyRef.onDestroy(() => stops.forEach((stop) => stop()));
+    this.checkSessionWithRefresh();
+  }
+
+  /**
+   * An acknowledgement the operator wrote, or read again after a conflict or an unknown outcome, shown at once
+   * wherever the alert is: the list and the screening run. Until a refresh brings an equal or newer row, an older
+   * answer that left before it never takes it back.
+   */
+  setAcknowledgement(eventId: string, ack: Acknowledgement | null): void {
+    this.localAcks.set(eventId, ack);
+    this.liveList.update((list) => withAcknowledgements(list, new Map([[eventId, ack]])));
+    this.screeningQuery.update((d) =>
+      this.screeningAcks(d, (current, id) => (id === eventId ? ack : current)),
+    );
+  }
+
+  /**
+   * What an acknowledgement read from the API becomes on arrival: without principal and note while they are hidden,
+   * and the row this page wrote when the answer is older than it.
+   */
+  private arriving(ack: Acknowledgement | null, eventId: string): Acknowledgement | null {
+    let result = ack;
+    if (this.localAcks.has(eventId)) {
+      const local = this.localAcks.get(eventId)!;
+      if (supersedes(ack, local)) {
+        this.localAcks.delete(eventId);
+      } else {
+        result = local;
+      }
+    }
+    return this.operatorFields.hidden() ? withoutOperator(result) : result;
+  }
+
+  private screeningAcks(
+    d: ScreeningCurrentData,
+    change: (ack: Acknowledgement | null, eventId: string) => Acknowledgement | null,
+  ): ScreeningCurrentData {
+    if (!d.screening_current) {
+      return d;
+    }
+    return {
+      ...d,
+      screening_current: {
+        ...d.screening_current,
+        approaches: d.screening_current.approaches.map((a) => {
+          const ack = change(a.acknowledgement, a.event_id);
+          return ack === a.acknowledgement ? a : { ...a, acknowledgement: ack };
+        }),
+      },
+    };
+  }
+
+  /**
+   * After a sign in, the alerts shown get their acknowledgements again with the operator's names and notes, without
+   * changing which alerts are listed, their order, or the older pages loaded. After a failed read the next refresh
+   * brings the first page's names and notes; older pages keep what they show.
+   */
+  private async readAcknowledgements(): Promise<void> {
+    const generation = ++this.ackGeneration;
+    const ids = (this.recentAlerts()?.items ?? []).map((a) => a.event_id);
+    if (ids.length === 0) {
+      return;
+    }
+    try {
+      const acks = await this.ackApi.acknowledgements(ids);
+      if (generation === this.ackGeneration) {
+        const merged = new Map([...acks].map(([id, ack]) => [id, this.arriving(ack, id)]));
+        this.liveList.update((list) => withAcknowledgements(list, merged));
+      }
+    } catch {
+      // The next refresh brings the first page's; older pages keep what they show.
+    }
+  }
+
+  /** Drops every principal and note the page holds: the list, the screening run, and Apollo's cache. */
+  private clearOperatorFields(): void {
+    this.ackGeneration++;
+    // The rows kept over older answers held operator fields; the next answers are shown as they come.
+    this.localAcks.clear();
+    this.liveList.update(withoutOperatorFields);
+    this.screeningQuery.update((d) =>
+      d.screening_current
+        ? {
+            ...d,
+            screening_current: {
+              ...d.screening_current,
+              approaches: d.screening_current.approaches.map((a) => ({
+                ...a,
+                acknowledgement: withoutOperator(a.acknowledgement),
+              })),
+            },
+          }
+        : d,
+    );
+    const cache = this.apollo.client.cache;
+    const stored = cache.extract() as Record<string, Record<string, unknown> | undefined>;
+    for (const [id, entity] of Object.entries(stored)) {
+      if (entity && 'acknowledgement' in entity) {
+        cache.modify({
+          id,
+          fields: {
+            acknowledgement: (value) =>
+              withoutOperator(value as Acknowledgement | null) as typeof value,
+          },
+          broadcast: false,
+        });
+      }
+    }
+  }
+
+  /**
+   * While signed in and not paused, asks who is signed in with each one minute refresh, so a session that ended on
+   * the server shows as ended. Stops once it is ended or signed out, and while updates are paused.
+   */
+  private checkSessionWithRefresh(): void {
+    if (this.pollInterval <= 0) {
+      return;
+    }
+    let timer: ReturnType<typeof setInterval> | undefined;
+    effect(() => {
+      clearInterval(timer);
+      timer = undefined;
+      if (this.session.signedIn() && !this.pausedState()) {
+        timer = setInterval(() => void this.session.check(), this.pollInterval);
+      }
+    });
+    this.destroyRef.onDestroy(() => clearInterval(timer));
   }
 
   /**
@@ -225,6 +387,8 @@ export class DashboardData {
   resume(): void {
     this.pausedState.set(false);
     this.resumed = true;
+    // The refresh at resume checks the session too.
+    void this.session.check();
     this.live.start((n) => this.notice(n));
     for (const ref of this.refs) {
       if (this.pollInterval > 0) {
@@ -289,7 +453,11 @@ export class DashboardData {
             this.olderState.set({ ...OLDER_IDLE, phase: 'failed', seq });
             return;
           }
-          this.liveList.update((list) => withOlderPage(list, page));
+          const items = page.items.map((a) => {
+            const ack = this.arriving(a.acknowledgement, a.event_id);
+            return ack === a.acknowledgement ? a : { ...a, acknowledgement: ack };
+          });
+          this.liveList.update((list) => withOlderPage(list, { ...page, items }));
           this.olderLoaded(lastShown, seq);
         },
         error: () => {
@@ -414,6 +582,7 @@ export class DashboardData {
     query: TypedDocumentNode<T, V>,
     variables: V,
     onData?: (data: T) => void,
+    prepare: (data: T) => T = (d) => d,
   ): Watched<T> {
     const data = signal<T | undefined>(undefined);
     const failedAt = signal<number | undefined>(undefined);
@@ -430,9 +599,10 @@ export class DashboardData {
       if (result.error) {
         failedAt.set(Date.now());
       } else if (result.dataState === 'complete') {
-        data.set(result.data as T);
+        const prepared = prepare(result.data as T);
+        data.set(prepared);
         failedAt.set(undefined);
-        onData?.(result.data as T);
+        onData?.(prepared);
       }
     });
     return {
@@ -441,6 +611,12 @@ export class DashboardData {
       reset: () => {
         data.set(undefined);
         failedAt.set(undefined);
+      },
+      update: (change) => {
+        const held = data();
+        if (held !== undefined) {
+          data.set(change(held));
+        }
       },
     };
   }

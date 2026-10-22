@@ -4,7 +4,7 @@
     <button class="btn btn-secondary" type="button" [attr.aria-disabled]="loading()" (click)="refresh()">Refresh passes</button>
   </div>
 
-  <p role="status" [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</p>
+  <p class="status-line" role="status"><span [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</span></p>
   @if (view(); as v) {
     @if (v.common; as c) {
       <dl class="run-meta">

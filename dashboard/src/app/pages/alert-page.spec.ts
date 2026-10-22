@@ -25,6 +25,9 @@ import {
   ALERTS_ENDED,
 } from '../../testing/fixtures';
 import { AlertPage } from './alert-page';
+import { ACK_PATH } from '../ack/ack-api';
+import { answerAcks } from '../../testing/acks';
+import { LOGIN_PATH, LOGOUT_PATH, SESSION_PATH, SessionService } from '../session/session.service';
 
 const squash = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
 const APPROACH_ID = ALERT_APPROACH.alert.event_id;
@@ -453,5 +456,224 @@ describe('AlertPage', () => {
     await settle(harness);
     expect(el.querySelector('.page-head button')).toBeNull();
     expect(document.activeElement).toBe(el.querySelector('h1'));
+  });
+
+  describe('acknowledgement panel', () => {
+    const OP_ACK = {
+      action: 'acknowledge',
+      acted_at: '2026-09-30T19:02:11.000000Z',
+      principal: 'operator',
+      note: 'Reviewed.',
+    };
+    const historyReq = () => http.expectOne((r) => r.method === 'GET' && r.url === ACK_PATH);
+    const panel = (el: HTMLElement) => el.querySelector<HTMLElement>('section.ack-panel')!;
+    const stateLine = (el: HTMLElement) =>
+      squash(panel(el).querySelector(':scope > div .ack-state')?.textContent);
+    const historyEntries = (el: HTMLElement) =>
+      Array.from(panel(el).querySelectorAll('.ack-history li')).map((li) => squash(li.textContent));
+
+    async function signedIn(): Promise<SessionService> {
+      const session = TestBed.inject(SessionService);
+      const loaded = session.load();
+      http.expectOne(SESSION_PATH).flush({ username: 'operator' });
+      await loaded;
+      return session;
+    }
+
+    async function openApproach(ack: object | null = OP_ACK) {
+      const opened = await open(pathFor(APPROACH_ID));
+      answer(posts()[0], { alert: { ...ALERT_APPROACH.alert, acknowledgement: ack } });
+      await settle(opened.harness);
+      return opened;
+    }
+
+    it('shows the state and the history to an anonymous viewer, with no controls', async () => {
+      const { harness, el } = await openApproach(ALERT_APPROACH.alert.acknowledgement);
+      historyReq().flush({
+        event_id: APPROACH_ID,
+        items: [{ action: 'acknowledge', acted_at: '2026-09-30T19:02:11.000000Z' }],
+      });
+      await settle(harness);
+      expect(panel(el).querySelector('.ack-main')).toBeNull();
+      expect(squash(panel(el).querySelector('h3')?.textContent)).toBe('History');
+      expect(historyEntries(el)).toEqual(['Acknowledged 2026-09-30 19:02 UTC']);
+    });
+
+    it('lets the operator unacknowledge, then shows the returned row in the state line and at the top of History', async () => {
+      await signedIn();
+      const { harness, el } = await openApproach();
+      historyReq().flush({ event_id: APPROACH_ID, items: [OP_ACK] });
+      await settle(harness);
+      expect(stateLine(el)).toBe('Acknowledged 2026-09-30 19:02 UTC by operator');
+      const button = panel(el).querySelector<HTMLButtonElement>('.ack-main')!;
+      expect(squash(button.textContent)).toBe('Unacknowledge');
+      button.click();
+      const req = http.expectOne((r) => r.method === 'POST' && r.url === ACK_PATH);
+      expect(req.request.body).toEqual({ action: 'unacknowledge' });
+      req.flush(
+        {
+          event_id: APPROACH_ID,
+          action: 'unacknowledge',
+          principal: 'operator',
+          acted_at: '2026-10-01T11:58:00.000000Z',
+        },
+        { status: 201, statusText: 'Created' },
+      );
+      await settle(harness);
+      expect(stateLine(el)).toBe('Unacknowledged 2026-10-01 11:58 UTC by operator');
+      expect(historyEntries(el)).toEqual([
+        'Unacknowledged 2026-10-01 11:58 UTC by operator',
+        'Acknowledged 2026-09-30 19:02 UTC by operatorReviewed.',
+      ]);
+      expect(squash(panel(el).querySelector('.ack-main')?.textContent)).toBe('Acknowledge');
+      expect(
+        squash(panel(el).querySelector('app-ack-controls > [role="status"]')?.textContent),
+      ).toBe('Unacknowledged at 2026-10-01 11:58 UTC.');
+      http.expectNone((r) => r.method === 'GET' && r.url === ACK_PATH);
+    });
+
+    it('after a conflict redraws from the fresh state and fetches the first page of History again', async () => {
+      await signedIn();
+      const { harness, el } = await openApproach(null);
+      historyReq().flush({ event_id: APPROACH_ID, items: [] });
+      await settle(harness);
+      panel(el).querySelector<HTMLButtonElement>('.ack-main')!.click();
+      http
+        .expectOne((r) => r.method === 'POST' && r.url === ACK_PATH)
+        .flush({ status: 409 }, { status: 409, statusText: 'Conflict' });
+      await settle(harness);
+      answerAcks(posts()[0], { [APPROACH_ID]: OP_ACK });
+      await settle(harness);
+      expect(stateLine(el)).toBe('Acknowledged 2026-09-30 19:02 UTC by operator');
+      historyReq().flush({ event_id: APPROACH_ID, items: [OP_ACK] });
+      await settle(harness);
+      expect(historyEntries(el)).toEqual([
+        'Acknowledged 2026-09-30 19:02 UTC by operatorReviewed.',
+      ]);
+    });
+
+    it('after a sign in reads the state and the first page of History again, with names and notes', async () => {
+      const unauthorized = { status: 401, statusText: 'Unauthorized' };
+      const session = TestBed.inject(SessionService);
+      const loaded = session.load();
+      http.expectOne(SESSION_PATH).flush({}, unauthorized);
+      await loaded;
+      const { harness, el } = await openApproach(ALERT_APPROACH.alert.acknowledgement);
+      historyReq().flush({ event_id: APPROACH_ID, items: [] });
+      await settle(harness);
+      expect(panel(el).querySelector('.ack-main')).toBeNull();
+      const signing = session.signIn('operator', 'pw');
+      http.expectOne(LOGIN_PATH).flush('', { status: 204, statusText: 'No Content' });
+      await settle(harness);
+      http.expectOne(SESSION_PATH).flush({ username: 'operator' });
+      await signing;
+      await settle(harness);
+      answerAcks(posts()[0], { [APPROACH_ID]: OP_ACK });
+      historyReq().flush({ event_id: APPROACH_ID, items: [OP_ACK] });
+      await settle(harness);
+      expect(stateLine(el)).toBe('Acknowledged 2026-09-30 19:02 UTC by operator');
+      expect(squash(panel(el).querySelector('.ack-note')?.textContent)).toBe('Reviewed.');
+      expect(historyEntries(el)).toEqual([
+        'Acknowledged 2026-09-30 19:02 UTC by operatorReviewed.',
+      ]);
+      expect(panel(el).querySelector('.ack-main')).not.toBeNull();
+    });
+
+    it('removes every name, note and control at once on sign out, before any request', async () => {
+      const session = await signedIn();
+      const { harness, el } = await openApproach();
+      historyReq().flush({ event_id: APPROACH_ID, items: [OP_ACK] });
+      await settle(harness);
+      const out = session.signOut();
+      http.expectOne(LOGOUT_PATH).flush('', { status: 204, statusText: 'No Content' });
+      await out;
+      await settle(harness);
+      expect(stateLine(el)).toBe('Acknowledged 2026-09-30 19:02 UTC');
+      expect(panel(el).querySelector('.ack-note')).toBeNull();
+      expect(historyEntries(el)).toEqual(['Acknowledged 2026-09-30 19:02 UTC']);
+      expect(panel(el).querySelector('.ack-main')).toBeNull();
+      http.expectNone(GRAPHQL_PATH);
+      http.expectNone(ACK_PATH);
+    });
+
+    it('keeps the status line at its height while Try again is out', async () => {
+      const { harness, el } = await open(pathFor(APPROACH_ID));
+      fail(posts()[0]);
+      await settle(harness);
+      const line = el.querySelector<HTMLElement>('.page-head > [role="status"]')!;
+      expect(line.className).toBe('status-line');
+      vi.spyOn(line, 'getBoundingClientRect').mockReturnValue({ height: 22 } as DOMRect);
+      el.querySelector<HTMLButtonElement>('.page-head button')!.click();
+      await settle(harness);
+      expect(line.style.minHeight).toBe('22px');
+      fail(posts()[0]);
+      await settle(harness);
+      expect(line.style.minHeight).toBe('');
+    });
+
+    it('drops the name and note from an alert that arrives after the session ended', async () => {
+      const session = await signedIn();
+      const opened = await open(pathFor(APPROACH_ID));
+      const req = posts()[0];
+      session.end('check');
+      answer(req, { alert: { ...ALERT_APPROACH.alert, acknowledgement: OP_ACK } });
+      await settle(opened.harness);
+      historyReq().flush({ event_id: APPROACH_ID, items: [] });
+      const again = TestBed.inject(SessionService).load();
+      http.expectOne(SESSION_PATH).flush({ username: 'operator' });
+      await again;
+      await settle(opened.harness);
+      expect(stateLine(opened.el)).toBe('Acknowledged 2026-09-30 19:02 UTC');
+    });
+
+    it('keeps a note being written in the panel when the session ends, and Discard note focuses the panel heading', async () => {
+      const session = await signedIn();
+      const { harness, el } = await openApproach(null);
+      historyReq().flush({ event_id: APPROACH_ID, items: [] });
+      await settle(harness);
+      const details = panel(el).querySelector<HTMLDetailsElement>('details')!;
+      details.open = true;
+      details.dispatchEvent(new Event('toggle'));
+      await settle(harness);
+      const area = panel(el).querySelector<HTMLTextAreaElement>('textarea')!;
+      area.value = 'Checked';
+      area.dispatchEvent(new Event('input'));
+      session.end('check');
+      await settle(harness);
+      const kept = panel(el).querySelector<HTMLElement>('.kept-note')!;
+      expect(kept.getAttribute('aria-label')).toBe('Note not saved');
+      expect(kept.querySelector('textarea')?.value).toBe('Checked');
+      Array.from(kept.querySelectorAll('button'))
+        .find((b) => squash(b.textContent) === 'Discard note')!
+        .click();
+      await settle(harness);
+      expect(panel(el).querySelector('.kept-note')).toBeNull();
+      expect(document.activeElement).toBe(panel(el).querySelector('h2'));
+    });
+
+    it('lets only the newest re-read land after a sign in', async () => {
+      const unauthorized = { status: 401, statusText: 'Unauthorized' };
+      const session = TestBed.inject(SessionService);
+      const loaded = session.load();
+      http.expectOne(SESSION_PATH).flush({}, unauthorized);
+      await loaded;
+      const { harness, el } = await openApproach(ALERT_APPROACH.alert.acknowledgement);
+      historyReq().flush({ event_id: APPROACH_ID, items: [] });
+      await settle(harness);
+      const signing = session.signIn('operator', 'pw');
+      http.expectOne(LOGIN_PATH).flush('', { status: 204, statusText: 'No Content' });
+      await settle(harness);
+      http.expectOne(SESSION_PATH).flush({ username: 'operator' });
+      await signing;
+      await settle(harness);
+      const stale = posts()[0];
+      historyReq().flush({ event_id: APPROACH_ID, items: [] });
+      // The session ends before the re-read answers; its operator fields must not land.
+      session.end('check');
+      answerAcks(stale, { [APPROACH_ID]: OP_ACK });
+      await settle(harness);
+      expect(stateLine(el)).toBe('Acknowledged 2026-09-30 19:02 UTC');
+      expect(panel(el).querySelector('.ack-note')).toBeNull();
+    });
   });
 });

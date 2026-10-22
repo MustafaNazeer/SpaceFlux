@@ -115,6 +115,10 @@ describe('PassesPanel', () => {
     expect(el(fixture).querySelector('h2')?.textContent).toBe('Watchlist passes');
     expect(el(fixture).querySelector('h2')?.id).toBe('passes-title');
     expect(status(fixture)).toBe('Computing passes for the watchlist.');
+    // The live element keeps one style; a child holds the text and its shown or hidden styling.
+    const live = el(fixture).querySelector('[role="status"]')!;
+    expect(live.className).toBe('status-line');
+    expect(live.firstElementChild?.className).toBe('secondary');
     expect(button(fixture).getAttribute('aria-disabled')).toBe('true');
     button(fixture).click();
     await settle(fixture);

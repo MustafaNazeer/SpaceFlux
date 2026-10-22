@@ -2,7 +2,7 @@
 <main id="main" class="route-page">
   <div class="page-head" [class.state-block]="state().phase === 'failed' || state().phase === 'retry'">
     <h1 class="page-title" tabindex="-1">{{ heading() }}</h1>
-    <p role="status" [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</p>
+    <p class="status-line" role="status" [style.min-height.px]="heldHeight()"><span [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</span></p>
     @if (state().phase === 'failed' || state().phase === 'retry') {
       <button class="btn btn-secondary" type="button" [attr.aria-disabled]="state().phase === 'retry' ? 'true' : null" (click)="tryAgain()">Try again</button>
     }

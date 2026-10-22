@@ -17,6 +17,8 @@ import { parseUtc } from '../format';
 import { provideFakeSocket } from '../../testing/fake-socket';
 import { respond } from '../../testing/graphql';
 import { APPROACH_ITEM, catalogObjectAj } from '../../testing/fixtures';
+import { signedIn } from '../../testing/acks';
+import { SessionService } from '../session/session.service';
 import { catalogNumber, ObjectPage } from './object-page';
 
 const squash = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
@@ -261,5 +263,63 @@ describe('ObjectPage', () => {
     answer(posts()[0], catalogObjectAj({ null: { items: [], next: null } }));
     await settle(h);
     expect(document.activeElement).toBe(el.querySelector('h1'));
+  });
+
+  it('keeps the status line at its height while Try again is out, the live element keeping one style', async () => {
+    const { h, el } = await open('/objects/57036/alerts');
+    posts()[0].flush({ status: 503 }, { status: 503, statusText: 'Unavailable' });
+    await settle(h);
+    const line = el.querySelector<HTMLElement>('.page-head > [role="status"]')!;
+    expect(line.className).toBe('status-line');
+    vi.spyOn(line, 'getBoundingClientRect').mockReturnValue({ height: 22 } as DOMRect);
+    el.querySelector<HTMLButtonElement>('.page-head button')!.click();
+    await settle(h);
+    expect(line.style.minHeight).toBe('22px');
+    answer(posts()[0], catalogObjectAj({ null: { items: [], next: null } }));
+    await settle(h);
+    expect(line.style.minHeight).toBe('');
+  });
+
+  describe('operator fields', () => {
+    const OP = {
+      action: 'acknowledge',
+      acted_at: '2026-09-30T19:02:11.000000Z',
+      principal: 'operator',
+      note: 'Reviewed.',
+    };
+    const withOp = { ...APPROACH_ITEM, acknowledgement: OP };
+
+    it('drops names and notes from its loaded items at once when the session ends', async () => {
+      await signedIn(http);
+      const { h, el } = await open('/objects/57036/alerts');
+      answer(posts()[0], catalogObjectAj({ null: { items: [withOp], next: null } }));
+      await settle(h);
+      expect(squash(el.querySelector('.ack-state')?.textContent)).toContain('by operator');
+      TestBed.inject(SessionService).end('check');
+      await signedIn(http);
+      await settle(h);
+      expect(squash(el.querySelector('.ack-state')?.textContent)).not.toContain('operator');
+      expect(el.querySelector('.ack-note')).toBeNull();
+    });
+
+    it('drops names and notes from items that arrive while signed out', async () => {
+      await signedIn(http);
+      const { h, el } = await open('/objects/57036/alerts');
+      const req = posts()[0];
+      TestBed.inject(SessionService).end('check');
+      answer(req, catalogObjectAj({ null: { items: [withOp], next: null } }));
+      await settle(h);
+      await signedIn(http);
+      await settle(h);
+      expect(squash(el.querySelector('.ack-state')?.textContent)).not.toContain('operator');
+    });
+
+    it('stays read only for the signed in operator', async () => {
+      await signedIn(http);
+      const { h, el } = await open('/objects/57036/alerts');
+      answer(posts()[0], catalogObjectAj({ null: { items: [withOp], next: null } }));
+      await settle(h);
+      expect(el.querySelector('.ack-main')).toBeNull();
+    });
   });
 });

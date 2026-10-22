@@ -17,6 +17,11 @@ export class Clock {
     }
   }
 
+  /** The browser's time right now, for a deadline that must not wait for the next tick. */
+  read(): number {
+    return Date.now();
+  }
+
   set(ms: number): void {
     this.ms.set(ms);
   }

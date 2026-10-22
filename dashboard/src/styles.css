@@ -244,6 +244,19 @@ p {
   cursor: pointer;
   transition: background-color var(--duration-instant) var(--ease-standard);
 }
+.btn-primary {
+  background: var(--accent);
+  color: var(--on-fill);
+  border: 1px solid var(--accent);
+}
+.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.btn-primary:active {
+  background: var(--accent-active);
+  border-color: var(--accent-active);
+}
 .btn-secondary {
   background: transparent;
   color: var(--text-primary);
@@ -389,6 +402,170 @@ details.disclosure[open] > summary::before {
 }
 details.disclosure[open] > summary {
   margin-bottom: var(--space-3);
+}
+
+/* Sign in, sign out and acknowledgement */
+.ack-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.ack-form {
+  display: grid;
+  gap: var(--space-2);
+}
+.ack-form label,
+.signin-form .field label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+textarea,
+input[type='text'],
+input[type='password'] {
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  width: 100%;
+}
+textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+textarea::placeholder,
+input::placeholder {
+  color: var(--text-muted);
+}
+textarea[aria-invalid='true'] {
+  border-width: 2px;
+  padding: calc(var(--space-2) - 1px) calc(var(--space-3) - 1px);
+}
+input[readonly],
+textarea[readonly] {
+  color: var(--text-secondary);
+}
+.signin-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-3);
+  flex-basis: 100%;
+}
+.signin-form .field {
+  display: grid;
+  gap: var(--space-1);
+  flex: 1 1 180px;
+  max-width: 260px;
+}
+.signin-form .ack-actions {
+  flex: none;
+}
+.signin-form .caption,
+.signin-form .inline-message,
+.signin-form [role='status'] {
+  flex-basis: 100%;
+}
+.inline-message {
+  color: var(--text-primary);
+  border-left: 2px solid var(--border-strong);
+  padding-left: var(--space-2);
+}
+.inline-message strong {
+  font-weight: 600;
+}
+.note-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+.note-counter {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+.note-counter.is-over {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.ack-history {
+  display: grid;
+  gap: var(--space-3);
+}
+.ack-history ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.ack-history li {
+  display: grid;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.ack-history li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.ack-panel {
+  display: grid;
+  gap: var(--space-3);
+}
+.ack-panel .ack-history {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-3);
+}
+.session-notice {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+.session-notice p {
+  margin: 0;
+  flex: 1 1 280px;
+}
+.session-notice strong,
+.kept-note .kept-line strong {
+  font-weight: 600;
+}
+.kept-note {
+  display: grid;
+  gap: var(--space-2);
+}
+.kept-note > label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.kept-note .kept-line {
+  margin: 0;
+  color: var(--text-primary);
+}
+.panel .history-title {
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 600;
 }
 
 .ack-state {

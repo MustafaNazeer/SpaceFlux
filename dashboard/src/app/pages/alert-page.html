@@ -5,7 +5,7 @@
       <div class="badge-row"><app-badge [badge]="b" /></div>
     }
     <h1 class="page-title" tabindex="-1">{{ heading() }}</h1>
-    <p role="status" [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</p>
+    <p class="status-line" role="status" [style.min-height.px]="heldHeight()"><span [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</span></p>
     @if (state().phase === 'failed' || state().phase === 'retry') {
       <button class="btn btn-secondary" type="button" [attr.aria-disabled]="state().phase === 'retry' ? 'true' : null" (click)="tryAgain()">Try again</button>
     }
@@ -31,9 +31,13 @@
 
   @if (view(); as v) {
     @if (v.acknowledgeable && alert(); as a) {
-      <section class="panel" aria-labelledby="ack-title">
-        <h2 id="ack-title" class="panel-title">Acknowledgement</h2>
+      <section class="panel ack-panel" aria-labelledby="ack-title">
+        <h2 id="ack-title" class="panel-title" tabindex="-1">Acknowledgement</h2>
         <div><app-ack-state [ack]="a.acknowledgement" [showNote]="true" [dated]="true" /></div>
+        @if (signedIn() || kept()) {
+          <app-ack-controls [eventId]="a.event_id" [ack]="a.acknowledgement" [page]="true" (changed)="ackChanged($event)" />
+        }
+        <app-ack-history [eventId]="a.event_id" />
       </section>
     }
     @if (v.kindPanel; as k) {

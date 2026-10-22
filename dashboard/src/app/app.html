@@ -24,21 +24,40 @@
   <button class="btn btn-secondary" type="button" (click)="togglePause()">
     {{ data.paused() ? 'Resume updates' : 'Pause updates' }}
   </button>
-  <div class="session">
+  <div class="session" [class.is-signing-in]="formOpen()">
     @switch (session().kind) {
       @case ('signed_in') {
-        <p class="who">
+        <p class="who" tabindex="-1">
           Signed in as <strong>{{ $any(session()).username }}</strong>
         </p>
+        <button class="btn btn-secondary signout" type="button" [attr.aria-disabled]="sessions.signingOut() ? 'true' : null" (click)="signOut()">Sign out</button>
       }
       @case ('anonymous') {
         <p class="who">Not signed in, read only</p>
+      }
+      @case ('ended') {
+        <p class="who">Session ended, read only</p>
       }
       @case ('unknown') {
         <p class="who">Sign in state unknown</p>
       }
     }
+    @if (formShown()) {
+      <app-sign-in-form (closed)="formClosed($event)" />
+    } @else if (session().kind === 'anonymous' || session().kind === 'ended') {
+      <button class="btn btn-secondary signin" type="button" (click)="formOpen.set(true)">Sign in</button>
+    }
+    <p class="status-line" role="status"><span [class]="line().failure ? 'inline-message' : 'visually-hidden'">@if (line().lead) {<strong>{{ line().lead }}</strong>{{ ' ' }}}{{ line().text }}</span></p>
+    <p class="visually-hidden notice-line" role="status">{{ limits.line() }}</p>
   </div>
+  @if (notice(); as n) {
+    <div class="session-notice">
+      <p><strong><app-segments [segments]="n.parts.lead" /></strong>{{ ' ' }}<app-segments [segments]="n.parts.rest" /></p>
+      @if (n.stay) {
+        <button class="btn btn-secondary stay" type="button" [attr.aria-disabled]="limits.staying() ? 'true' : null" (click)="stay()">Stay signed in</button>
+      }
+    </div>
+  }
 </header>
 
 <router-outlet />

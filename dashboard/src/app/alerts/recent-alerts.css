@@ -4,6 +4,10 @@
   gap: var(--space-3);
   align-content: start;
 }
+.filter-area .status-line > .secondary {
+  display: block;
+  margin-block-start: var(--space-3);
+}
 .empty {
   margin-bottom: 0;
 }

@@ -6,6 +6,8 @@ import gLevel from '../../../schemas/alerts/examples/valid-g-level.json';
 import rRestatement from '../../../schemas/alerts/examples/valid-r-restatement.json';
 import screeningRun from '../../../schemas/alerts/examples/valid-screening-run.json';
 import { routes } from './app.routes';
+import { AlertPage } from './pages/alert-page';
+import { ObjectPage } from './pages/object-page';
 
 /** The event id the alert route takes from a URL, decoded as the Router decodes its path segments. */
 function eventIdIn(router: Router, url: string): string | undefined {
@@ -70,5 +72,19 @@ describe('routes', () => {
     expect(object?.paramMap.get('noradCatId')).toBe('57036');
     await router.navigateByUrl('/nowhere');
     expect(router.url).toBe('/');
+  });
+
+  it('loads the alert and object pages on first use, outside the console bundle', async () => {
+    const lazy = routes.filter((r) => r.loadComponent);
+    expect(lazy.map((r) => r.path)).toEqual([
+      'alerts/:eventId',
+      'alerts',
+      'objects/:noradCatId/alerts',
+    ]);
+    expect(routes.filter((r) => r.component).map((r) => r.path)).toEqual(['']);
+    const loaded = await Promise.all(
+      lazy.map((r) => (r.loadComponent as () => Promise<unknown>)()),
+    );
+    expect(loaded).toEqual([AlertPage, AlertPage, ObjectPage]);
   });
 });

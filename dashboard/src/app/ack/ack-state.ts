@@ -2,11 +2,13 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 
 import { Acknowledgement } from '../data/queries';
 import { Clock } from '../data/clock';
+import { OperatorFields } from './operator-fields';
 import { dateHm, dateOf, datetimeAttr, hm, parseUtc } from '../format';
 
 /**
  * The acknowledgement state of an alert. Anonymous viewers get the action and its time only; the principal and
- * note are shown when the API returned them, which it does for the signed in operator alone.
+ * note are shown when the API returned them, which it does for the signed in operator alone, and never after a
+ * sign out or an ended session, even before the data is fetched again.
  */
 @Component({
   selector: 'app-ack-state',
@@ -18,9 +20,9 @@ import { dateHm, dateOf, datetimeAttr, hm, parseUtc } from '../format';
     <span class="ack-state"
       ><svg class="icon" aria-hidden="true"><use [attr.href]="view().icon" /></svg>{{ view().label }}
       @if (view().datetime) {<time [attr.datetime]="view().datetime">{{ view().time }}</time>}
-      @if (ack()?.principal) {{{ ' by ' + ack()?.principal }}}</span
+      @if (!hidden() && ack()?.principal) {{{ ' by ' + ack()?.principal }}}</span
     >
-    @if (showNote() && ack()?.note) {
+    @if (showNote() && !hidden() && ack()?.note) {
       <p class="ack-note">{{ ack()?.note }}</p>
     }
   `,
@@ -38,6 +40,7 @@ export class AckState {
   /** Puts the date on the time even when it is today, as the alert page does with every time. */
   readonly dated = input(false);
   private readonly now = inject(Clock).now;
+  protected readonly hidden = inject(OperatorFields).hidden;
 
   protected readonly view = computed(() => {
     const a = this.ack();

@@ -1,6 +1,6 @@
 <section aria-labelledby="sw-title">
   <h2 id="sw-title" class="section-title">Space weather, derived levels</h2>
-  <p role="status" [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</p>
+  <p class="status-line" role="status"><span [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</span></p>
   @if (current()) {
     <div class="scales">
       @for (v of views(); track v.scale) {

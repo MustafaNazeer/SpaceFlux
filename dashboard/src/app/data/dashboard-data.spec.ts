@@ -5,7 +5,7 @@ import {
   TestRequest,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideApollo } from 'apollo-angular';
+import { Apollo, provideApollo } from 'apollo-angular';
 
 import { FakeSocket, provideFakeSocket } from '../../testing/fake-socket';
 import { dataOf, respond } from '../../testing/graphql';
@@ -19,6 +19,7 @@ import { ANNOUNCE_GROUP_MS, AWAY_KEPT_PER_KIND, DashboardData, startKind } from 
 import { RECONNECT } from './alert-socket';
 import { apolloOptions, GRAPHQL_PATH, POLL_INTERVAL_MS } from './graphql';
 import { ALERT_STORED, AlertStoredData, RECENT_ALERTS_PAGE } from './queries';
+import { LOGIN_PATH, LOGOUT_PATH, SESSION_PATH, SessionService } from '../session/session.service';
 
 const POLL = 1000;
 
@@ -75,6 +76,22 @@ describe('DashboardData', () => {
       return body.operationName;
     });
   }
+
+  it('recovers at the next poll when the very first answer fails and nothing was held before', async () => {
+    const data = TestBed.inject(DashboardData);
+    await vi.advanceTimersByTimeAsync(0);
+    answerAll('fail');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(data.spaceWeather.data()).toBeUndefined();
+    expect(data.spaceWeather.failedAt()).toBeDefined();
+    await vi.advanceTimersByTimeAsync(POLL);
+    expect(answerAll(SPACE_WEATHER_MIXED)).toContain('SpaceWeatherCurrent');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(data.spaceWeather.failedAt()).toBeUndefined();
+    expect(data.spaceWeather.data()?.space_weather_current.as_of).toBe(
+      '2026-10-04T18:00:00.000000Z',
+    );
+  });
 
   it('keeps the earlier answer through a failed refresh, keeps polling, and clears the failure on the next good answer', async () => {
     const data = TestBed.inject(DashboardData);
@@ -1016,5 +1033,350 @@ describe('DashboardData', () => {
       expect(data.older()).toMatchObject({ phase: 'loaded', added: 1, end: true });
       expect(data.recentAlerts()!.items.length).toBe(RECENT_ALERTS_PAGE + 1);
     });
+  });
+});
+
+describe('DashboardData with the operator session', () => {
+  let http: HttpTestingController;
+  const OP_ACK = {
+    action: 'acknowledge',
+    acted_at: '2026-09-30T19:02:11.000000Z',
+    principal: 'operator',
+    note: 'Reviewed; element ages 1.6 and 4.2 days.',
+  };
+  const APPROACH_ID = ALERTS_ANONYMOUS.alerts.items[5].event_id;
+  const SCREENING_OPERATOR = {
+    screening_current: {
+      ...SCREENING_CURRENT.screening_current,
+      approaches: [
+        { ...SCREENING_CURRENT.screening_current.approaches[0], acknowledgement: OP_ACK },
+      ],
+    },
+  };
+  const ALERTS_WITH_OPERATOR = {
+    alerts: {
+      ...ALERTS_ANONYMOUS.alerts,
+      items: ALERTS_ANONYMOUS.alerts.items.map((a, i) =>
+        i === 5 ? { ...a, acknowledgement: OP_ACK } : a,
+      ),
+    },
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideApollo(apolloOptions),
+        { provide: POLL_INTERVAL_MS, useValue: POLL },
+        provideFakeSocket(),
+      ],
+    });
+    FakeSocket.reset();
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function answer(roots: Record<string, object>): string[] {
+    return http.match({ method: 'POST', url: GRAPHQL_PATH }).map((req) => {
+      const body = req.request.body as {
+        operationName: string;
+        query: string;
+        variables: Record<string, unknown>;
+      };
+      req.flush(respond(body.query, roots[body.operationName], body.variables));
+      return body.operationName;
+    });
+  }
+
+  const ROOTS = {
+    SpaceWeatherCurrent: SPACE_WEATHER_MIXED,
+    ScreeningCurrent: SCREENING_CURRENT,
+    RecentAlerts: ALERTS_ANONYMOUS,
+  };
+
+  async function start(signedIn: boolean, roots: Record<string, object> = ROOTS) {
+    const session = TestBed.inject(SessionService);
+    const loaded = session.load();
+    if (signedIn) {
+      http.expectOne(SESSION_PATH).flush({ username: 'operator' });
+    } else {
+      http.expectOne(SESSION_PATH).flush({}, { status: 401, statusText: 'Unauthorized' });
+    }
+    await loaded;
+    const data = TestBed.inject(DashboardData);
+    await vi.advanceTimersByTimeAsync(0);
+    answer(roots);
+    await vi.advanceTimersByTimeAsync(0);
+    TestBed.tick();
+    return { data, session };
+  }
+
+  it('checks the session with each refresh while signed in, and stops once a 401 ends it', async () => {
+    const { session } = await start(true);
+    await vi.advanceTimersByTimeAsync(POLL);
+    answer(ROOTS);
+    http.expectOne(SESSION_PATH).flush({ username: 'operator' });
+    await vi.advanceTimersByTimeAsync(POLL);
+    answer(ROOTS);
+    http.expectOne(SESSION_PATH).flush({}, { status: 401, statusText: 'Unauthorized' });
+    await vi.advanceTimersByTimeAsync(0);
+    TestBed.tick();
+    expect(session.state()).toEqual({ kind: 'ended' });
+    await vi.advanceTimersByTimeAsync(POLL * 3);
+    answer(ROOTS);
+    http.expectNone(SESSION_PATH);
+  });
+
+  it('never checks the session while signed out', async () => {
+    await start(false);
+    await vi.advanceTimersByTimeAsync(POLL * 2);
+    answer(ROOTS);
+    http.expectNone(SESSION_PATH);
+  });
+
+  it('pauses the session check with updates and checks at once on resume', async () => {
+    const { data } = await start(true);
+    data.pause();
+    TestBed.tick();
+    await vi.advanceTimersByTimeAsync(POLL * 3);
+    http.expectNone(SESSION_PATH);
+    data.resume();
+    TestBed.tick();
+    http.expectOne(SESSION_PATH).flush({ username: 'operator' });
+    await vi.advanceTimersByTimeAsync(0);
+    answer(ROOTS);
+    await vi.advanceTimersByTimeAsync(POLL);
+    answer(ROOTS);
+    http.expectOne(SESSION_PATH).flush({ username: 'operator' });
+  });
+
+  it('after a sign in reads the acknowledgements of the alerts shown, keeping which are listed and their order', async () => {
+    const { data, session } = await start(false);
+    const before = data.recentAlerts()!.items.map((a) => a.event_id);
+    const signing = session.signIn('operator', 'pw');
+    http.expectOne(LOGIN_PATH).flush('', { status: 204, statusText: 'No Content' });
+    await vi.advanceTimersByTimeAsync(0);
+    http.expectOne(SESSION_PATH).flush({ username: 'operator' });
+    await signing;
+    await vi.advanceTimersByTimeAsync(0);
+    const [req] = http.match({ method: 'POST', url: GRAPHQL_PATH });
+    expect(req.request.body.operationName).toBe('Acknowledgements');
+    expect(Object.values(req.request.body.variables)).toEqual(before);
+    const body = req.request.body as { query: string; variables: Record<string, unknown> };
+    req.flush(
+      respond(
+        body.query,
+        {
+          alert: ({ event_id }: { event_id: string }) => {
+            const a = ALERTS_ANONYMOUS.alerts.items.find((x) => x.event_id === event_id)!;
+            return event_id === APPROACH_ID ? { ...a, acknowledgement: OP_ACK } : a;
+          },
+        },
+        body.variables,
+      ),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    const items = data.recentAlerts()!.items;
+    expect(items.map((a) => a.event_id)).toEqual(before);
+    expect(items[5].acknowledgement).toMatchObject(OP_ACK);
+  });
+
+  it('on sign out drops every name and note at once: the list, the screening run and the cache', async () => {
+    const { data, session } = await start(true, {
+      ...ROOTS,
+      ScreeningCurrent: SCREENING_OPERATOR,
+      RecentAlerts: ALERTS_WITH_OPERATOR,
+    });
+    expect(data.recentAlerts()!.items[5].acknowledgement?.principal).toBe('operator');
+    expect(data.screening.data()!.screening_current!.approaches[0].acknowledgement?.note).toBe(
+      OP_ACK.note,
+    );
+    const out = session.signOut();
+    http.expectOne(LOGOUT_PATH).flush('', { status: 204, statusText: 'No Content' });
+    await out;
+    expect(data.recentAlerts()!.items[5].acknowledgement).toMatchObject({
+      action: 'acknowledge',
+      acted_at: OP_ACK.acted_at,
+      principal: null,
+      note: null,
+    });
+    expect(data.screening.data()!.screening_current!.approaches[0].acknowledgement).toMatchObject({
+      action: 'acknowledge',
+      acted_at: OP_ACK.acted_at,
+      principal: null,
+      note: null,
+    });
+    const cached = JSON.stringify(TestBed.inject(Apollo).client.cache.extract());
+    expect(cached).not.toContain('operator');
+    expect(cached).not.toContain('Reviewed');
+  });
+
+  it('shows an acknowledgement the operator wrote at once, in the list and in the screening run', async () => {
+    const { data } = await start(true);
+    data.setAcknowledgement(APPROACH_ID, OP_ACK);
+    expect(data.recentAlerts()!.items[5].acknowledgement).toEqual(OP_ACK);
+    expect(data.screening.data()!.screening_current!.approaches[0].acknowledgement).toEqual(OP_ACK);
+    data.setAcknowledgement(APPROACH_ID, null);
+    expect(data.recentAlerts()!.items[5].acknowledgement).toBeNull();
+  });
+
+  const LATER = {
+    ...OP_ACK,
+    action: 'unacknowledge',
+    acted_at: '2026-09-30T20:00:00.000000Z',
+    note: null,
+  };
+
+  it('never lets an older poll answer undo a row the operator just wrote, and lets an equal or newer one through', async () => {
+    const { data } = await start(true, {
+      ...ROOTS,
+      RecentAlerts: ALERTS_WITH_OPERATOR,
+      ScreeningCurrent: SCREENING_OPERATOR,
+    });
+    data.setAcknowledgement(APPROACH_ID, LATER);
+    // A refresh that left before the row was written still shows the older acknowledgement.
+    await vi.advanceTimersByTimeAsync(POLL);
+    answer({ ...ROOTS, RecentAlerts: ALERTS_WITH_OPERATOR, ScreeningCurrent: SCREENING_OPERATOR });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(data.recentAlerts()!.items[5].acknowledgement).toMatchObject(LATER);
+    expect(data.screening.data()!.screening_current!.approaches[0].acknowledgement).toMatchObject(
+      LATER,
+    );
+    // A refresh that has the row takes over, and a still newer one after it wins too.
+    const NEWER = { ...OP_ACK, acted_at: '2026-09-30T20:05:00.000000Z' };
+    const withAck = (ack: object) => ({
+      alerts: {
+        ...ALERTS_ANONYMOUS.alerts,
+        items: ALERTS_ANONYMOUS.alerts.items.map((a, i) =>
+          i === 5 ? { ...a, acknowledgement: ack } : a,
+        ),
+      },
+    });
+    await vi.advanceTimersByTimeAsync(POLL);
+    answer({ ...ROOTS, RecentAlerts: withAck(LATER) });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(data.recentAlerts()!.items[5].acknowledgement).toMatchObject(LATER);
+    await vi.advanceTimersByTimeAsync(POLL);
+    answer({ ...ROOTS, RecentAlerts: withAck(NEWER) });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(data.recentAlerts()!.items[5].acknowledgement).toMatchObject(NEWER);
+    // Once confirmed, the poll is the source of truth again, even for an older row.
+    await vi.advanceTimersByTimeAsync(POLL);
+    answer({ ...ROOTS, RecentAlerts: ALERTS_WITH_OPERATOR });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(data.recentAlerts()!.items[5].acknowledgement).toMatchObject(OP_ACK);
+  });
+
+  it('keeps a row the operator just wrote over an older answer to the re-read after a sign in', async () => {
+    const { data, session } = await start(false);
+    const signing = session.signIn('operator', 'pw');
+    http.expectOne(LOGIN_PATH).flush('', { status: 204, statusText: 'No Content' });
+    await vi.advanceTimersByTimeAsync(0);
+    http.expectOne(SESSION_PATH).flush({ username: 'operator' });
+    await signing;
+    await vi.advanceTimersByTimeAsync(0);
+    const [req] = http.match({ method: 'POST', url: GRAPHQL_PATH });
+    data.setAcknowledgement(APPROACH_ID, LATER);
+    const body = req.request.body as { query: string; variables: Record<string, unknown> };
+    req.flush(
+      respond(
+        body.query,
+        {
+          alert: ({ event_id }: { event_id: string }) => {
+            const a = ALERTS_ANONYMOUS.alerts.items.find((x) => x.event_id === event_id)!;
+            return event_id === APPROACH_ID ? { ...a, acknowledgement: OP_ACK } : a;
+          },
+        },
+        body.variables,
+      ),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(data.recentAlerts()!.items[5].acknowledgement).toMatchObject(LATER);
+  });
+
+  it('drops names and notes from answers that arrive after the session ended', async () => {
+    const { data, session } = await start(true);
+    session.end('check');
+    await vi.advanceTimersByTimeAsync(POLL);
+    answer({ ...ROOTS, RecentAlerts: ALERTS_WITH_OPERATOR, ScreeningCurrent: SCREENING_OPERATOR });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(data.recentAlerts()!.items[5].acknowledgement).toMatchObject({
+      principal: null,
+      note: null,
+    });
+    expect(data.screening.data()!.screening_current!.approaches[0].acknowledgement).toMatchObject({
+      principal: null,
+      note: null,
+    });
+  });
+
+  it('drops names and notes from a Load older page that arrives while signed out', async () => {
+    const { data } = await start(false);
+    data.loadOlder();
+    await vi.advanceTimersByTimeAsync(0);
+    const [req] = http.match({ method: 'POST', url: GRAPHQL_PATH });
+    const body = req.request.body as { query: string; variables: Record<string, unknown> };
+    const older = {
+      ...ALERTS_ANONYMOUS.alerts.items[5],
+      event_id: 'close_approach/older',
+      acknowledgement: OP_ACK,
+    };
+    req.flush(respond(body.query, { alerts: { items: [older], next: null } }, body.variables));
+    await vi.advanceTimersByTimeAsync(0);
+    const item = data.recentAlerts()!.items.find((a) => a.event_id === 'close_approach/older')!;
+    expect(item.acknowledgement).toMatchObject({ principal: null, note: null });
+  });
+
+  it('forgets the rows it kept over older answers once signed out, so the next answer is shown as it is', async () => {
+    const { data, session } = await start(true);
+    data.setAcknowledgement(APPROACH_ID, LATER);
+    const out = session.signOut();
+    http.expectOne(LOGOUT_PATH).flush('', { status: 204, statusText: 'No Content' });
+    await out;
+    await vi.advanceTimersByTimeAsync(POLL);
+    answer({ ...ROOTS, RecentAlerts: ALERTS_WITH_OPERATOR });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(data.recentAlerts()!.items[5].acknowledgement).toMatchObject({
+      action: 'acknowledge',
+      acted_at: OP_ACK.acted_at,
+      principal: null,
+      note: null,
+    });
+  });
+
+  it('keeps names and notes out of the cache when a late refresh answers after sign out', async () => {
+    const { session } = await start(true);
+    await vi.advanceTimersByTimeAsync(POLL);
+    const late = http.match({ method: 'POST', url: GRAPHQL_PATH });
+    const out = session.signOut();
+    http.expectOne(LOGOUT_PATH).flush('', { status: 204, statusText: 'No Content' });
+    await out;
+    const roots: Record<string, object> = {
+      ...ROOTS,
+      RecentAlerts: ALERTS_WITH_OPERATOR,
+      ScreeningCurrent: SCREENING_OPERATOR,
+    };
+    for (const req of late) {
+      const body = req.request.body as {
+        operationName: string;
+        query: string;
+        variables: Record<string, unknown>;
+      };
+      req.flush(respond(body.query, roots[body.operationName], body.variables));
+    }
+    await vi.advanceTimersByTimeAsync(0);
+    const cached = JSON.stringify(TestBed.inject(Apollo).client.cache.extract());
+    expect(cached).not.toContain('operator');
+    expect(cached).not.toContain('Reviewed');
+  });
+
+  it('keeps names and notes in the cache while signed in', async () => {
+    await start(true, { ...ROOTS, RecentAlerts: ALERTS_WITH_OPERATOR });
+    expect(JSON.stringify(TestBed.inject(Apollo).client.cache.extract())).toContain('Reviewed');
   });
 });

@@ -189,6 +189,9 @@ describe('Screening', () => {
     expect(squash(el.querySelector('[role="status"]')?.textContent)).toBe(
       'The latest screening run could not be loaded. The page tries again at the next refresh.',
     );
+    // The live element keeps one style; a child holds the text and its shown or hidden styling.
+    expect(el.querySelector('[role="status"]')?.className).toBe('status-line');
+    expect(el.querySelector('[role="status"]')?.firstElementChild?.className).toBe('secondary');
   });
 
   it('says a failed load waits for updates to resume while they are paused', async () => {

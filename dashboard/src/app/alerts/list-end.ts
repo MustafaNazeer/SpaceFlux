@@ -24,6 +24,8 @@ export const OLDER_IDLE: OlderState = {
 export interface ListNoun {
   one: string;
   many: string;
+  /** False for a list whose end line says only that every row is shown, not that every stored one is. */
+  stored?: boolean;
 }
 
 export const NOUNS: Record<'all' | 'close_approach' | 'space_weather_level', ListNoun> = {
@@ -37,9 +39,10 @@ export function endLine(count: number, more: boolean, noun: ListNoun): string {
   if (more) {
     return `${count} shown, newest first`;
   }
+  const stored = noun.stored === false ? '' : 'stored ';
   return count === 1
-    ? `The one stored ${noun.one} is shown.`
-    : `All ${count} stored ${noun.many} are shown, newest first.`;
+    ? `The one ${stored}${noun.one} is shown.`
+    : `All ${count} ${stored}${noun.many} are shown, newest first.`;
 }
 
 /** The persistent status line under the end line, naming what the list holds. */

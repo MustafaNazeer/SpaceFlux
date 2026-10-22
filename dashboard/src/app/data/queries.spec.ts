@@ -12,6 +12,7 @@ import {
   validate,
 } from 'graphql';
 
+import { ACK_BATCH, acknowledgementsQuery } from '../ack/ack-api';
 import { respond, SCHEMA } from '../../testing/graphql';
 import * as fixtures from '../../testing/fixtures';
 import {
@@ -108,6 +109,11 @@ const DOCUMENTS: [string, DocumentNode, Record<string, unknown>][] = [
   ['AlertStored', ALERT_STORED, {}],
   ['AlertDetail', ALERT_DETAIL, { event_id: 'x' }],
   ['ObjectAlerts', OBJECT_ALERTS, { norad_cat_id: 57036, limit: OBJECT_ALERTS_PAGE }],
+  [
+    'Acknowledgements',
+    acknowledgementsQuery(ACK_BATCH),
+    Object.fromEntries(Array.from({ length: ACK_BATCH }, (_, i) => [`e${i}`, 'x'])),
+  ],
 ];
 
 /** The root type an operation starts from; the server's cost calculator treats Subscription as a root like Query. */

@@ -16,6 +16,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Apollo } from 'apollo-angular';
 import { Subscription } from 'rxjs';
 
+import { alertsWithoutOperator, heightOf } from '../ack/note';
+import { OperatorFields } from '../ack/operator-fields';
 import { AlertItem } from '../alerts/alert-item';
 import { focusAfterOlder, ListEnd, NOUNS, OLDER_IDLE, OlderState } from '../alerts/list-end';
 import { Clock } from '../data/clock';
@@ -25,6 +27,7 @@ import { APPROACH_NOTE, DetailFact } from './alert-detail-view';
 import { RouteFocus } from '../route-focus';
 import { DetailFacts } from './detail-facts';
 import { LoadPhase, refusedInput } from './load';
+import { SessionService } from '../session/session.service';
 
 /** The largest catalog number the API takes (docs/api/rest.md, section 5). */
 export const NORAD_MAX = 999_999_999;
@@ -73,6 +76,9 @@ export class ObjectPage {
 
   protected readonly number = signal<number | null>(null);
   protected readonly state = signal<ObjectState>({ phase: 'loading' });
+  /** The status line's height while Try again's request is out, so the button does not move. */
+  protected readonly heldHeight = signal<number | null>(null);
+  private readonly operatorFields = inject(OperatorFields);
   protected readonly older = signal<OlderState>(OLDER_IDLE);
   protected readonly noun = NOUNS.close_approach;
   protected readonly note = APPROACH_NOTE;
@@ -155,12 +161,25 @@ export class ObjectPage {
         this.number.set(catalogNumber(params.get('noradCatId')));
         this.load('loading');
       });
+    const stop = inject(SessionService).onOperatorCleared(() => {
+      const s = this.found();
+      if (s) {
+        this.state.set({ ...s, items: alertsWithoutOperator(s.items) });
+      }
+    });
+    inject(DestroyRef).onDestroy(stop);
   }
 
   protected tryAgain(): void {
     if (this.state().phase !== 'retry') {
+      this.heldHeight.set(heightOf(this.host, '.page-head > .status-line'));
       this.load('retry');
     }
+  }
+
+  /** Close approaches as they arrive: without principal and note while those are hidden. */
+  private arriving(items: Alert[]): Alert[] {
+    return this.operatorFields.hidden() ? alertsWithoutOperator(items) : items;
   }
 
   /** The page after the oldest close approach shown; sends nothing while one is out. */
@@ -188,7 +207,7 @@ export class ObjectPage {
             return;
           }
           const known = new Set(current.items.map((a) => a.event_id));
-          const added = page.items.filter((a) => !known.has(a.event_id));
+          const added = this.arriving(page.items).filter((a) => !known.has(a.event_id));
           this.state.set({ ...current, items: [...current.items, ...added], next: page.next });
           this.older.set({
             phase: 'loaded',
@@ -235,7 +254,7 @@ export class ObjectPage {
               phase: 'done',
               result: 'found',
               object,
-              items: page.items,
+              items: this.arriving(page.items),
               next: page.next,
             });
           } else {
@@ -257,6 +276,7 @@ export class ObjectPage {
    * Try again is removed once its request answers, so focus goes to the page title rather than to the body.
    */
   private afterLoad(phase: 'loading' | 'retry'): void {
+    this.heldHeight.set(null);
     if (phase === 'loading') {
       this.routeFocus.settled(this.host, this.injector);
     } else if (this.state().phase === 'done') {

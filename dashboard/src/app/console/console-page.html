@@ -20,5 +20,6 @@
     (heldChange)="data.setHeld($event)"
     (kindChange)="setKind($event)"
     (loadOlder)="data.loadOlder()"
+    (ackChange)="data.setAcknowledgement($event.eventId, $event.ack)"
   />
 </div>

@@ -1,4 +1,5 @@
-import { Alert, AlertNotice } from '../data/queries';
+import { withoutOperator } from '../ack/note';
+import { Acknowledgement, Alert, AlertNotice } from '../data/queries';
 
 /**
  * What the recent alerts panel shows, newest first, and whether older alerts exist: at most one page until an older
@@ -145,4 +146,43 @@ export function shown(list: LiveList, pageSize: number): AlertList | undefined {
     items: all.slice(0, pageSize),
     more: list.poll.next !== null || all.length > pageSize,
   };
+}
+
+/** Applies `change` to every alert the list holds, wherever it is: pending, in the poll's page or in older pages. */
+function mapAlerts(list: LiveList, change: (a: Alert) => Alert): LiveList {
+  const next: LiveList = {
+    ...list,
+    pending: list.pending.map((p) => ({ ...p, alert: change(p.alert) })),
+  };
+  if (list.poll) {
+    (next as { poll: LiveList['poll'] }).poll = {
+      ...list.poll,
+      items: list.poll.items.map(change),
+    };
+  }
+  if (list.older) {
+    (next as { older: Older }).older = { ...list.older, items: list.older.items.map(change) };
+  }
+  return next;
+}
+
+/**
+ * Sets the acknowledgement of the alerts named in `acks`, by event_id, leaving which alerts are listed and their
+ * order as they are.
+ */
+export function withAcknowledgements(
+  list: LiveList,
+  acks: ReadonlyMap<string, Acknowledgement | null>,
+): LiveList {
+  return mapAlerts(list, (a) =>
+    acks.has(a.event_id) ? { ...a, acknowledgement: acks.get(a.event_id)! } : a,
+  );
+}
+
+/** Every acknowledgement as an anonymous viewer gets it, with no principal and no note. */
+export function withoutOperatorFields(list: LiveList): LiveList {
+  return mapAlerts(list, (a) => {
+    const ack = withoutOperator(a.acknowledgement);
+    return ack === a.acknowledgement ? a : { ...a, acknowledgement: ack };
+  });
 }

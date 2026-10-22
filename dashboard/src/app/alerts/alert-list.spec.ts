@@ -13,8 +13,10 @@ import {
   LiveList,
   noticeAlert,
   shown,
+  withAcknowledgements,
   withNotice,
   withOlderPage,
+  withoutOperatorFields,
   withOlderStarted,
   withoutOlder,
   withPoll,
@@ -183,6 +185,52 @@ describe('alert list', () => {
       const started = withOlderStarted(withPoll(EMPTY_LIVE, page(run('a', 2), 'Mg')));
       expect(withOlderStarted(started)).toBe(started);
       expect(withOlderPage(EMPTY_LIVE, page(run('b', 1)))).toBe(EMPTY_LIVE);
+    });
+  });
+
+  describe('acknowledgements', () => {
+    const op = {
+      action: 'acknowledge',
+      acted_at: '2026-10-22T10:00:00.000000Z',
+      principal: 'operator',
+      note: 'Reviewed.',
+    };
+
+    /** A list with a pending notice, the poll's page, and one older page. */
+    function full(): LiveList {
+      let list = withPoll(EMPTY_LIVE, page(RECORDED.slice(0, 3), 'c1'));
+      list = add(list, notice(5, 'close_approach/new')).list;
+      list = withOlderStarted(list);
+      return withOlderPage(list, page(RECORDED.slice(3, 6)));
+    }
+
+    it('sets acknowledgements by event_id in every part of the list, never changing which alerts or their order', () => {
+      const list = full();
+      const before = ids(shown(list, PAGE)?.items);
+      const acks = new Map([
+        ['close_approach/new', op],
+        [RECORDED[1]['event_id'] as string, op],
+        [RECORDED[5]['event_id'] as string, null],
+      ]);
+      const after = withAcknowledgements(list, acks);
+      const items = shown(after, PAGE)!.items;
+      expect(ids(items)).toEqual(before);
+      const byId = new Map(items.map((a) => [a.event_id, a.acknowledgement]));
+      expect(byId.get('close_approach/new')).toEqual(op);
+      expect(byId.get(RECORDED[1]['event_id'] as string)).toEqual(op);
+      expect(byId.get(RECORDED[5]['event_id'] as string)).toBeNull();
+      expect(byId.get(RECORDED[0]['event_id'] as string)).toBeNull();
+    });
+
+    it('drops every principal and note at once, keeping the action and its time', () => {
+      const everywhere = new Map(ids(shown(full(), PAGE)?.items).map((id) => [id, op]));
+      const signedIn = withAcknowledgements(full(), everywhere);
+      const items = shown(withoutOperatorFields(signedIn), PAGE)!.items;
+      expect(items.length).toBe(7);
+      for (const a of items) {
+        expect(a.acknowledgement).toEqual({ ...op, principal: null, note: null });
+      }
+      expect(withoutOperatorFields(EMPTY_LIVE)).toEqual(EMPTY_LIVE);
     });
   });
 });

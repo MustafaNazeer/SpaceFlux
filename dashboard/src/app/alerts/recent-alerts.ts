@@ -15,8 +15,9 @@ import {
   untracked,
 } from '@angular/core';
 
+import { AckActivity } from '../ack/ack-activity';
 import { Segments } from '../badge/segments';
-import { Alert, AlertKind } from '../data/queries';
+import { Acknowledgement, Alert, AlertKind } from '../data/queries';
 import { AlertItem, newBorder } from './alert-item';
 import { AlertList } from './alert-list';
 import { LogEntry } from './announcer';
@@ -66,9 +67,10 @@ export function filterResult(count: number, more: boolean, kind: AlertKind | nul
 }
 
 /**
- * Recent alerts, newest first, with their acknowledgement state, a filter by kind and Load older. Read only. While
- * focus is inside the list (or in the bar that offers what is waiting) or a form is open, the list is held: it never
- * trims or reorders, and new alerts wait in a bar above it.
+ * Recent alerts, newest first, with their acknowledgement state, a filter by kind and Load older, and the acknowledge
+ * controls for the signed in operator. While focus is inside the list (or in the bar that offers what is waiting), a
+ * note form is open, or an acknowledgement request is out, the list is held: it never trims or reorders, and new
+ * alerts wait in a bar above it.
  */
 @Component({
   selector: 'app-recent-alerts',
@@ -77,6 +79,7 @@ export function filterResult(count: number, more: boolean, kind: AlertKind | nul
   templateUrl: './recent-alerts.html',
   styleUrl: './recent-alerts.css',
   host: { style: 'display: contents' },
+  providers: [AckActivity],
 })
 export class RecentAlerts {
   readonly page = input.required<AlertList | undefined>();
@@ -98,6 +101,8 @@ export class RecentAlerts {
   readonly arrived = input<ReadonlySet<string>>(new Set());
   readonly kindChange = output<AlertKind | null>();
   readonly loadOlder = output<void>();
+  /** An item's acknowledgement changed: a row the operator wrote, or the state read again after a conflict. */
+  readonly ackChange = output<{ eventId: string; ack: Acknowledgement | null }>();
   /**
    * The alerts shown when the hold began, or null once the list is no longer held, so what the log says about new
    * alerts matches the bar above the list.
@@ -108,6 +113,9 @@ export class RecentAlerts {
   private readonly host: HTMLElement = inject(ElementRef).nativeElement;
   private readonly injector = inject(Injector);
   private readonly marks = new NewMarks();
+  private readonly activity = inject(AckActivity);
+  /** A form is open or an acknowledgement request is out, which holds the list like focus inside it does. */
+  private readonly working = computed(() => this.formOpen() || this.activity.active());
   /** The alerts shown when the hold began, and the filter they were for; null while not held. */
   private readonly frozen = signal<{ kind: AlertKind | null; items: Alert[] } | null>(null);
   private focusInside = false;
@@ -179,7 +187,7 @@ export class RecentAlerts {
     this.watchFilterResult();
     this.keepFocusInPlace();
     effect(() => {
-      if (this.formOpen()) {
+      if (this.working()) {
         untracked(() => this.hold());
       } else if (!untracked(() => this.focusInside)) {
         this.frozen.set(null);
@@ -224,7 +232,7 @@ export class RecentAlerts {
         el.contains(active),
       );
       this.focusInside = inside;
-      if (!inside && !this.formOpen()) {
+      if (!inside && !this.working()) {
         this.frozen.set(null);
       }
     });

@@ -18,7 +18,9 @@ import { ANNOUNCE_WINDOW_MS, DashboardData } from './data/dashboard-data';
 import { GRAPHQL_PATH, POLL_INTERVAL_MS } from './data/graphql';
 import { ALERT_STORED } from './data/queries';
 import { parseUtc } from './format';
-import { SESSION_PATH } from './session/session.service';
+import { LOGIN_PATH, LOGOUT_PATH, SESSION_PATH, SessionService } from './session/session.service';
+import { ACK_PATH } from './ack/ack-api';
+import { SessionActivity } from './session/session-activity';
 import { FakeSocket, provideFakeSocket } from '../testing/fake-socket';
 import { respond } from '../testing/graphql';
 import {
@@ -79,6 +81,10 @@ describe('App', () => {
   });
 
   afterEach(() => {
+    // An alert page loads its acknowledgement history; the routing tests here are not about it.
+    http
+      .match((r) => r.method === 'GET' && r.url === ACK_PATH)
+      .forEach((r) => r.cancelled || r.flush({ event_id: '', items: [] }));
     http.verify();
     document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
   });
@@ -697,6 +703,360 @@ describe('App', () => {
       const heading = el.querySelector('app-passes-panel h3')!;
       expect(heading.querySelector('a')?.getAttribute('href')).toMatch(/^\/objects\/\d+\/alerts$/);
       expect(heading.textContent).toMatch(/ \d+$/);
+    });
+  });
+
+  describe('session area', () => {
+    const unauthorized = { status: 401, statusText: 'Unauthorized' };
+    const area = (f: ComponentFixture<App>) =>
+      (f.nativeElement as HTMLElement).querySelector<HTMLElement>('.app-header .session')!;
+    const headerLine = (f: ComponentFixture<App>) =>
+      area(f).querySelector<HTMLElement>(':scope > .status-line')!;
+    /** The child that holds the line's text and its shown or hidden styling; the live element keeps one style. */
+    const shownAs = (f: ComponentFixture<App>) => headerLine(f).firstElementChild!.className;
+    const button = (f: ComponentFixture<App>, label: string) =>
+      Array.from(area(f).querySelectorAll<HTMLButtonElement>('button')).find(
+        (b) => squash(b.textContent) === label,
+      );
+    async function console(signedIn: boolean) {
+      const fixture = await start(
+        signedIn ? { status: 200, body: { username: 'operator' } } : { status: 401, body: {} },
+      );
+      http.match(GRAPHQL_PATH).forEach((p) => answer(p));
+      await settle(fixture);
+      return fixture;
+    }
+
+    it('reads not signed in with a Sign in button and an empty status line in the page', async () => {
+      const fixture = await console(false);
+      expect(squash(area(fixture).querySelector('.who')?.textContent)).toBe(
+        'Not signed in, read only',
+      );
+      expect(button(fixture, 'Sign in')).toBeDefined();
+      expect(headerLine(fixture).textContent).toBe('');
+      expect(shownAs(fixture)).toBe('visually-hidden');
+    });
+
+    it('opens the sign in form in place of the button with focus on Username, and Cancel or Escape returns focus to Sign in', async () => {
+      const fixture = await console(false);
+      button(fixture, 'Sign in')!.click();
+      await settle(fixture);
+      const form = area(fixture).querySelector('form')!;
+      expect(form.getAttribute('aria-label')).toBe('Operator sign in');
+      expect(button(fixture, 'Sign in')?.getAttribute('type')).toBe('submit');
+      expect(area(fixture).classList).toContain('is-signing-in');
+      expect(document.activeElement).toBe(form.querySelector('input[autocomplete="username"]'));
+      (form.querySelector('input[type="password"]') as HTMLInputElement).value = 'x';
+      button(fixture, 'Cancel')!.click();
+      await settle(fixture);
+      expect(area(fixture).querySelector('form')).toBeNull();
+      expect(document.activeElement).toBe(button(fixture, 'Sign in'));
+      button(fixture, 'Sign in')!.click();
+      await settle(fixture);
+      const reopened = area(fixture).querySelector('form')!;
+      expect((reopened.querySelector('input[type="password"]') as HTMLInputElement).value).toBe('');
+      reopened
+        .querySelector('input')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await settle(fixture);
+      expect(area(fixture).querySelector('form')).toBeNull();
+      expect(document.activeElement).toBe(button(fixture, 'Sign in'));
+    });
+
+    it('signs in: the form closes, the header names the operator, focus moves to Sign out, and the list reads its acknowledgements again', async () => {
+      const fixture = await console(false);
+      button(fixture, 'Sign in')!.click();
+      await settle(fixture);
+      const form = area(fixture).querySelector('form')!;
+      const [user, pass] = Array.from(form.querySelectorAll('input'));
+      user.value = 'operator';
+      user.dispatchEvent(new Event('input'));
+      pass.value = 'pw';
+      pass.dispatchEvent(new Event('input'));
+      button(fixture, 'Sign in')!.click();
+      await settle(fixture);
+      const login = http.expectOne(LOGIN_PATH);
+      expect(login.request.headers.get('X-XSRF-TOKEN')).toBe(
+        '8d1e5c1a-36f1-4f43-9b7e-0c2f4b2a9d11',
+      );
+      login.flush('', { status: 204, statusText: 'No Content' });
+      await settle(fixture);
+      http.expectOne(SESSION_PATH).flush({ username: 'operator' });
+      await settle(fixture);
+      expect(area(fixture).querySelector('form')).toBeNull();
+      expect(squash(area(fixture).querySelector('.who')?.textContent)).toBe(
+        'Signed in as operator',
+      );
+      expect(document.activeElement).toBe(button(fixture, 'Sign out'));
+      expect(squash(headerLine(fixture).textContent)).toBe('Signed in as operator.');
+      expect(shownAs(fixture)).toBe('visually-hidden');
+      const reads = http.match({ method: 'POST', url: GRAPHQL_PATH });
+      expect(reads.map((r) => r.request.body.operationName)).toEqual(['Acknowledgements']);
+      reads.forEach((r) =>
+        r.flush(
+          respond(
+            r.request.body.query,
+            {
+              alert: ({ event_id }: { event_id: string }) =>
+                ALERTS_ANONYMOUS.alerts.items.find((a) => a.event_id === event_id),
+            },
+            r.request.body.variables,
+          ),
+        ),
+      );
+      await settle(fixture);
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('app-recent-alerts .ack-main')
+          .length,
+      ).toBe(4);
+    });
+
+    it('signs out: names and controls go at once, the header says so and focus moves to Sign in', async () => {
+      const fixture = await console(true);
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelectorAll('app-recent-alerts .ack-main').length).toBe(4);
+      const out = button(fixture, 'Sign out')!;
+      out.focus();
+      out.click();
+      await settle(fixture);
+      expect(out.getAttribute('aria-disabled')).toBe('true');
+      expect(squash(headerLine(fixture).textContent)).toBe('Signing out.');
+      http.expectOne(LOGOUT_PATH).flush('', { status: 204, statusText: 'No Content' });
+      await settle(fixture);
+      expect(squash(area(fixture).querySelector('.who')?.textContent)).toBe(
+        'Not signed in, read only',
+      );
+      expect(document.activeElement).toBe(button(fixture, 'Sign in'));
+      expect(squash(headerLine(fixture).textContent)).toBe('Signed out.');
+      expect(el.querySelectorAll('app-recent-alerts .ack-main').length).toBe(0);
+    });
+
+    it('keeps the signed in view on a failed sign out, shows why, and keeps focus on Sign out', async () => {
+      const fixture = await console(true);
+      const out = button(fixture, 'Sign out')!;
+      out.focus();
+      out.click();
+      await settle(fixture);
+      http.expectOne(LOGOUT_PATH).flush({}, { status: 503, statusText: 'x' });
+      await settle(fixture);
+      expect(squash(area(fixture).querySelector('.who')?.textContent)).toBe(
+        'Signed in as operator',
+      );
+      expect(document.activeElement).toBe(out);
+      expect(shownAs(fixture)).toBe('inline-message');
+      expect(squash(headerLine(fixture).textContent)).toBe(
+        'Sign out not confirmed. The server could not be reached or had a problem, so you may still be signed in. Use Sign out to try again.',
+      );
+    });
+
+    it('switches to the ended view when an acknowledgement finds the session gone, with focus on Sign in', async () => {
+      const fixture = await console(true);
+      const el = fixture.nativeElement as HTMLElement;
+      el.querySelector<HTMLButtonElement>('app-recent-alerts .ack-main')!.click();
+      await settle(fixture);
+      http.expectOne((r) => r.url === ACK_PATH).flush({ status: 401 }, unauthorized);
+      await settle(fixture);
+      expect(squash(area(fixture).querySelector('.who')?.textContent)).toBe(
+        'Session ended, read only',
+      );
+      expect(document.activeElement).toBe(button(fixture, 'Sign in'));
+      expect(squash(headerLine(fixture).textContent)).toBe(
+        'Your session has ended, so the acknowledgement was not saved. Sign in again to acknowledge.',
+      );
+      expect(el.querySelectorAll('app-recent-alerts .ack-main').length).toBe(0);
+      expect(squash(el.querySelector('app-recent-alerts')?.textContent)).not.toContain(
+        ' by operator',
+      );
+    });
+
+    it('leaves focus where it was when the minute check finds the session ended', async () => {
+      const fixture = await console(true);
+      const el = fixture.nativeElement as HTMLElement;
+      const link = el.querySelector<HTMLElement>('app-screening a')!;
+      link.focus();
+      const checked = TestBed.inject(SessionService).check();
+      http.expectOne(SESSION_PATH).flush({}, unauthorized);
+      await checked;
+      await settle(fixture);
+      expect(squash(area(fixture).querySelector('.who')?.textContent)).toBe(
+        'Session ended, read only',
+      );
+      expect(squash(headerLine(fixture).textContent)).toBe(
+        'Your session has ended. Sign in again to acknowledge.',
+      );
+      expect(document.activeElement).toBe(link);
+    });
+
+    it('shows nothing while the first check is out, and no button when the state is unknown', async () => {
+      const init = TestBed.inject(ApplicationInitStatus);
+      const req = http.expectOne(SESSION_PATH);
+      const fixture = TestBed.createComponent(App);
+      await fixture.whenStable();
+      expect(squash(area(fixture).querySelector('.who')?.textContent)).toBe('');
+      expect(area(fixture).querySelector('button')).toBeNull();
+      req.flush({}, { status: 503, statusText: 'x' });
+      await init.donePromise;
+      await fixture.whenStable();
+      expect(squash(area(fixture).querySelector('.who')?.textContent)).toBe(
+        'Sign in state unknown',
+      );
+      expect(area(fixture).querySelector('button')).toBeNull();
+      http.match(GRAPHQL_PATH);
+      TestBed.inject(SessionService)['retry'] &&
+        clearTimeout(TestBed.inject(SessionService)['retry']);
+      fixture.destroy();
+    });
+
+    describe('time limits', () => {
+      const MIN = 60_000;
+      const notice = (f: ComponentFixture<App>) =>
+        (f.nativeElement as HTMLElement).querySelector<HTMLElement>(
+          '.app-header > .session-notice',
+        );
+      const noticeLine = (f: ComponentFixture<App>) =>
+        squash(area(f).querySelector('.notice-line')?.textContent);
+
+      it('shows the idle notice as the header last row, speaks it once, and Stay signed in keeps the session', async () => {
+        const fixture = await console(true);
+        TestBed.inject(SessionActivity)['last'].set(Date.now() - 29 * MIN);
+        await settle(fixture);
+        const n = notice(fixture)!;
+        expect(squash(n.querySelector('strong')?.textContent)).toBe('Session ending soon.');
+        expect(squash(n.querySelector('p')?.textContent)).toMatch(
+          /^Session ending soon\. The session can end at \d\d:\d\d UTC, 30 minutes after this page last reached the server\. Use Stay signed in at the top of the page to keep it\.$/,
+        );
+        expect(n.getAttribute('role')).toBeNull();
+        expect(noticeLine(fixture)).toBe(squash(n.querySelector('p')?.textContent));
+        const stay = n.querySelector<HTMLButtonElement>('button')!;
+        stay.focus();
+        stay.click();
+        await settle(fixture);
+        expect(stay.getAttribute('aria-disabled')).toBe('true');
+        expect(document.activeElement).toBe(stay);
+        expect(noticeLine(fixture)).toBe('Checking the session.');
+        http.expectOne(SESSION_PATH).flush({ username: 'operator' });
+        await settle(fixture);
+        expect(notice(fixture)).toBeNull();
+        expect(document.activeElement).toBe(area(fixture).querySelector('.who'));
+        expect(area(fixture).querySelector('.who')?.getAttribute('tabindex')).toBe('-1');
+        expect(noticeLine(fixture)).toBe('You are still signed in.');
+      });
+
+      it('gives the 8 hour notice with no button, and never moves focus', async () => {
+        const fixture = await console(true);
+        const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+          'app-screening a',
+        )!;
+        link.focus();
+        const session = TestBed.inject(SessionService);
+        const checked = session.check();
+        const end = new Date(Date.now() + 5 * MIN).toISOString();
+        http.expectOne(SESSION_PATH).flush({ username: 'operator', expires_at: end });
+        await checked;
+        await settle(fixture);
+        const n = notice(fixture)!;
+        expect(squash(n.textContent)).toMatch(
+          /^Session ends at \d\d:\d\d UTC\. A session lasts at most 8 hours from sign in and cannot be extended\. To keep acknowledging after that, sign in again\.$/,
+        );
+        expect(n.querySelector('button')).toBeNull();
+        expect(document.activeElement).toBe(link);
+      });
+
+      it.each([
+        ['the browser does not anchor', 150, 50],
+        ['the browser anchors part of the way', 120, 20],
+        ['the browser anchors fully', 100, null],
+      ])(
+        'with the header out of view, scrolls only by what scroll anchoring left: %s',
+        async (_, after, expected) => {
+          const fixture = await console(true);
+          const root = fixture.nativeElement as HTMLElement;
+          const header = root.querySelector<HTMLElement>('.app-header')!;
+          const main = root.querySelector<HTMLElement>('main')!;
+          const shown = () => !!header.querySelector('.session-notice');
+          vi.spyOn(header, 'getBoundingClientRect').mockImplementation(
+            () => ({ top: -260, bottom: -200, height: shown() ? 110 : 60 }) as DOMRect,
+          );
+          vi.spyOn(main, 'getBoundingClientRect').mockImplementation(
+            () => ({ top: shown() ? after : 100 }) as DOMRect,
+          );
+          const scroll = vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined);
+          TestBed.inject(SessionActivity)['last'].set(Date.now() - 29 * MIN);
+          await settle(fixture);
+          expect(notice(fixture)).not.toBeNull();
+          if (expected === null) {
+            expect(scroll).not.toHaveBeenCalled();
+          } else {
+            expect(scroll).toHaveBeenCalledWith({ top: expected, left: 0, behavior: 'instant' });
+          }
+        },
+      );
+
+      it('does not scroll when the header is in view', async () => {
+        const fixture = await console(true);
+        const root = fixture.nativeElement as HTMLElement;
+        const main = root.querySelector<HTMLElement>('main')!;
+        const header = root.querySelector<HTMLElement>('.app-header')!;
+        vi.spyOn(header, 'getBoundingClientRect').mockReturnValue({
+          top: 0,
+          bottom: 60,
+          height: 60,
+        } as DOMRect);
+        vi.spyOn(main, 'getBoundingClientRect').mockImplementation(
+          () => ({ top: header.querySelector('.session-notice') ? 150 : 100 }) as DOMRect,
+        );
+        const scroll = vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined);
+        TestBed.inject(SessionActivity)['last'].set(Date.now() - 29 * MIN);
+        await settle(fixture);
+        expect(notice(fixture)).not.toBeNull();
+        expect(scroll).not.toHaveBeenCalled();
+      });
+    });
+
+    it('keeps the form open, with the header reading state unknown, when a sign in cannot be confirmed', async () => {
+      const fixture = await console(false);
+      button(fixture, 'Sign in')!.click();
+      await settle(fixture);
+      const [user, pass] = Array.from(area(fixture).querySelectorAll('input'));
+      user.value = 'operator';
+      user.dispatchEvent(new Event('input'));
+      pass.value = 'pw';
+      pass.dispatchEvent(new Event('input'));
+      button(fixture, 'Sign in')!.click();
+      await settle(fixture);
+      http.expectOne(LOGIN_PATH).error(new ProgressEvent('error'));
+      await settle(fixture);
+      http.expectOne(SESSION_PATH).error(new ProgressEvent('error'));
+      await settle(fixture);
+      expect(squash(area(fixture).querySelector('.who')?.textContent)).toBe(
+        'Sign in state unknown',
+      );
+      expect(squash(area(fixture).querySelector('form [role="status"]')?.textContent)).toBe(
+        'Sign in not confirmed. The server could not be reached or had a problem. Try again.',
+      );
+      const retry = TestBed.inject(SessionService)['retry'];
+      clearTimeout(retry);
+    });
+
+    it('leaves focus in a note kept as the session ends, instead of moving it to Sign in', async () => {
+      const fixture = await console(true);
+      const el = fixture.nativeElement as HTMLElement;
+      const details = el.querySelector<HTMLDetailsElement>('app-recent-alerts details')!;
+      details.open = true;
+      details.dispatchEvent(new Event('toggle'));
+      await settle(fixture);
+      const area2 = el.querySelector<HTMLTextAreaElement>('app-recent-alerts textarea')!;
+      area2.value = 'Checked';
+      area2.dispatchEvent(new Event('input'));
+      area2.focus();
+      TestBed.inject(SessionService).end('check');
+      await settle(fixture);
+      const kept = el.querySelector<HTMLTextAreaElement>('app-recent-alerts .kept-note textarea')!;
+      expect(kept.value).toBe('Checked');
+      expect(document.activeElement).toBe(kept);
+      expect(squash(headerLine(fixture).textContent)).toBe(
+        'Your session has ended. Sign in again to acknowledge. The note you were writing is kept, not saved.',
+      );
     });
   });
 });
