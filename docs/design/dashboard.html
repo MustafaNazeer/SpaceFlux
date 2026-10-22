@@ -13,7 +13,8 @@
   docs/data/topics.md and schemas/alerts/examples/. The close approach is the committed
   example (OBJECT AJ and SL-12 DEB, run 2026-09-29T05:20:09Z/1); the R1 value is the
   rest.md example re-timed to the page clock. The screening coverage counts, the suppressed
-  pair separations, the operator name, the acknowledgement note and the ended series example
+  pair separations, the operator name, the acknowledgement notes, the acknowledgement history
+  entries, the sign in and acknowledgement messages' times, and the ended series example
   (GOES-19 to GOES-18 on 2026-09-28, before the page clock) are illustrative,
   composed for this page, and are not taken from one real run.
   Page clock (as_of): 2026-09-29T18:00:00Z.
@@ -402,6 +403,55 @@ textarea, input[type="text"], input[type="password"] {
 }
 textarea { min-height: 72px; resize: vertical; }
 textarea::placeholder, input::placeholder { color: var(--text-muted); }
+textarea[aria-invalid="true"] { border-width: 2px; padding: calc(var(--space-2) - 1px) calc(var(--space-3) - 1px); }
+input[readonly], textarea[readonly] { color: var(--text-secondary); }
+
+/* Sign in, sign out and acknowledgement */
+.session { flex-wrap: wrap; }
+.session.is-signing-in { flex-basis: 100%; }
+.signin-form {
+  display: flex; flex-wrap: wrap; align-items: flex-end;
+  gap: var(--space-2) var(--space-3);
+  flex-basis: 100%;
+}
+.signin-form .field { display: grid; gap: var(--space-1); flex: 1 1 180px; max-width: 260px; }
+.signin-form .field label { color: var(--text-secondary); font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+.signin-form .ack-actions { flex: none; }
+.signin-form .caption, .signin-form .inline-message, .signin-form [role="status"] { flex-basis: 100%; }
+.inline-message {
+  color: var(--text-primary);
+  border-left: 2px solid var(--border-strong);
+  padding-left: var(--space-2);
+}
+.inline-message strong { font-weight: 600; }
+.note-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-1) var(--space-3); }
+.note-counter { color: var(--text-muted); font-size: 12px; line-height: 16px; }
+.note-counter.is-over { color: var(--text-primary); font-weight: 600; }
+.ack-history { display: grid; gap: var(--space-3); }
+.ack-history ol { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.ack-history li { display: grid; gap: var(--space-1); padding-bottom: var(--space-2); border-bottom: 1px solid var(--border-subtle); }
+.ack-history li:last-child { border-bottom: 0; padding-bottom: 0; }
+.ack-panel { display: grid; gap: var(--space-3); }
+.ack-panel .ack-history { border-top: 1px solid var(--border-subtle); padding-top: var(--space-3); }
+.history-title { margin: 0; font-size: 14px; line-height: 22px; font-weight: 600; }
+.session-notice {
+  flex-basis: 100%;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+.session-notice p { margin: 0; flex: 1 1 280px; }
+.session-notice strong { font-weight: 600; }
+.kept-note { display: grid; gap: var(--space-2); }
+.kept-note > label { color: var(--text-secondary); font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+.kept-note .kept-line { margin: 0; color: var(--text-primary); }
+.kept-note .kept-line strong { font-weight: 600; }
+/* The line above Try again stays in the flow at the height measured when Try again was pressed: one 22 px line in the sample. */
+.line-held { min-height: 22px; }
 
 /* Alert views: links, New badge, kind filter, Load older, held alerts */
 a.title-link { color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px; scroll-margin-block: var(--space-2); }
@@ -469,14 +519,6 @@ a.title-link:hover { color: var(--accent-hover); }
 .detail-facts dd { margin: 0; color: var(--text-primary); min-width: 0; }
 .detail-facts dd .sub { display: block; color: var(--text-muted); font-size: 12px; line-height: 16px; }
 .event-id { overflow-wrap: anywhere; }
-.slot-reserved {
-  display: grid; gap: var(--space-1);
-  min-height: 48px;
-  padding: var(--space-3);
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-md);
-  color: var(--text-muted);
-}
 .state-block { display: grid; gap: var(--space-3); justify-items: start; }
 .panel-title { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; }
 .alert-item .alert-title { margin: 0; font-size: 14px; line-height: 22px; font-weight: 500; }
@@ -561,6 +603,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
   <div class="session">
     <p class="who">Signed in as <strong>operator</strong></p>
     <button class="btn btn-secondary" type="button">Sign out</button>
+    <p class="visually-hidden" role="status"></p>
   </div>
 </header>
 
@@ -807,15 +850,22 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
         <div class="ack-actions">
           <button class="btn btn-primary" type="button">Acknowledge</button>
         </div>
-        <details class="disclosure">
+        <details class="disclosure" open>
           <summary>Acknowledge with a note</summary>
-          <form class="ack-form" aria-label="Acknowledge the R1 level at 17:52 UTC with a note">
+          <form class="ack-form" aria-label="Acknowledge with a note, R1 level from GOES-18 X-ray flux 1.06e-5 W m&minus;2 (class M1.0) at 17:52 UTC">
             <label for="note-r1">Note, optional</label>
-            <textarea id="note-r1" maxlength="500" aria-describedby="note-r1-help" placeholder="What you checked"></textarea>
-            <span id="note-r1-help" class="caption">Up to 500 characters. Shown only to the signed in operator.</span>
-            <div class="ack-actions"><button class="btn btn-primary" type="submit">Acknowledge with note</button></div>
+            <textarea id="note-r1" aria-describedby="note-r1-help note-r1-count" placeholder="What you checked">Flare seen on the GOES-18 plot.</textarea>
+            <div class="note-meta">
+              <span id="note-r1-help" class="caption">Up to 500 characters; some symbols count as more than one. Shown only to the signed in operator.</span>
+              <span id="note-r1-count" class="note-counter">31 of 500 characters</span>
+            </div>
+            <div class="ack-actions">
+              <button class="btn btn-primary" type="submit">Acknowledge with note</button>
+              <button class="btn btn-secondary" type="button">Cancel</button>
+            </div>
           </form>
         </details>
+        <p class="visually-hidden" role="status"></p>
       </li>
 
       <li class="alert-item">
@@ -829,6 +879,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
         <div class="ack-actions">
           <button class="btn btn-secondary" type="button">Unacknowledge</button>
         </div>
+        <p class="visually-hidden" role="status"></p>
       </li>
 
       <li class="alert-item">
@@ -841,6 +892,22 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
         <div class="ack-actions">
           <button class="btn btn-primary" type="button">Acknowledge</button>
         </div>
+        <details class="disclosure">
+          <summary>Acknowledge with a note</summary>
+          <form class="ack-form" aria-label="Acknowledge with a note, R1 level from GOES-18 X-ray flux 1.21e-5 W m&minus;2 (class M1.2) at 16:41 UTC">
+            <label for="note-r1b">Note, optional</label>
+            <textarea id="note-r1b" aria-describedby="note-r1b-help note-r1b-count" placeholder="What you checked"></textarea>
+            <div class="note-meta">
+              <span id="note-r1b-help" class="caption">Up to 500 characters; some symbols count as more than one. Shown only to the signed in operator.</span>
+              <span id="note-r1b-count" class="note-counter">0 of 500 characters</span>
+            </div>
+            <div class="ack-actions">
+              <button class="btn btn-primary" type="submit">Acknowledge with note</button>
+              <button class="btn btn-secondary" type="button">Cancel</button>
+            </div>
+          </form>
+        </details>
+        <p class="visually-hidden" role="status"></p>
       </li>
 
     </ol>
@@ -889,21 +956,377 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
 
     <figure>
       <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
-        <div class="brand"><span class="view-name">Signed out header</span></div>
+        <div class="brand"><span class="view-name">Signed out</span></div>
         <div class="session">
+          <p class="who">Not signed in, read only</p>
           <button class="btn btn-secondary" type="button">Sign in</button>
+          <p class="visually-hidden" role="status"></p>
         </div>
       </header>
-      <form class="panel ack-form" aria-label="Operator sign in">
-        <h3>Operator sign in</h3>
-        <label for="user">Username</label>
-        <input id="user" type="text" autocomplete="username">
-        <label for="pass">Password</label>
-        <input id="pass" type="password" autocomplete="current-password">
-        <div class="ack-actions"><button class="btn btn-primary" type="submit">Sign in</button></div>
-        <p class="caption">Reading needs no sign in. Signing in only adds acknowledgement.</p>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <div class="brand"><span class="view-name">Session ended</span></div>
+        <div class="session">
+          <p class="who">Session ended, read only</p>
+          <button class="btn btn-secondary" type="button">Sign in</button>
+          <p class="visually-hidden" role="status">Your session has ended, so the acknowledgement was not saved. Sign in again to acknowledge.</p>
+        </div>
+      </header>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <div class="brand"><span class="view-name">Signing out</span></div>
+        <div class="session">
+          <p class="who">Signed in as <strong>operator</strong></p>
+          <button class="btn btn-secondary" type="button" aria-disabled="true">Sign out</button>
+          <p class="visually-hidden" role="status">Signing out.</p>
+        </div>
+      </header>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <div class="brand"><span class="view-name">Sign out failed</span></div>
+        <div class="session">
+          <p class="who">Signed in as <strong>operator</strong></p>
+          <button class="btn btn-secondary" type="button">Sign out</button>
+          <p class="inline-message" role="status"><strong>Sign out not confirmed.</strong> The server could not be reached or had a problem, so you may still be signed in. Use Sign out to try again.</p>
+        </div>
+      </header>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <div class="brand"><span class="view-name">State unknown</span></div>
+        <div class="session">
+          <p class="who">Sign in state unknown</p>
+          <p class="visually-hidden" role="status"></p>
+        </div>
+      </header>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <div class="brand"><span class="view-name">Sign in not confirmed</span></div>
+        <div class="session is-signing-in">
+          <p class="who">Sign in state unknown</p>
+          <form class="signin-form" aria-label="Operator sign in">
+            <div class="field"><label for="user-u">Username</label><input id="user-u" type="text" autocomplete="username" value="operator" aria-describedby="signin-u-msg"></div>
+            <div class="field"><label for="pass-u">Password</label><input id="pass-u" type="password" autocomplete="current-password" value="example" aria-describedby="signin-u-msg"></div>
+            <div class="ack-actions">
+              <button class="btn btn-primary" type="submit">Sign in</button>
+              <button class="btn btn-secondary" type="button">Cancel</button>
+            </div>
+            <p id="signin-u-msg" class="inline-message" role="status"><strong>Sign in not confirmed.</strong> The server could not be reached or had a problem. Try again.</p>
+          </form>
+          <p class="visually-hidden" role="status"></p>
+        </div>
+      </header>
+      <figcaption>The session area of the header. Signed out, it reads "Not signed in, read only" next to a Sign in button. Signed in, it reads "Signed in as {username}", the name the API's session answer gives, next to a Sign out button (main view above). Sign out keeps its label and is marked <span class="mono">aria-disabled</span> while its request is out, so focus stays on it; a second press sends nothing. When sign out succeeds the header returns to the signed out view, focus moves to the Sign in button, and the status line says "Signed out." Every note and operator name on the page is removed at once, without waiting for a request, and every acknowledge control and open note form goes with them; a note being written is discarded. When sign out fails, the signed in view stays, focus stays on Sign out, and the same status line shows the failure. When a request finds the session gone (30 minutes passed with no request, it reached its 8 hour limit, a newer sign in replaced it, or it was signed out in another tab), the page switches to the signed out view and the header reads "Session ended, read only" until the next sign in; a note being written is then kept, not discarded (see the time limit samples). While the session check has not answered, the area is empty; when it failed, it reads "Sign in state unknown" with no button, and the check is repeated as at startup. After a sign in that could not be confirmed (last sample) it also reads "Sign in state unknown", with the sign in form still open and its message, until the repeated check answers. The status line is in the page from first render, polite, visually hidden while it holds a progress or success line, and shown as an inline message while it holds a failure.</figcaption>
+    </figure>
+
+    <figure>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <div class="brand"><span class="view-name">Sign in form</span></div>
+        <div class="session is-signing-in">
+          <p class="who">Not signed in, read only</p>
+          <form class="signin-form" aria-label="Operator sign in">
+            <div class="field"><label for="user">Username</label><input id="user" type="text" autocomplete="username" spellcheck="false" autocapitalize="none"></div>
+            <div class="field"><label for="pass">Password</label><input id="pass" type="password" autocomplete="current-password"></div>
+            <div class="ack-actions">
+              <button class="btn btn-primary" type="submit">Sign in</button>
+              <button class="btn btn-secondary" type="button">Cancel</button>
+            </div>
+            <p class="visually-hidden" role="status"></p>
+            <p class="caption">Reading needs no sign in. Signing in only adds acknowledgement.</p>
+          </form>
+        </div>
+      </header>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <div class="brand"><span class="view-name">Signing in</span></div>
+        <div class="session is-signing-in">
+          <p class="who">Not signed in, read only</p>
+          <form class="signin-form" aria-label="Operator sign in">
+            <div class="field"><label for="user-b">Username</label><input id="user-b" type="text" autocomplete="username" value="operator" readonly></div>
+            <div class="field"><label for="pass-b">Password</label><input id="pass-b" type="password" autocomplete="current-password" value="example" readonly></div>
+            <div class="ack-actions">
+              <button class="btn btn-primary" type="submit" aria-disabled="true">Sign in</button>
+              <button class="btn btn-secondary" type="button" aria-disabled="true">Cancel</button>
+            </div>
+            <p class="visually-hidden" role="status">Signing in.</p>
+            <p class="caption">Reading needs no sign in. Signing in only adds acknowledgement.</p>
+          </form>
+        </div>
+      </header>
+      <figcaption>Sign in opens this form in the header in place of the Sign in button, and focus moves to Username. Labels are visible, the fields carry <span class="mono">autocomplete="username"</span> and <span class="mono">autocomplete="current-password"</span>, and paste is never blocked. Cancel, or Escape with focus anywhere in the form, closes it, clears both fields and returns focus to the Sign in button. While the request is out (second sample) the fields are read only, Sign in and Cancel keep their labels and are marked <span class="mono">aria-disabled</span>, Escape does nothing, focus stays where it was (on Sign in, or in the password field after Enter), and the form's status line says "Signing in." without being shown. Pressing Sign in with a field empty sends nothing, and the status line names what is missing (see the empty field sample below). On success the form closes, the header reads "Signed in as {username}", focus moves to Sign out, and the header's status line says "Signed in as {username}." The recent alerts list and an open alert page then fetch their acknowledgements again, gaining names, notes and controls, without changing which alerts are listed or their order.</figcaption>
+    </figure>
+
+    <figure>
+      <form class="panel signin-form" aria-label="Operator sign in, wrong credentials">
+        <div class="field"><label for="user-c">Username</label><input id="user-c" type="text" autocomplete="username" value="operator" aria-describedby="signin-c-msg"></div>
+        <div class="field"><label for="pass-c">Password</label><input id="pass-c" type="password" autocomplete="current-password" value="example" aria-describedby="signin-c-msg"></div>
+        <div class="ack-actions">
+          <button class="btn btn-primary" type="submit">Sign in</button>
+          <button class="btn btn-secondary" type="button">Cancel</button>
+        </div>
+        <p id="signin-c-msg" class="inline-message" role="status"><strong>Not signed in.</strong> The username or password is not correct. Check both and try again.</p>
       </form>
-      <figcaption>Anonymous viewers see a Sign in button. The form opens in place of the button.</figcaption>
+      <form class="panel signin-form" aria-label="Operator sign in, password empty">
+        <div class="field"><label for="user-h">Username</label><input id="user-h" type="text" autocomplete="username" value="operator"></div>
+        <div class="field"><label for="pass-h">Password</label><input id="pass-h" type="password" autocomplete="current-password" aria-invalid="true" aria-describedby="signin-h-msg"></div>
+        <div class="ack-actions">
+          <button class="btn btn-primary" type="submit">Sign in</button>
+          <button class="btn btn-secondary" type="button">Cancel</button>
+        </div>
+        <p id="signin-h-msg" class="inline-message" role="status"><strong>Not signed in.</strong> Enter the password.</p>
+      </form>
+      <form class="panel signin-form" aria-label="Operator sign in, backing off">
+        <div class="field"><label for="user-d">Username</label><input id="user-d" type="text" autocomplete="username" value="operator" aria-describedby="signin-d-msg"></div>
+        <div class="field"><label for="pass-d">Password</label><input id="pass-d" type="password" autocomplete="current-password" value="example" aria-describedby="signin-d-msg"></div>
+        <div class="ack-actions">
+          <button class="btn btn-primary" type="submit" aria-disabled="true">Sign in</button>
+          <button class="btn btn-secondary" type="button">Cancel</button>
+        </div>
+        <p id="signin-d-msg" class="inline-message" role="status"><strong>Not signed in.</strong> Too many sign in attempts were made. Try again at <time datetime="2026-09-29T18:02:10Z">18:02:10 UTC</time>, in 120 seconds.</p>
+      </form>
+      <form class="panel signin-form" aria-label="Operator sign in, refused request">
+        <div class="field"><label for="user-e">Username</label><input id="user-e" type="text" autocomplete="username" value="operator" aria-describedby="signin-e-msg"></div>
+        <div class="field"><label for="pass-e">Password</label><input id="pass-e" type="password" autocomplete="current-password" value="example" aria-describedby="signin-e-msg"></div>
+        <div class="ack-actions">
+          <button class="btn btn-primary" type="submit">Sign in</button>
+          <button class="btn btn-secondary" type="button">Cancel</button>
+        </div>
+        <p id="signin-e-msg" class="inline-message" role="status"><strong>Not signed in.</strong> The server refused the request. Try again.</p>
+      </form>
+      <figcaption>Sign in failures, shown in the header form (drawn here as panels to save room). The message appears in the form's own status line, polite and in the page from first render, below the buttons, and both fields point to it with <span class="mono">aria-describedby</span>, so returning to a field reads it again. Focus stays where it was, and both fields keep their values. A press with a field empty (second sample) sends nothing and names what is missing: "Not signed in. Enter the username.", "Not signed in. Enter the password." or "Not signed in. Enter both the username and the password." Each empty field gets <span class="mono">aria-invalid="true"</span> and points to the line, and focus moves to the first empty field. A field counts as empty only with no character at all; nothing is trimmed. A field loses <span class="mono">aria-invalid</span> once it holds a character, and the line empties silently once every field it names is filled. A second press with a field still empty is never silent: the line is emptied, then set again in a later rendering frame, so it is spoken again even with focus already in the field. A wrong username and a wrong password get the same message, which never says which one was wrong; so does a server with no operator account set up, since it answers the same way. While the API is backing off (HTTP 429), the message names the time the wait ends, from the <span class="mono">Retry-After</span> seconds, "Try again at {HH:MM:SS} UTC, in {n} seconds." ("in 1 second." for one), Sign in is marked <span class="mono">aria-disabled</span> until then, and at that time the message is removed silently and Sign in works again; without a usable <span class="mono">Retry-After</span> it reads "Too many sign in attempts were made. Try again later." and Sign in stays usable. A refused request (HTTP 400 or any other 4xx status not named here, or a 403 with no live session) reads as the fourth sample, "Not signed in. The server refused the request. Try again."; no answer in time, a lost connection (status 0) or any status from 500 up is an unknown outcome, shown in the unknown outcome samples below. A 403 first asks the API for the session once, which sets a fresh token: a live session counts as a success, and otherwise the next press can succeed.</figcaption>
+    </figure>
+
+    <figure>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <div class="brand"><span class="view-name">Idle limit coming</span></div>
+        <div class="session">
+          <p class="who" tabindex="-1">Signed in as <strong>operator</strong></p>
+          <button class="btn btn-secondary" type="button">Sign out</button>
+          <p class="visually-hidden" role="status"></p>
+          <p class="visually-hidden" role="status">Session ending soon. The session can end at 18:01 UTC, 30 minutes after this page last reached the server. Use Stay signed in at the top of the page to keep it.</p>
+        </div>
+        <div class="session-notice">
+          <p><strong>Session ending soon.</strong> The session can end at <time datetime="2026-09-29T18:01Z">18:01 UTC</time>, 30 minutes after this page last reached the server. Use Stay signed in at the top of the page to keep it.</p>
+          <button class="btn btn-secondary" type="button">Stay signed in</button>
+        </div>
+      </header>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <div class="brand"><span class="view-name">Checking the session</span></div>
+        <div class="session">
+          <p class="who" tabindex="-1">Signed in as <strong>operator</strong></p>
+          <button class="btn btn-secondary" type="button">Sign out</button>
+          <p class="visually-hidden" role="status"></p>
+          <p class="visually-hidden" role="status">Checking the session.</p>
+        </div>
+        <div class="session-notice">
+          <p><strong>Session ending soon.</strong> The session can end at <time datetime="2026-09-29T18:01Z">18:01 UTC</time>, 30 minutes after this page last reached the server. Use Stay signed in at the top of the page to keep it.</p>
+          <button class="btn btn-secondary" type="button" aria-disabled="true">Stay signed in</button>
+        </div>
+      </header>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <div class="brand"><span class="view-name">Not confirmed</span></div>
+        <div class="session">
+          <p class="who" tabindex="-1">Signed in as <strong>operator</strong></p>
+          <button class="btn btn-secondary" type="button">Sign out</button>
+          <p class="visually-hidden" role="status"></p>
+          <p class="visually-hidden" role="status">Not confirmed. The server could not be reached or had a problem, so the session can still end at 18:01 UTC. Use Stay signed in to try again.</p>
+        </div>
+        <div class="session-notice">
+          <p><strong>Not confirmed.</strong> The server could not be reached or had a problem, so the session can still end at <time datetime="2026-09-29T18:01Z">18:01 UTC</time>. Use Stay signed in to try again.</p>
+          <button class="btn btn-secondary" type="button">Stay signed in</button>
+        </div>
+      </header>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <div class="brand"><span class="view-name">8 hour limit coming</span></div>
+        <div class="session">
+          <p class="who" tabindex="-1">Signed in as <strong>operator</strong></p>
+          <button class="btn btn-secondary" type="button">Sign out</button>
+          <p class="visually-hidden" role="status"></p>
+          <p class="visually-hidden" role="status">Session ends at 18:12 UTC. A session lasts at most 8 hours from sign in and cannot be extended. To keep acknowledging after that, sign in again.</p>
+        </div>
+        <div class="session-notice">
+          <p><strong>Session ends at <time datetime="2026-09-29T18:12Z">18:12 UTC</time>.</strong> A session lasts at most 8 hours from sign in and cannot be extended. To keep acknowledging after that, sign in again.</p>
+        </div>
+      </header>
+      <header class="app-header" style="border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+        <div class="brand"><span class="view-name">Session ended, note kept</span></div>
+        <div class="session">
+          <p class="who">Session ended, read only</p>
+          <button class="btn btn-secondary" type="button">Sign in</button>
+          <p class="visually-hidden" role="status">Your session has ended. Sign in again to acknowledge. The note you were writing is kept, not saved.</p>
+          <p class="visually-hidden" role="status"></p>
+        </div>
+      </header>
+      <div class="alert-item">
+        <div class="alert-top">
+          <span class="badge outline l1"><svg class="icon" aria-hidden="true"><use href="#i-l1"/></svg>R1 Minor</span>
+          <span class="caption">Received <time datetime="2026-09-29T17:58:00Z">17:58 UTC</time></span>
+        </div>
+        <h3><a class="title-link" href="/alerts/space_weather_level%2F1%2FR%2F18%2F2026-09-29T17%3A52%3A00Z%2F2026-09-29T17%3A57%3A41Z">R1 level from GOES-18 X-ray flux 1.06e-5 W m<sup>&minus;2</sup> (class M1.0) at <time datetime="2026-09-29T17:52:00Z">17:52 UTC</time></a></h3>
+        <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
+        <div class="kept-note" role="group" aria-label="Note not saved, R1 level from GOES-18 X-ray flux 1.06e-5 W m&minus;2 (class M1.0) at 17:52 UTC">
+          <label for="note-kept">Note, not saved</label>
+          <textarea id="note-kept" readonly aria-describedby="note-kept-count note-kept-line">Flare seen on the GOES-18 plot.</textarea>
+          <span id="note-kept-count" class="note-counter">31 of 500 characters</span>
+          <p id="note-kept-line" class="kept-line"><strong>Note not saved.</strong> The session ended first. Sign in again to send it, or copy it.</p>
+          <div class="ack-actions"><button class="btn btn-secondary" type="button">Discard note</button></div>
+        </div>
+      </div>
+      <figcaption>Session time limits, shown only while signed in. The session ends after 30 minutes with no request and 8 hours after sign in, so the page warns first, in a notice that takes the header's last row. One notice at a time, for the limit that comes first; it never moves focus, and if the header is scrolled out of view the window scrolls by the height it adds, so nothing on screen moves. The notice is not a live region: the session area keeps its own notice line, polite, visually hidden and in the page from page load, separate from the header's line. The notice line speaks the notice once when it appears, and the results of Stay signed in. The idle clock runs from the moment the last request this tab sent went out, counting only requests answered with a status below 500. With updates running the minute refresh restarts it, so in practice this notice only comes while updates are paused or the machine is offline. 28 minutes after that moment the first notice appears, two minutes before the limit, with the time rounded down to the minute; it says "can end" because another tab can also keep the session. Stay signed in asks the API for the session, which counts as activity, and can be pressed any number of times. While its request is out (second sample) it keeps its label and focus, is marked <span class="mono">aria-disabled</span>, and the notice line says "Checking the session." The answer is awaited for 10 seconds. When the session is live the notice goes, focus moves to the "Signed in as" line, never to Sign out, and the notice line says "You are still signed in." When the session had already ended the page shows the ended view. Anything else (third sample) keeps the notice and focus on the button. Ten minutes before the 8 hour limit (fourth sample) the notice gives the end time and has no button, since that limit cannot be extended; it is kept for security. When either limit passes with no answered request, the page asks the API for the session once, a minute after the limit. Sign out removes the notice at once. When the session ends for any reason other than Sign out in this tab (fifth sample), a note being written is kept in place, read only, with "Note not saved. The session ended first. Sign in again to send it, or copy it." and Discard note; the header's line adds "The note you were writing is kept, not saved." After the next sign in it becomes its open note form again, editable, and is sent only when Acknowledge with note is pressed; if the alert is acknowledged by then, the line reads "Note kept. This alert is now acknowledged, so this note cannot be sent. The state above shows any note the acknowledgement already has. Copy it if you need it." Discard note removes it and moves focus to the item's title link. A kept note lives only in this tab and holds the list as an open note form does.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="alert-item">
+        <div class="alert-top">
+          <span class="badge outline l1"><svg class="icon" aria-hidden="true"><use href="#i-l1"/></svg>R1 Minor</span>
+          <span class="caption">Received <time datetime="2026-09-29T16:47:00Z">16:47 UTC</time></span>
+        </div>
+        <h3><a class="title-link" href="/alerts/space_weather_level%2F1%2FR%2F18%2F2026-09-29T16%3A41%3A00Z%2F2026-09-29T16%3A46%3A40Z">R1 level from GOES-18 X-ray flux 1.21e-5 W m<sup>&minus;2</sup> (class M1.2) at <time datetime="2026-09-29T16:41:00Z">16:41 UTC</time></a></h3>
+        <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Unacknowledged <time datetime="2026-09-29T16:59:00Z">16:59 UTC</time> by operator</p>
+        <div class="ack-actions">
+          <button class="btn btn-primary" type="button" aria-disabled="true">Acknowledge</button>
+        </div>
+        <details class="disclosure">
+          <summary>Acknowledge with a note</summary>
+        </details>
+        <p class="visually-hidden" role="status">Acknowledging.</p>
+      </div>
+      <div class="alert-item">
+        <div class="alert-top">
+          <span class="badge outline l1"><svg class="icon" aria-hidden="true"><use href="#i-l1"/></svg>R1 Minor</span>
+          <span class="caption">Received <time datetime="2026-09-29T16:47:00Z">16:47 UTC</time></span>
+        </div>
+        <h3><a class="title-link" href="/alerts/space_weather_level%2F1%2FR%2F18%2F2026-09-29T16%3A41%3A00Z%2F2026-09-29T16%3A46%3A40Z">R1 level from GOES-18 X-ray flux 1.21e-5 W m<sup>&minus;2</sup> (class M1.2) at <time datetime="2026-09-29T16:41:00Z">16:41 UTC</time></a></h3>
+        <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T18:00:00Z">18:00 UTC</time> by operator</p>
+        <div class="ack-actions">
+          <button class="btn btn-secondary" type="button">Unacknowledge</button>
+        </div>
+        <p class="visually-hidden" role="status">Acknowledged at 18:00 UTC.</p>
+      </div>
+      <figcaption>Acknowledge in progress, then done. Acknowledge and Unacknowledge are one press each. While the request is out the button keeps its label and is marked <span class="mono">aria-disabled</span>, so focus stays on it and further presses send nothing; the note form's submit button is inactive too, and the item's status line says "Acknowledging." ("Unacknowledging.") without being shown. On success the state line is rebuilt from the row the API returns (action, time, name and note), the button keeps its place and focus and its label changes to the other action, and the status line says "Acknowledged at {HH:MM} UTC.", "Acknowledged at {HH:MM} UTC with a note." or "Unacknowledged at {HH:MM} UTC.", still visually hidden since the state line shows it. Each item the operator can act on has its own status line, polite and present from the item's first render; it is visually hidden while it holds a progress or success line and shown as an inline message while it holds a failure. Controls appear only on alerts that can be acknowledged: close approaches, and space weather events in a level that are not a refresh. While any acknowledgement request is out, the recent alerts list holds new alerts as it does while focus is inside it.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="alert-item">
+        <div class="alert-top">
+          <span class="badge approach"><svg class="icon" aria-hidden="true"><use href="#i-approach"/></svg>Close approach</span>
+          <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
+        </div>
+        <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
+        <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
+        <div class="ack-actions">
+          <button class="btn btn-primary" type="button">Acknowledge</button>
+        </div>
+        <details class="disclosure">
+          <summary>Acknowledge with a note</summary>
+        </details>
+        <p class="inline-message" role="status"><strong>Not saved.</strong> The server refused the request.</p>
+        <div class="ack-actions"><button class="btn btn-secondary" type="button">Try again</button></div>
+      </div>
+      <div class="alert-item">
+        <div class="alert-top">
+          <span class="badge approach"><svg class="icon" aria-hidden="true"><use href="#i-approach"/></svg>Close approach</span>
+          <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
+        </div>
+        <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
+        <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">06:02 UTC</time> by operator</p>
+        <p class="ack-note">Reviewed; element ages 1.6 and 4.2 days.</p>
+        <div class="ack-actions">
+          <button class="btn btn-secondary" type="button">Unacknowledge</button>
+        </div>
+        <p class="inline-message" role="status"><strong>Not saved.</strong> This alert was already acknowledged, for example from an earlier press or another tab. The state above is current.</p>
+      </div>
+      <div class="alert-item">
+        <div class="alert-top">
+          <span class="badge approach"><svg class="icon" aria-hidden="true"><use href="#i-approach"/></svg>Close approach</span>
+          <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
+        </div>
+        <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
+        <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
+        <div class="ack-actions">
+          <button class="btn btn-primary" type="button">Acknowledge</button>
+        </div>
+        <details class="disclosure">
+          <summary>Acknowledge with a note</summary>
+        </details>
+        <p class="inline-message" role="status"><strong>Not saved.</strong> The server says this alert cannot be acknowledged.</p>
+      </div>
+      <figcaption>Acknowledgement failures, shown in the item's status line under its controls, never in a dialog and never in an alert color. Focus stays on the button that was pressed; when that was Try again or a note form's submit and it goes away, focus moves to the action button. A refused request (any 4xx status not named here, and every 403 that is not an ended session, first sample): "Not saved. The server refused the request." with a Try again button that repeats the same action with the same note; the line empties while the request is out, so a repeated failure is spoken again, but keeps its height, blank, so Try again does not move. No answer, status 0 and every status from 500 up are unknown outcomes, like a timeout (see the unknown outcome samples). The alert is in that state already (HTTP 409, second sample): the page fetches the alert again, redraws its state line and controls from the answer, keeps focus on the action button, whose label now shows the action the fresh state allows, and says "Not saved. This alert was already acknowledged, for example from an earlier press or another tab. The state above is current." ("... already unacknowledged, ..." for the other action); if that fetch fails or finds no alert it reads "Not saved. The server refused the change, and the alert's current state could not be loaded. Open the alert to see it." ("Reload the page to see it." on an alert page). A conflict whose fresh state does not match the action asked for is the other kind of 409 (third sample): "Not saved. The server says this alert cannot be acknowledged." No stored alert (HTTP 404): "Not saved. No alert with this event id is stored." A refused request token (HTTP 403) first asks the API for the session: with no session it is handled as an ended session, otherwise as the first sample, and the fresh token lets Try again succeed. No session (HTTP 401): the page switches to the signed out view, the header reads "Session ended, read only", focus moves to its Sign in button, and the header's status line says "Your session has ended, so the acknowledgement was not saved. Sign in again to acknowledge."</figcaption>
+    </figure>
+
+    <figure>
+      <div class="alert-item">
+        <div class="alert-top">
+          <span class="badge approach"><svg class="icon" aria-hidden="true"><use href="#i-approach"/></svg>Close approach</span>
+          <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
+        </div>
+        <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
+        <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
+        <div class="ack-actions">
+          <button class="btn btn-primary" type="button">Acknowledge</button>
+        </div>
+        <details class="disclosure">
+          <summary>Acknowledge with a note</summary>
+        </details>
+        <p class="inline-message" role="status"><strong>Not confirmed.</strong> The server could not be reached or had a problem, and the current state above does not show this alert as acknowledged. It was most likely not saved, but a delayed save can still go through later. Trying again never saves it twice.</p>
+        <div class="ack-actions"><button class="btn btn-secondary" type="button">Try again</button></div>
+      </div>
+      <div class="alert-item">
+        <div class="alert-top">
+          <span class="badge approach"><svg class="icon" aria-hidden="true"><use href="#i-approach"/></svg>Close approach</span>
+          <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
+        </div>
+        <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
+        <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">06:02 UTC</time> by operator</p>
+        <div class="ack-actions">
+          <button class="btn btn-secondary" type="button">Unacknowledge</button>
+        </div>
+        <p class="inline-message" role="status"><strong>Not confirmed.</strong> The server could not be reached or had a problem, and the alert's current state could not be loaded, so it is not known whether it was unacknowledged. Trying again never saves it twice. Open the alert to see its state.</p>
+        <div class="ack-actions"><button class="btn btn-secondary" type="button">Try again</button></div>
+      </div>
+      <form class="panel signin-form" aria-label="Operator sign in, unknown outcome and no session">
+        <div class="field"><label for="user-f">Username</label><input id="user-f" type="text" autocomplete="username" value="operator" aria-describedby="signin-f-msg"></div>
+        <div class="field"><label for="pass-f">Password</label><input id="pass-f" type="password" autocomplete="current-password" value="example" aria-describedby="signin-f-msg"></div>
+        <div class="ack-actions">
+          <button class="btn btn-primary" type="submit">Sign in</button>
+          <button class="btn btn-secondary" type="button">Cancel</button>
+        </div>
+        <p id="signin-f-msg" class="inline-message" role="status"><strong>Not signed in.</strong> The server could not be reached or had a problem, and no session was found. Try again.</p>
+      </form>
+      <form class="panel signin-form" aria-label="Operator sign in, unknown outcome and no session check">
+        <div class="field"><label for="user-g">Username</label><input id="user-g" type="text" autocomplete="username" value="operator" aria-describedby="signin-g-msg"></div>
+        <div class="field"><label for="pass-g">Password</label><input id="pass-g" type="password" autocomplete="current-password" value="example" aria-describedby="signin-g-msg"></div>
+        <div class="ack-actions">
+          <button class="btn btn-primary" type="submit">Sign in</button>
+          <button class="btn btn-secondary" type="button">Cancel</button>
+        </div>
+        <p id="signin-g-msg" class="inline-message" role="status"><strong>Sign in not confirmed.</strong> The server could not be reached or had a problem. Try again.</p>
+      </form>
+      <figcaption>Unknown outcomes. Sign in, sign out, Acknowledge and Unacknowledge wait 35 seconds for an answer, and the page never sends one of them again by itself. When no answer comes in time, the connection is lost, or the server answers with any status from 500 up, the request may still have gone through, so the outcome is unknown rather than failed, and the lead says "not confirmed" wherever the page cannot tell. The page then fetches the alert again and redraws its state line and controls from the answer. When the fresh state shows the action, the item reads as a success. When it does not (first sample), the request was most likely not saved, but a delayed save can still go through later. When that fetch fails too (second sample), the state line stays as it was, and an alert page ends with "Reload the page to see its state." instead of "Open the alert to see its state.". Both keep Try again, which repeats the same action with the same note: the API refuses an action that equals the alert's current state, so a press after a delayed save went through gets the "already acknowledged" line, never a second row. Focus stays on the pressed button, and an open note form stays open with its note. For a sign in, the page asks the API for the session once instead: a live session is a success; no session reads as the third sample; a failed check as the fourth, since the page cannot tell whether a session exists, and a new sign in replaces any session the first one made; the header then reads "Sign in state unknown" with the form still open and its message, and the check is repeated as at startup. A sign out with no answer shows the sign out failure in the header, and pressing Sign out again is harmless.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="alert-item">
+        <div class="alert-top">
+          <span class="badge approach"><svg class="icon" aria-hidden="true"><use href="#i-approach"/></svg>Close approach</span>
+          <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
+        </div>
+        <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
+        <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
+        <div class="ack-actions">
+          <button class="btn btn-primary" type="button">Acknowledge</button>
+        </div>
+        <details class="disclosure" open>
+          <summary>Acknowledge with a note</summary>
+          <form class="ack-form" aria-label="Acknowledge with a note, OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC">
+            <label for="note-over">Note, optional</label>
+            <textarea id="note-over" aria-invalid="true" aria-describedby="note-over-help note-over-count" placeholder="What you checked">Checked both element sets against the previous run. (The rest of a 512 character note.)</textarea>
+            <div class="note-meta">
+              <span id="note-over-help" class="caption">Up to 500 characters; some symbols count as more than one. Shown only to the signed in operator.</span>
+              <span id="note-over-count" class="note-counter is-over">512 of 500 characters, 12 over the limit</span>
+            </div>
+            <div class="ack-actions">
+              <button class="btn btn-primary" type="submit">Acknowledge with note</button>
+              <button class="btn btn-secondary" type="button">Cancel</button>
+            </div>
+          </form>
+        </details>
+        <p class="visually-hidden" role="status">The note is over the 500 character limit.</p>
+      </div>
+      <figcaption>The note form, over its limit. "Acknowledge with a note" opens a disclosure with an optional note and its own submit button; Unacknowledge has no note. The limit is 500 Unicode code points, the count the API applies, not the UTF-16 units a string length or the <span class="mono">maxlength</span> attribute counts, so the field has no <span class="mono">maxlength</span> and a pasted note is never cut. The counter under the field, "{n} of 500 characters", counts code points as you type, is not a live region, and is read with the field through <span class="mono">aria-describedby</span>. Over the limit it reads "{n} of 500 characters, {k} over the limit" in <span class="mono">text-primary</span> at weight 600, the field gets <span class="mono">aria-invalid="true"</span> and a 2 px outline, and the item's status line says "The note is over the 500 character limit." once each time the note crosses the limit; it empties silently when the note is back within it. Pressing Acknowledge with note while over sends nothing and moves focus to the note field. On success the disclosure closes, the note is cleared, and focus moves to the action button, which now reads Unacknowledge. On failure the disclosure stays open with the note kept and the failure shows under it. Cancel closes the disclosure, clears the note and returns focus to its summary; closing it with the summary keeps the note. Escape does not close it, so a long note is not lost by accident. While the disclosure is open, the recent alerts list holds new alerts.</figcaption>
     </figure>
 
     <figure>
@@ -1313,7 +1736,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <div class="brand"><p style="font-size: 28px; line-height: 36px; font-weight: 600;">SpaceFlux</p><span class="view-name">Operator console</span></div>
           <p class="live"><span class="live-dot" aria-hidden="true" style="animation: none;"></span><span>Live</span><time datetime="2026-09-29T18:00:00Z">18:00:00 UTC</time></p>
           <button class="btn btn-secondary" type="button">Pause updates</button>
-          <div class="session"><p class="who">Not signed in, read only</p></div>
+          <div class="session"><p class="who">Not signed in, read only</p><button class="btn btn-secondary" type="button">Sign in</button></div>
         </div>
         <nav class="route-bar" aria-label="Page"><a class="back-link" href="/">Back to the console</a></nav>
         <div class="route-page">
@@ -1324,13 +1747,21 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
             <p class="caption">Two public element sets propagated with SGP4 that come within the report distance of the screening run that found them. Not a collision probability or a conjunction assessment; distances carry an uncertainty of kilometres.</p>
           </div>
 
-          <div class="panel">
+          <div class="panel ack-panel">
             <h4 class="panel-title">Acknowledgement</h4>
-            <p class="ack-state" style="margin-top: var(--space-3);"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">2026-09-29 06:02 UTC</time></p>
-            <!-- Design marker only: the acknowledge action and its note are designed with sign in and are not built yet. -->
-            <div class="slot-reserved" style="margin-top: var(--space-3);">
-              <span class="label">Reserved</span>
-              <span class="caption">Acknowledge or Unacknowledge, with an optional note, for the signed in operator.</span>
+            <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">2026-09-29 06:02 UTC</time></p>
+            <div class="ack-history">
+              <h5 class="history-title" tabindex="-1">History</h5>
+              <p class="visually-hidden" role="status"></p>
+              <ol>
+                <li><span class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">2026-09-29 06:02 UTC</time></span></li>
+                <li><span class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Unacknowledged <time datetime="2026-09-29T05:50:00Z">2026-09-29 05:50 UTC</time></span></li>
+                <li><span class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T05:41:00Z">2026-09-29 05:41 UTC</time></span></li>
+              </ol>
+              <div class="list-end">
+                <p class="caption">All 3 entries are shown, newest first.</p>
+                <p class="secondary" role="status"></p>
+              </div>
             </div>
           </div>
 
@@ -1357,7 +1788,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           </div>
         </div>
       </div>
-      <figcaption>Alert detail for a close approach, anonymous view. Document title: "Close approach, OBJECT AJ and SL-12 DEB, SpaceFlux". An object with no catalog name is "Object 57036" where it starts a heading or a title and "object 57036" in the middle of one: page title "Object 57036 and object 27958", document title "Close approach, object 57036 and object 27958, SpaceFlux", and in the list "Object 57036 and object 27958, miss distance 2 km at 2026-09-30 03:34:37 UTC" or "OBJECT AJ (57036) and object 27958, ...", where only a catalog name takes the number in brackets. The New alerts log keeps the list title as it is: "New alert, close approach: Object 57036 and object 27958, ...". In the Watchlist object and Other object rows the name stands alone, so it reads "Object 57036". Both object names link to that object's close approaches. The dashed box marks where the acknowledge action goes once sign in exists; it is a design marker and is not built. A signed in operator also sees "by {principal}" and the note under the state, as in the list. Times on this page always carry their date. A field the alert does not have leaves its row out; no row reads "null".</figcaption>
+      <figcaption>Alert detail for a close approach, anonymous view. Document title: "Close approach, OBJECT AJ and SL-12 DEB, SpaceFlux". An object with no catalog name is "Object 57036" where it starts a heading or a title and "object 57036" in the middle of one: page title "Object 57036 and object 27958", document title "Close approach, object 57036 and object 27958, SpaceFlux", and in the list "Object 57036 and object 27958, miss distance 2 km at 2026-09-30 03:34:37 UTC" or "OBJECT AJ (57036) and object 27958, ...", where only a catalog name takes the number in brackets. The New alerts log keeps the list title as it is: "New alert, close approach: Object 57036 and object 27958, ...". In the Watchlist object and Other object rows the name stands alone, so it reads "Object 57036". Both object names link to that object's close approaches. Anonymous, the Acknowledgement panel holds the state line and the History list, each entry with its action and time only. A signed in operator also sees "by {principal}" and the note under the state and under each history entry, and gets the controls (next sample). Times on this page always carry their date. A field the alert does not have leaves its row out; no row reads "null".</figcaption>
     </figure>
 
     <!-- Alert detail, space weather level. -->
@@ -1372,12 +1803,32 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
             <p class="caption">Derived from this one sample; it does not mark the start of an event. Not an issued NOAA scale level.</p>
           </div>
 
-          <div class="panel">
+          <div class="panel ack-panel">
             <h4 class="panel-title">Acknowledgement</h4>
-            <p class="ack-state" style="margin-top: var(--space-3);"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
-            <div class="slot-reserved" style="margin-top: var(--space-3);">
-              <span class="label">Reserved</span>
-              <span class="caption">Acknowledge or Unacknowledge, with an optional note, for the signed in operator.</span>
+            <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
+            <div class="ack-actions">
+              <button class="btn btn-primary" type="button">Acknowledge</button>
+            </div>
+            <details class="disclosure">
+              <summary>Acknowledge with a note</summary>
+              <form class="ack-form" aria-label="Acknowledge with a note">
+                <label for="note-page">Note, optional</label>
+                <textarea id="note-page" aria-describedby="note-page-help note-page-count" placeholder="What you checked"></textarea>
+                <div class="note-meta">
+                  <span id="note-page-help" class="caption">Up to 500 characters; some symbols count as more than one. Shown only to the signed in operator.</span>
+                  <span id="note-page-count" class="note-counter">0 of 500 characters</span>
+                </div>
+                <div class="ack-actions">
+                  <button class="btn btn-primary" type="submit">Acknowledge with note</button>
+                  <button class="btn btn-secondary" type="button">Cancel</button>
+                </div>
+              </form>
+            </details>
+            <p class="visually-hidden" role="status"></p>
+            <div class="ack-history">
+              <h5 class="history-title" tabindex="-1">History</h5>
+              <p class="visually-hidden" role="status"></p>
+              <p class="secondary">No acknowledgement is recorded for this alert yet.</p>
             </div>
           </div>
 
@@ -1406,7 +1857,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           </div>
         </div>
       </div>
-      <figcaption>Alert detail for a space weather level (header and footer as above). Document title: "R1 level, GOES-18 X-ray flux, SpaceFlux". The page title follows the state: "{label} level, {measurement}", "Below {scale}1, {measurement}", "No data, {measurement}", "No longer primary, {measurement}" for an ended series, and "Restated as no data, {measurement}" for a restatement. A restatement's sentence reads "The {measurement} sample at {time} UTC, published as below {scale}1, is restated as no data."; every other event uses its list title, with dates. The rows depend on the event; each appears only when its field is set. State: "Level {code}, {NOAA name}", "Below {scale}1", "No data" or "No longer SWPC's primary series"; a level whose number is missing reads "Level {scale}, level number missing" and one outside 1 to 5 reads "Level {code}, outside the NOAA scale's 1 to 5", never a guessed name. Before: the previous state in the same words, left out when no earlier state was held. Change: "State change", "Revised Kp value", "Restated as no data" or "Refresh, same state" (a refresh, which the list never shows); when no earlier state was held it carries the sub line "No earlier state was held, for example after a restart." Measurement: the measurement in words. Value: the value with its unit, and the X-ray class when there is one. Sample, with its averaging period, for R and S; Interval ("{start} to {end} UTC, 3 hours") for G, which also gets the row Estimated: "SWPC calls Kp estimated; a later value can revise this interval." Newest record: the series' newest record time. For no data: Reason (the same short reasons as the scale panels) and No data since. For a restatement: Restated because of "the zero run starting {time} UTC", and no No data since row. For ended: Taken over by "GOES-{n}". For a timer refresh: Timer tick. Source: the product, the source address as plain text (never a link, since it comes from the event), and when it was fetched. Badge, title and sentence are the ones the list uses, so a level badge takes its outline form here too.</figcaption>
+      <figcaption>Alert detail for a space weather level (header and footer as above). Document title: "R1 level, GOES-18 X-ray flux, SpaceFlux". The page title follows the state: "{label} level, {measurement}", "Below {scale}1, {measurement}", "No data, {measurement}", "No longer primary, {measurement}" for an ended series, and "Restated as no data, {measurement}" for a restatement. A restatement's sentence reads "The {measurement} sample at {time} UTC, published as below {scale}1, is restated as no data."; every other event uses its list title, with dates. The rows depend on the event; each appears only when its field is set. State: "Level {code}, {NOAA name}", "Below {scale}1", "No data" or "No longer SWPC's primary series"; a level whose number is missing reads "Level {scale}, level number missing" and one outside 1 to 5 reads "Level {code}, outside the NOAA scale's 1 to 5", never a guessed name. Before: the previous state in the same words, left out when no earlier state was held. Change: "State change", "Revised Kp value", "Restated as no data" or "Refresh, same state" (a refresh, which the list never shows); when no earlier state was held it carries the sub line "No earlier state was held, for example after a restart." Measurement: the measurement in words. Value: the value with its unit, and the X-ray class when there is one. Sample, with its averaging period, for R and S; Interval ("{start} to {end} UTC, 3 hours") for G, which also gets the row Estimated: "SWPC calls Kp estimated; a later value can revise this interval." Newest record: the series' newest record time. For no data: Reason (the same short reasons as the scale panels) and No data since. For a restatement: Restated because of "the zero run starting {time} UTC", and no No data since row. For ended: Taken over by "GOES-{n}". For a timer refresh: Timer tick. Source: the product, the source address as plain text (never a link, since it comes from the event), and when it was fetched. Badge, title and sentence are the ones the list uses, so a level badge takes its outline form here too. This sample shows the signed in operator's Acknowledgement panel for an alert never acknowledged: the state line, Acknowledge, the "Acknowledge with a note" disclosure, the panel's status line, then History with its empty state. The controls, the note form and every message behave as in the recent alerts list, with times carrying their date. A success also adds the returned row at the top of History without a request.</figcaption>
     </figure>
 
     <!-- Alert detail states. -->
@@ -1452,6 +1903,58 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
         </div>
       </div>
       <figcaption>Alert detail states: loading, failed (Try again repeats the request, with the status line emptied while it is out), not found (the field is null), and an id the API refuses. The page loads once on entry; it is not refreshed by the one minute poll, so it never changes under the reader. Document titles: "Alert, SpaceFlux" while loading or failed, "Alert not found, SpaceFlux", "Not an event id, SpaceFlux". The event id is shown as text exactly as decoded from the address. A screening run stored under an event id shows its badge-free title "Screening run {run_id}", the Record panel, and the line "Screening runs are shown on the console's latest screening run panel." with no acknowledgement panel, since a run cannot be acknowledged.</figcaption>
+    </figure>
+
+    <!-- Acknowledgement history states, signed in operator. -->
+    <figure>
+      <div class="panel ack-panel">
+        <div class="ack-history">
+          <h5 class="history-title" tabindex="-1">History</h5>
+          <p class="secondary" role="status">Loading the history.</p>
+        </div>
+      </div>
+      <div class="panel ack-panel">
+        <div class="ack-history state-block">
+          <h5 class="history-title" tabindex="-1">History</h5>
+          <p class="secondary" role="status">The history could not be loaded.</p>
+          <button class="btn btn-secondary" type="button">Try again</button>
+        </div>
+      </div>
+      <div class="panel ack-panel">
+        <div class="ack-history state-block">
+          <h5 class="history-title" tabindex="-1">History</h5>
+          <p class="line-held" role="status"><span class="visually-hidden">Loading the history.</span></p>
+          <button class="btn btn-secondary" type="button" aria-disabled="true">Try again</button>
+        </div>
+      </div>
+      <div class="panel ack-panel">
+        <div class="ack-history">
+          <h5 class="history-title" tabindex="-1">History</h5>
+          <p class="visually-hidden" role="status"></p>
+          <ol>
+            <li><span class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">2026-09-29 06:02 UTC</time> by operator</span><p class="ack-note">Reviewed; element ages 1.6 and 4.2 days.</p></li>
+            <li><span class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Unacknowledged <time datetime="2026-09-29T05:50:00Z">2026-09-29 05:50 UTC</time> by operator</span></li>
+            <li><span class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T05:41:00Z">2026-09-29 05:41 UTC</time> by operator</span></li>
+          </ol>
+          <div class="list-end">
+            <div class="list-end-row">
+              <span class="caption">20 shown, newest first</span>
+              <button class="btn btn-secondary" type="button">Load older</button>
+            </div>
+            <p class="secondary" role="status"></p>
+          </div>
+        </div>
+      </div>
+      <div class="panel ack-panel">
+        <div class="ack-history">
+          <h5 class="history-title" tabindex="-1">History</h5>
+          <div class="list-end">
+            <p class="caption" tabindex="-1">All 23 entries are shown, newest first.</p>
+            <p class="secondary" role="status">3 older entries loaded. No older entries are stored.</p>
+          </div>
+        </div>
+      </div>
+      <figcaption>The History list on an alert page, signed in (the first three entries of a longer sample; the list itself is left out of the loading, failed and end samples). Every acknowledgement row of the alert, newest first, in pages of 20, loaded with the page and on its own persistent status line, so a failed history never hides the alert. Each entry is the state line's words for that row with its date and time: "Acknowledged {date} {HH:MM} UTC" or "Unacknowledged ...", and for the signed in operator "by {principal}" and the note under it. Loading: "Loading the history." Failed: "The history could not be loaded." with Try again, which repeats the request with the line emptied while it is out. Try again does not move while its request is out (third sample): the line stays in the flow at the height it had when Try again was pressed, blank, holding "Loading the history." visually hidden, and Try again keeps its place, its label and focus, marked <span class="mono">aria-disabled</span>. The held height is released when the answer comes; when it succeeds, Try again goes and focus moves to the History heading. Every Try again that sits after its status line does the same, on alert items and on the alert and object pages. Empty: "No acknowledgement is recorded for this alert yet." Load older follows the list end treatment with "entries" as the noun: "{n} shown, newest first", "All {n} entries are shown, newest first." ("The one entry is shown." for one), and on its status line "Loading older entries.", "{k} older entries loaded." ("1 older entry loaded."), "{k} older entries loaded. No older entries are stored.", "No older entries are stored." and "Older entries could not be loaded. Use Load older to try again."; focus moves as it does on the alert lists. After an acknowledgement from this page the returned row joins the top of the list; after a conflict or a sign in the first page is fetched again and older pages are dropped; after sign out the names and notes are removed at once.</figcaption>
     </figure>
 
     <!-- One object's close approaches. -->
