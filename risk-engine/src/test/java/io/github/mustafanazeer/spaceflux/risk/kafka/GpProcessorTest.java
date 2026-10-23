@@ -423,6 +423,26 @@ class GpProcessorTest {
         assertThat(run.get("differing_copies_over_cap")).isEmpty();
     }
 
+    /**
+     * Synthetic: the count is set one below 2147483647, then the same five copies are sent again. The three held ones
+     * match and are not counted, so exactly two arrivals count.
+     */
+    @Test
+    void theOverCapCountStopsAtTheLargestIntInsteadOfWrapping() throws IOException {
+        processor.accept(stations(FETCHED), FETCHED.plusSeconds(60));
+        overTheCopyCap(25544, FETCHED.plusSeconds(60), FETCHED.plusSeconds(120));
+        processor.setOverCap(25544, Integer.MAX_VALUE - 1);
+
+        overTheCopyCap(25544, FETCHED.plusSeconds(60), FETCHED.plusSeconds(125));
+        GpProcessor.Out out = processor.poll(FETCHED.plusSeconds(150));
+
+        assertThat(out.deadLetters()).isEmpty();
+        assertThat(runOf(out).get("differing_copies_over_cap")).singleElement().satisfies(o -> {
+            assertThat(o.get("records_not_listed").isInt()).isTrue();
+            assertThat(o.get("records_not_listed").asInt()).isEqualTo(Integer.MAX_VALUE);
+        });
+    }
+
     @ParameterizedTest(name = "fetched_at {0}")
     @ValueSource(strings = {"2026-09-27T05:00:00.1234567890Z", "2026-09-27T24:00:00Z"})
     void aFetchedAtThatIsNotAPlainUtcTimeIsDeadLetteredAndNotHeld(String fetchedAt) throws IOException {

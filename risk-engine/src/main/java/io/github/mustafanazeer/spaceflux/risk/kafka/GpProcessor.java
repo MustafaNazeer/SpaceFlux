@@ -63,6 +63,7 @@ public final class GpProcessor {
     private final Map<Integer, TrackedObject> newest = new TreeMap<>();
     /** Element sets with the same epoch as the held one but other elements or name, listed as differing copies. */
     private final Map<Integer, List<TrackedObject>> copies = new TreeMap<>();
+    /** Differing copies past the cap, counted only; a count stops at Integer.MAX_VALUE instead of wrapping. */
     private final Map<Integer, Integer> overCap = new TreeMap<>();
     private final Set<String> writtenRuns = new HashSet<>();
     private Instant newestFetched;
@@ -161,11 +162,16 @@ public final class GpProcessor {
             return false;
         }
         if (list.size() >= MAX_COPIES) {
-            overCap.merge(n, 1, Integer::sum);
+            overCap.merge(n, 1, (count, one) -> count == Integer.MAX_VALUE ? count : count + one);
             return false;
         }
         list.add(object);
         return true;
+    }
+
+    /** Sets an object's over cap count, so a test can start next to the count's limit. */
+    synchronized void setOverCap(int catalogNumber, int count) {
+        overCap.put(catalogNumber, count);
     }
 
     static String cut(String name) {
