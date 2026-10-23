@@ -25,12 +25,15 @@ export class RouteFocus {
   private ready: Ready | null = null;
   /** A page change finished and waits for its page to settle; `href` is the link to return to. */
   private pending: { href: string | null } | null = null;
+  /** The link a history navigation returned focus to, until the next navigation starts. */
+  private returned: HTMLElement | null = null;
 
   /** A navigation starts away from `url`, with `active` focused. */
   start(url: string, active: Element | null): void {
     this.navigating = true;
     this.ready = null;
     this.pending = null;
+    this.returned = null;
     const href = active instanceof HTMLAnchorElement ? active.getAttribute('href') : null;
     this.leftBy.delete(url);
     if (href) {
@@ -59,6 +62,22 @@ export class RouteFocus {
     } else {
       this.pending = { href };
     }
+  }
+
+  /**
+   * Content above the page's own has finished loading and may have pushed the link focus returned to out of the
+   * window: it is brought just into view again, but only while it still has focus.
+   */
+  reveal(injector: Injector): void {
+    afterNextRender(
+      () => {
+        const link = this.returned;
+        if (link?.isConnected && document.activeElement === link) {
+          intoView(link);
+        }
+      },
+      { injector },
+    );
   }
 
   /** A navigation was cancelled or failed: nothing waits for it. */
@@ -98,14 +117,19 @@ export class RouteFocus {
           return;
         }
         link.focus({ preventScroll: true });
+        this.returned = link;
         // The browser restores the scroll position before the page is drawn again, so it can leave the link out
         // of view.
-        const { top, bottom } = link.getBoundingClientRect();
-        if (top < 0 || bottom > window.innerHeight) {
-          link.scrollIntoView({ block: 'nearest', behavior: 'instant' });
-        }
+        intoView(link);
       },
       { injector },
     );
+  }
+}
+
+function intoView(link: HTMLElement): void {
+  const { top, bottom } = link.getBoundingClientRect();
+  if (top < 0 || bottom > window.innerHeight) {
+    link.scrollIntoView({ block: 'nearest', behavior: 'instant' });
   }
 }

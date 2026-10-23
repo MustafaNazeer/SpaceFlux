@@ -601,6 +601,48 @@ describe('App', () => {
       http.match(GRAPHQL_PATH).forEach((p) => answer(p));
     });
 
+    it('on history Back to an alert page brings the returned object link into view again once History has answered', async () => {
+      const fixture = await start({ status: 401, body: {} });
+      recentKinds();
+      await settle(fixture);
+      const el = fixture.nativeElement as HTMLElement;
+      const location = TestBed.inject(Location);
+      el.querySelectorAll<HTMLAnchorElement>('.alert-item a.title-link')[5].click();
+      await settle(fixture);
+      answer(http.expectOne(GRAPHQL_PATH));
+      await settle(fixture);
+      const objectLink = el.querySelector<HTMLAnchorElement>('main dd a')!;
+      objectLink.focus();
+      objectLink.click();
+      await settle(fixture);
+      answer(http.expectOne(GRAPHQL_PATH), {
+        ObjectAlerts: { catalog_object: null },
+      });
+      await settle(fixture);
+
+      location.back();
+      await settle(fixture);
+      answer(http.expectOne(GRAPHQL_PATH));
+      await settle(fixture);
+      const returned = el.querySelector<HTMLAnchorElement>('main dd a')!;
+      expect(document.activeElement).toBe(returned);
+      vi.spyOn(returned, 'getBoundingClientRect').mockReturnValue({
+        top: window.innerHeight + 400,
+        bottom: window.innerHeight + 420,
+      } as DOMRect);
+      const scroll = vi.fn();
+      returned.scrollIntoView = scroll;
+      const history = http
+        .match((r) => r.method === 'GET' && r.url === ACK_PATH)
+        .filter((r) => !r.cancelled);
+      expect(history.length).toBe(1);
+      history[0].flush({ event_id: '', items: [] });
+      await settle(fixture);
+      expect(scroll).toHaveBeenCalledExactlyOnceWith({ block: 'nearest', behavior: 'instant' });
+      expect(document.activeElement).toBe(returned);
+      http.match(GRAPHQL_PATH).forEach((p) => answer(p));
+    });
+
     it('adds nothing to the log while another page is shown; on return it sums up once and marks those alerts New', async () => {
       const fixture = await start({ status: 401, body: {} });
       http.match(GRAPHQL_PATH).forEach((p) => answer(p));

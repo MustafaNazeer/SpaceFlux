@@ -174,6 +174,78 @@ describe('RouteFocus', () => {
       expect(scroll).toHaveBeenCalledExactlyOnceWith({ block: 'nearest', behavior: 'instant' });
     });
 
+    describe('once a later load has moved the page', () => {
+      /** The link moves to `top` after it was focused, as when a list above it is drawn. */
+      function moveTo(root: HTMLElement, top: number): void {
+        vi.mocked(link(root, '/to/1').getBoundingClientRect).mockReturnValue({
+          top,
+          bottom: top + 20,
+        } as DOMRect);
+      }
+
+      it('brings the returned link just into view again when it still has focus', () => {
+        const { root, scroll } = at(200);
+        back('/p/1', root);
+        moveTo(root, window.innerHeight + 200);
+        focus.reveal(injector);
+        render();
+        expect(scroll).toHaveBeenCalledExactlyOnceWith({ block: 'nearest', behavior: 'instant' });
+      });
+
+      it('leaves the scroll position alone when the link is still inside the window', () => {
+        const { root, scroll } = at(200);
+        back('/p/1', root);
+        moveTo(root, 300);
+        focus.reveal(injector);
+        render();
+        expect(scroll).not.toHaveBeenCalled();
+      });
+
+      it('does nothing once focus has moved off the returned link', () => {
+        const { root, scroll } = at(200);
+        back('/p/1', root);
+        root.querySelector<HTMLElement>('h1')!.focus();
+        moveTo(root, window.innerHeight + 200);
+        focus.reveal(injector);
+        render();
+        expect(scroll).not.toHaveBeenCalled();
+        expect(document.activeElement).toBe(root.querySelector('h1'));
+      });
+
+      it('does nothing for a page reached by a new navigation, where the h1 took focus', () => {
+        const { root, scroll } = at(200);
+        focus.start('/elsewhere', null);
+        focus.end('/p/1', true, false);
+        focus.settled(root, injector);
+        render();
+        link(root, '/to/1').focus();
+        moveTo(root, window.innerHeight + 200);
+        focus.reveal(injector);
+        render();
+        expect(scroll).not.toHaveBeenCalled();
+      });
+
+      it('forgets the returned link once another navigation starts', () => {
+        const { root, scroll } = at(200);
+        back('/p/1', root);
+        focus.start('/p/1', document.activeElement);
+        moveTo(root, window.innerHeight + 200);
+        focus.reveal(injector);
+        render();
+        expect(scroll).not.toHaveBeenCalled();
+      });
+
+      it('does nothing when the page has left the document', () => {
+        const { root, scroll } = at(200);
+        back('/p/1', root);
+        moveTo(root, window.innerHeight + 200);
+        root.remove();
+        focus.reveal(injector);
+        render();
+        expect(scroll).not.toHaveBeenCalled();
+      });
+    });
+
     it('leaves the scroll position alone when the link is inside the window', () => {
       const { root, scroll } = at(200);
       back('/p/1', root);

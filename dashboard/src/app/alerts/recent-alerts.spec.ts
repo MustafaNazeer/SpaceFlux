@@ -877,6 +877,32 @@ describe('RecentAlerts', () => {
       ]);
     });
 
+    it('names each note form for its title and the receive time the item shows', async () => {
+      const { el } = await panel({ items: [alert('g', 4)], more: false });
+      const g4 = items(el)[0];
+      const about =
+        'G4 level from SWPC estimated planetary Kp 7.67, 2024-05-10 15:00 to 18:00 UTC, received 18:50 UTC';
+      expect(squash(g4.querySelector('.alert-top .caption')?.textContent)).toBe(
+        'Received 18:50 UTC',
+      );
+      expect(g4.querySelector('form')?.getAttribute('aria-label')).toBe(
+        `Acknowledge with a note, ${about}`,
+      );
+      const described = g4.querySelector('.ack-main')!.getAttribute('aria-describedby')!;
+      expect(document.getElementById(described)?.textContent).toBe(about);
+    });
+
+    it('dates the receive time in the form name when it is not today', async () => {
+      const yesterday = {
+        ...alert('y', 4),
+        received_at: '2026-09-29T23:08:14.512006Z',
+      };
+      const { el } = await panel({ items: [yesterday], more: false });
+      expect(items(el)[0].querySelector('form')?.getAttribute('aria-label')).toBe(
+        'Acknowledge with a note, G4 level from SWPC estimated planetary Kp 7.67, 2024-05-10 15:00 to 18:00 UTC, received 2026-09-29 23:08 UTC',
+      );
+    });
+
     it('holds the list while an acknowledgement request is out, even with focus elsewhere, and reports the new state', async () => {
       const { fixture, el, set } = await panel({
         items: [alert('a', 5), alert('b', 1)],

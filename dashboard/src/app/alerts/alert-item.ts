@@ -11,6 +11,8 @@ import { Segment } from '../format';
 import { SessionService } from '../session/session.service';
 import { alertView } from './alert-view';
 
+type TimeSegment = Extract<Segment, { kind: 'time' }>;
+
 /**
  * The left border color class of a New item: its level's alert color, or border-strong for anything with no level
  * color of its own (a close approach, a level that was left, no data, ended, a screening run).
@@ -28,8 +30,6 @@ export function newBorder(alert: Alert): string {
   }
   return alert.close_approach ? 'approach' : 'plain';
 }
-
-let nextTitle = 0;
 
 /** A sentence's text as the page shows it, a unit's superscript included. */
 export function segmentsText(segments: Segment[]): string {
@@ -61,11 +61,11 @@ export function segmentsText(segments: Segment[]): string {
       <span class="alert-badges">@if (view().badge; as b) {<app-badge [badge]="b" />}@if (isNew()) {<span class="badge new"><svg class="icon" aria-hidden="true"><use href="#i-new" /></svg>New</span>}</span>
       <span class="caption"><app-segments [segments]="view().received" /></span>
     </div>
-    <h3 class="alert-title"><a class="title-link" [id]="titleId" [routerLink]="['/alerts', alert().event_id]"><app-segments [segments]="view().title" /></a></h3>
+    <h3 class="alert-title"><a class="title-link" [routerLink]="['/alerts', alert().event_id]"><app-segments [segments]="view().title" /></a></h3>
     @if (view().acknowledgeable) {
       <app-ack-state [ack]="alert().acknowledgement" [showNote]="true" />
       @if (actions() && (signedIn() || kept())) {
-        <app-ack-controls [eventId]="alert().event_id" [ack]="alert().acknowledgement" [title]="titleText()" [titleId]="titleId" (changed)="changed($event)" />
+        <app-ack-controls [eventId]="alert().event_id" [ack]="alert().acknowledgement" [title]="titleText()" [received]="receivedText()" (changed)="changed($event)" />
       }
     }`,
 })
@@ -80,9 +80,13 @@ export class AlertItem {
   private readonly keptNotes = inject(KeptNotes);
   /** A note kept when the session ended stays in place, read only, while signed out. */
   protected readonly kept = computed(() => this.keptNotes.get(this.alert().event_id) !== undefined);
-  protected readonly titleId = `alert-title-${nextTitle++}`;
   /** The title link's text as shown, which names the item's note form. */
   protected readonly titleText = computed(() => segmentsText(this.view().title));
+  /** The receive time as the item shows it, which with the title names the note form. */
+  protected readonly receivedText = computed(() => {
+    const time = this.view().received.find((s): s is TimeSegment => s.kind === 'time');
+    return time?.label ?? '';
+  });
 
   protected changed(change: AckChange): void {
     this.ackChange.emit({ eventId: this.alert().event_id, ack: change.ack });

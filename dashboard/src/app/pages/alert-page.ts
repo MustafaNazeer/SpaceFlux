@@ -155,6 +155,11 @@ export class AlertPage {
     }
   }
 
+  /** History above the record has grown, which may push a link focus returned to out of the window. */
+  protected historyAnswered(): void {
+    this.routeFocus.reveal(this.injector);
+  }
+
   /** The alert's acknowledgement and the first page of History again, now with names and notes. */
   private async afterSignIn(): Promise<void> {
     const alert = this.alert();

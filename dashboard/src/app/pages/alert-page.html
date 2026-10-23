@@ -37,7 +37,7 @@
         @if (signedIn() || kept()) {
           <app-ack-controls [eventId]="a.event_id" [ack]="a.acknowledgement" [page]="true" (changed)="ackChanged($event)" />
         }
-        <app-ack-history [eventId]="a.event_id" />
+        <app-ack-history [eventId]="a.event_id" (firstAnswer)="historyAnswered()" />
       </section>
     }
     @if (v.kindPanel; as k) {

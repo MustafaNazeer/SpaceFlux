@@ -48,7 +48,7 @@ const ASTRAL = String.fromCodePoint(0x1f6f0);
         [ack]="ack()"
         [page]="page()"
         [title]="page() ? '' : title"
-        [titleId]="page() ? null : 'item-title'"
+        [received]="page() ? '' : received()"
         (changed)="onChange($event)"
       />
     </li>
@@ -58,6 +58,7 @@ class Host {
   readonly id = EVENT_ID;
   readonly title =
     'OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC';
+  readonly received = signal('2026-09-29 23:08 UTC');
   readonly ack = signal<Acknowledgement | null>(null);
   readonly page = signal(false);
   readonly changes: AckChange[] = [];
@@ -342,14 +343,36 @@ describe('AckControls', () => {
       expect(textarea().value).toBe('');
     });
 
-    it('names the form for its item and points the buttons at the item title', async () => {
+    /** The text of the element a control's aria-describedby points to, and whether that element is hidden. */
+    const description = (control: Element) => {
+      const ids = (control.getAttribute('aria-describedby') ?? '').split(' ');
+      expect(ids.length).toBe(1);
+      const target = document.getElementById(ids[0]);
+      return { text: target?.textContent, hidden: target?.hidden };
+    };
+
+    it('names the form for its item and its receive time, and describes the buttons by both', async () => {
       await mount();
+      const about = `${fixture.componentInstance.title}, received 2026-09-29 23:08 UTC`;
       expect(el.querySelector('form')?.getAttribute('aria-label')).toBe(
-        `Acknowledge with a note, ${fixture.componentInstance.title}`,
+        `Acknowledge with a note, ${about}`,
       );
-      expect(main().getAttribute('aria-describedby')).toBe('item-title');
-      expect(el.querySelector('summary')?.getAttribute('aria-describedby')).toBe('item-title');
+      expect(description(main())).toEqual({ text: about, hidden: true });
+      expect(description(el.querySelector('summary')!)).toEqual({ text: about, hidden: true });
       expect(squash(main().textContent)).toBe('Acknowledge');
+    });
+
+    it('names the form for its title alone when the item shows no receive time', async () => {
+      fixture = TestBed.createComponent(Host);
+      fixture.componentInstance.received.set('');
+      document.body.appendChild(fixture.nativeElement);
+      await fixture.whenStable();
+      el = fixture.nativeElement as HTMLElement;
+      const title = fixture.componentInstance.title;
+      expect(el.querySelector('form')?.getAttribute('aria-label')).toBe(
+        `Acknowledge with a note, ${title}`,
+      );
+      expect(description(main())).toEqual({ text: title, hidden: true });
     });
 
     it('names the alert page form plainly', async () => {
@@ -642,6 +665,39 @@ describe('AckControls', () => {
       await type(text);
     }
 
+    it('names a kept note for its title alone when the item shows no receive time', async () => {
+      fixture = TestBed.createComponent(Host);
+      fixture.componentInstance.received.set('');
+      document.body.appendChild(fixture.nativeElement);
+      await fixture.whenStable();
+      el = fixture.nativeElement as HTMLElement;
+      await openNote();
+      await type('Flare seen on the plot.');
+      TestBed.inject(SessionService).end('check');
+      await settle();
+      expect(el.querySelector('.kept-note')?.getAttribute('aria-label')).toBe(
+        `Note not saved, ${fixture.componentInstance.title}`,
+      );
+    });
+
+    it('names a kept note on the alert page plainly', async () => {
+      await mount(null, true);
+      await openNote();
+      await type('Flare seen on the plot.');
+      TestBed.inject(SessionService).end('check');
+      await settle();
+      expect(el.querySelector('.kept-note')?.getAttribute('aria-label')).toBe('Note not saved');
+    });
+
+    it('leaves out the hidden description while signed out, when no control points at it', async () => {
+      await writing('Flare seen on the plot.');
+      expect(el.querySelectorAll('span[hidden]').length).toBe(1);
+      TestBed.inject(SessionService).end('check');
+      await settle();
+      expect(el.querySelector('.kept-note')).not.toBeNull();
+      expect(el.querySelector('span[hidden]')).toBeNull();
+    });
+
     it('keeps the note in place, read only, with focus in it, when the session ends on its own', async () => {
       await writing('Flare seen on the plot.');
       textarea().focus();
@@ -650,7 +706,7 @@ describe('AckControls', () => {
       const kept = el.querySelector<HTMLElement>('.kept-note')!;
       expect(kept.getAttribute('role')).toBe('group');
       expect(kept.getAttribute('aria-label')).toBe(
-        `Note not saved, ${fixture.componentInstance.title}`,
+        `Note not saved, ${fixture.componentInstance.title}, received 2026-09-29 23:08 UTC`,
       );
       expect(squash(kept.querySelector('label')?.textContent)).toBe('Note, not saved');
       expect(textarea().readOnly).toBe(true);

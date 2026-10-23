@@ -19,13 +19,19 @@ import { EVENT_ID } from '../../testing/acks';
 import { AckHistory } from './ack-history';
 
 const squash = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim();
+/** A frame drawn, then the task after it. */
+const afterPaint = () =>
+  new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve)));
 
 @Component({
   imports: [AckHistory],
-  template: `<section class="panel"><app-ack-history [eventId]="id" /></section>`,
+  template: `<section class="panel">
+    <app-ack-history [eventId]="id" (firstAnswer)="answers = answers + 1" />
+  </section>`,
 })
 class Host {
   readonly id = EVENT_ID;
+  answers = 0;
   readonly history = viewChild.required(AckHistory);
 }
 
@@ -91,8 +97,146 @@ describe('AckHistory', () => {
     await settle();
   }
 
+  it('draws its status line empty, then sets the loading text once a frame has been drawn', async () => {
+    fixture = TestBed.createComponent(Host);
+    document.body.appendChild(fixture.nativeElement);
+    el = fixture.nativeElement as HTMLElement;
+    await fixture.whenStable();
+    const line = status();
+    expect(squash(line.textContent)).toBe('');
+    expect(shown()).toBe('visually-hidden');
+    expect(line.classList).toContain('is-reserved');
+    await afterPaint();
+    await fixture.whenStable();
+    expect(status()).toBe(line);
+    expect(squash(line.textContent)).toBe('Loading the history.');
+    expect(shown()).toBe('secondary');
+    expect(line.classList).not.toContain('is-reserved');
+    await answer([]);
+    expect(line.classList).not.toContain('is-reserved');
+  });
+
+  it('gives up the reserved line when the first answer comes before the loading text', async () => {
+    fixture = TestBed.createComponent(Host);
+    document.body.appendChild(fixture.nativeElement);
+    el = fixture.nativeElement as HTMLElement;
+    await fixture.whenStable();
+    expect(status().classList).toContain('is-reserved');
+    get().flush({ event_id: EVENT_ID, items: [] });
+    await fixture.whenStable();
+    expect(status().classList).not.toContain('is-reserved');
+  });
+
+  it('keeps the line empty until a frame has run, however many tasks run first', async () => {
+    const frames: FrameRequestCallback[] = [];
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      frames.push(cb);
+      return frames.length;
+    });
+    try {
+      fixture = TestBed.createComponent(Host);
+      document.body.appendChild(fixture.nativeElement);
+      el = fixture.nativeElement as HTMLElement;
+      await settle();
+      expect(squash(status().textContent)).toBe('');
+      expect(frames.length).toBeGreaterThan(0);
+      frames.splice(0).forEach((frame) => frame(0));
+      await settle();
+      expect(squash(status().textContent)).toBe('Loading the history.');
+    } finally {
+      raf.mockRestore();
+    }
+    await answer([]);
+  });
+
+  it('says a first load that fails before a frame is drawn, and not the loading text after it', async () => {
+    fixture = TestBed.createComponent(Host);
+    document.body.appendChild(fixture.nativeElement);
+    el = fixture.nativeElement as HTMLElement;
+    await fixture.whenStable();
+    get().flush('', { status: 503, statusText: 'x' });
+    await fixture.whenStable();
+    expect(squash(status().textContent)).toBe('The history could not be loaded.');
+    await afterPaint();
+    await fixture.whenStable();
+    expect(squash(status().textContent)).toBe('The history could not be loaded.');
+  });
+
+  describe('once destroyed', () => {
+    /** Frames are held, never run, so only the frame the panel asked for is left waiting. */
+    function holdFrames() {
+      const waiting = new Map<number, FrameRequestCallback>();
+      let next = 1000;
+      const request = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+        waiting.set(++next, cb);
+        return next;
+      });
+      const cancel = vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation((id) => {
+        waiting.delete(id);
+      });
+      return {
+        waiting,
+        cancel,
+        restore: () => {
+          request.mockRestore();
+          cancel.mockRestore();
+        },
+      };
+    }
+
+    async function created(): Promise<void> {
+      fixture = TestBed.createComponent(Host);
+      document.body.appendChild(fixture.nativeElement);
+      el = fixture.nativeElement as HTMLElement;
+      await settle();
+    }
+
+    afterEach(() => {
+      http.match((r) => r.url === ACK_PATH).forEach((r) => r.cancelled || r.flush({ items: [] }));
+    });
+
+    it('cancels the frame it asked for when destroyed before that frame runs', async () => {
+      const frames = holdFrames();
+      try {
+        await created();
+        expect(frames.waiting.size).toBe(1);
+        const [own] = frames.waiting.keys();
+        frames.cancel.mockClear();
+        fixture.destroy();
+        expect(frames.cancel).toHaveBeenCalledWith(own);
+      } finally {
+        frames.restore();
+      }
+    });
+
+    it('clears its own timer when destroyed after the frame ran but before the loading text is set', async () => {
+      const frames = holdFrames();
+      const cleared = vi.spyOn(globalThis, 'clearTimeout');
+      try {
+        await created();
+        expect(frames.waiting.size).toBe(1);
+        const [[, own]] = frames.waiting.entries();
+        const timers = vi.spyOn(globalThis, 'setTimeout');
+        own(0);
+        expect(timers).toHaveBeenCalledTimes(1);
+        const timer = timers.mock.results[0].value;
+        timers.mockRestore();
+        cleared.mockClear();
+        fixture.destroy();
+        expect(cleared).toHaveBeenCalledWith(timer);
+        await new Promise((r) => setTimeout(r));
+        expect(squash(status().textContent)).toBe('');
+      } finally {
+        cleared.mockRestore();
+        frames.restore();
+      }
+    });
+  });
+
   it('loads the first 20 rows with the page on its own visible status line, under a History heading', async () => {
     await mount();
+    await afterPaint();
+    await fixture.whenStable();
     const req = get();
     expect(req.request.urlWithParams).toBe(
       `${ACK_PATH}?event_id=${encodeURIComponent(EVENT_ID)}&limit=20`,
@@ -106,6 +250,27 @@ describe('AckHistory', () => {
     expect(squash(el.querySelector('.ack-history > p.secondary')?.textContent)).toBe(
       'No acknowledgement is recorded for this alert yet.',
     );
+  });
+
+  it('tells the page once when its first load has answered, and not for a reload', async () => {
+    await mount();
+    expect(fixture.componentInstance.answers).toBe(0);
+    await answer([entry(2)]);
+    expect(fixture.componentInstance.answers).toBe(1);
+    fixture.componentInstance.history().reload();
+    await answer([entry(3)]);
+    expect(fixture.componentInstance.answers).toBe(1);
+  });
+
+  it('tells the page when its first load fails, and not again when Try again answers', async () => {
+    await mount();
+    get().flush({ status: 500 }, { status: 500, statusText: 'x' });
+    await settle();
+    expect(fixture.componentInstance.answers).toBe(1);
+    button('Try again')!.click();
+    await settle();
+    await answer([]);
+    expect(fixture.componentInstance.answers).toBe(1);
   });
 
   it('lists each row newest first with its date and time, and the name and note for the operator', async () => {

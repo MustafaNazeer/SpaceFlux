@@ -51,13 +51,14 @@ let nextId = 0;
   host: { style: 'display: contents' },
   // Whitespace sensitive: reformatting would add spaces between the inline pieces.
   // prettier-ignore
-  template: `@if (signedIn()) {
+  template: `@if (signedIn() && about()) {<span [id]="ids.about" hidden>{{ about() }}</span>}
+    @if (signedIn()) {
       <div class="ack-actions">
-        <button class="btn ack-main" [class.btn-primary]="!acknowledged()" [class.btn-secondary]="acknowledged()" type="button" [attr.aria-describedby]="titleId()" [attr.aria-disabled]="busy() ? 'true' : null" (click)="act(acknowledged() ? 'unacknowledge' : 'acknowledge')">{{ acknowledged() ? 'Unacknowledge' : 'Acknowledge' }}</button>
+        <button class="btn ack-main" [class.btn-primary]="!acknowledged()" [class.btn-secondary]="acknowledged()" type="button" [attr.aria-describedby]="about() ? ids.about : null" [attr.aria-disabled]="busy() ? 'true' : null" (click)="act(acknowledged() ? 'unacknowledge' : 'acknowledge')">{{ acknowledged() ? 'Unacknowledge' : 'Acknowledge' }}</button>
       </div>
     }
     @if (keptMode(); as mode) {
-      <div class="kept-note" role="group" [attr.aria-label]="title() ? 'Note not saved, ' + title() : 'Note not saved'">
+      <div class="kept-note" role="group" [attr.aria-label]="about() ? 'Note not saved, ' + about() : 'Note not saved'">
         <label [for]="ids.note">Note, not saved</label>
         <textarea [id]="ids.note" class="note-field" readonly [attr.aria-describedby]="ids.count + ' ' + ids.kept" [value]="note()"></textarea>
         <span [id]="ids.count" class="note-counter" [class.is-over]="over()">{{ counter() }}</span>
@@ -66,8 +67,8 @@ let nextId = 0;
       </div>
     } @else if (signedIn() && !acknowledged()) {
       <details class="disclosure" [open]="noteOpen()" (toggle)="toggled($event)">
-        <summary [attr.aria-describedby]="titleId()">Acknowledge with a note</summary>
-        <form class="ack-form" [attr.aria-label]="title() ? 'Acknowledge with a note, ' + title() : 'Acknowledge with a note'" novalidate (submit)="submitNote($event)">
+        <summary [attr.aria-describedby]="about() ? ids.about : null">Acknowledge with a note</summary>
+        <form class="ack-form" [attr.aria-label]="about() ? 'Acknowledge with a note, ' + about() : 'Acknowledge with a note'" novalidate (submit)="submitNote($event)">
           <label [for]="ids.note">Note, optional</label>
           <textarea [id]="ids.note" class="note-field" [attr.aria-describedby]="ids.help + ' ' + ids.count" [attr.aria-invalid]="over() ? 'true' : null" placeholder="What you checked" [value]="note()" (input)="typed($event)"></textarea>
           <div class="note-meta">
@@ -95,8 +96,8 @@ export class AckControls {
   readonly page = input(false);
   /** The item's title link text, which names its note form on the list; empty on the alert page. */
   readonly title = input('');
-  /** The id of the item's title, which the buttons point to. */
-  readonly titleId = input<string | null>(null);
+  /** The item's receive time as it shows it; empty when it shows none. */
+  readonly received = input('');
   readonly changed = output<AckChange>();
 
   private readonly api = inject(AckApi);
@@ -115,6 +116,7 @@ export class AckControls {
       help: `ack-note-${n}-help`,
       count: `ack-note-${n}-count`,
       kept: `ack-note-${n}-kept`,
+      about: `ack-note-${n}-about`,
     };
   })();
 
@@ -127,6 +129,12 @@ export class AckControls {
   protected readonly heldHeight = signal<number | null>(null);
   private readonly draft = signal('');
 
+  /** The item's title and receive time, which name the note form and a kept note and describe the buttons; empty on the alert page. */
+  protected readonly about = computed(() => {
+    const title = this.title();
+    const received = this.received();
+    return title && received ? `${title}, received ${received}` : title;
+  });
   protected readonly acknowledged = computed(() => isAcknowledged(this.ack()));
   private readonly keptText = computed(() => this.kept.get(this.eventId()));
   /** The note shown: a kept one while it is kept, else the one being written. */

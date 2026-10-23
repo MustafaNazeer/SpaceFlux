@@ -8,6 +8,7 @@ import {
   inject,
   Injector,
   input,
+  output,
   signal,
 } from '@angular/core';
 import { Subscription } from 'rxjs';
@@ -39,7 +40,7 @@ type Phase = 'loading' | 'failed' | 'retry' | 'done';
   // prettier-ignore
   template: `<div class="ack-history">
     <h3 class="history-title" tabindex="-1">History</h3>
-    <p class="status-line" role="status" [style.min-height.px]="heldHeight()"><span [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</span></p>
+    <p class="status-line" role="status" [class.is-reserved]="reserved()" [style.min-height.px]="heldHeight()"><span [class]="status() ? 'secondary' : 'visually-hidden'">{{ status() }}</span></p>
     @if (phase() === 'failed' || phase() === 'retry') {
       <div><button class="btn btn-secondary" type="button" [attr.aria-disabled]="phase() === 'retry' ? 'true' : null" (click)="tryAgain()">Try again</button></div>
     }
@@ -59,6 +60,8 @@ type Phase = 'loading' | 'failed' | 'retry' | 'done';
 })
 export class AckHistory {
   readonly eventId = input.required<string>();
+  /** The first load has answered or failed, which may have moved what follows the panel. */
+  readonly firstAnswer = output<void>();
 
   private readonly api = inject(AckApi);
   private readonly host: HTMLElement = inject(ElementRef).nativeElement;
@@ -74,11 +77,17 @@ export class AckHistory {
   /** The status line's height while Try again's request is out, so the button does not move. */
   protected readonly heldHeight = signal<number | null>(null);
   private readonly operatorFields = inject(OperatorFields);
+  /** The line is drawn empty first, so the live region exists before the loading text arrives. */
+  private readonly drawn = signal(false);
+  private answered = false;
+
+  /** The empty first line keeps the loading text's height, so its arrival does not move what follows. */
+  protected readonly reserved = computed(() => this.phase() === 'loading' && !this.drawn());
 
   protected readonly status = computed(() => {
     switch (this.phase()) {
       case 'loading':
-        return 'Loading the history.';
+        return this.drawn() ? 'Loading the history.' : '';
       case 'failed':
         return 'The history could not be loaded.';
       default:
@@ -91,12 +100,24 @@ export class AckHistory {
     const stop = session.onOperatorCleared(() =>
       this.items.update((items) => items.map((a) => withoutOperator(a)!)),
     );
+    let frame = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     inject(DestroyRef).onDestroy(() => {
       stop();
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
       this.request?.unsubscribe();
       this.olderRequest?.unsubscribe();
     });
-    afterNextRender(() => this.load('loading'), { injector: this.injector });
+    afterNextRender(
+      () => {
+        this.load('loading');
+        frame = requestAnimationFrame(() => {
+          timer = setTimeout(() => this.drawn.set(true));
+        });
+      },
+      { injector: this.injector },
+    );
   }
 
   /** The first page again, dropping older pages, as after a sign in or a conflict. What is shown stays until then. */
@@ -162,6 +183,7 @@ export class AckHistory {
         this.next.set(page.next);
         this.older.set({ ...OLDER_IDLE, seq: this.older().seq });
         this.phase.set('done');
+        this.firstAnswered();
         if (phase === 'retry') {
           // Try again is removed with the answer, so focus goes to the History heading.
           afterNextRender(() => this.host.querySelector<HTMLElement>('.history-title')?.focus(), {
@@ -172,8 +194,16 @@ export class AckHistory {
       error: () => {
         this.heldHeight.set(null);
         this.phase.set('failed');
+        this.firstAnswered();
       },
     });
+  }
+
+  private firstAnswered(): void {
+    if (!this.answered) {
+      this.answered = true;
+      this.firstAnswer.emit();
+    }
   }
 
   /** Load older is gone once the end is reached: focus the first entry it added, or the end line when none. */
