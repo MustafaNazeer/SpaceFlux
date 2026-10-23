@@ -517,8 +517,10 @@ a.title-link:hover { color: var(--accent-hover); }
 .detail-facts { display: grid; grid-template-columns: minmax(144px, max-content) minmax(0, 1fr); gap: var(--space-2) var(--space-4); margin: 0; }
 .detail-facts dt { color: var(--text-muted); font-size: 12px; line-height: 22px; }
 .detail-facts dd { margin: 0; color: var(--text-primary); min-width: 0; }
+.detail-facts dd a { scroll-margin-block: var(--space-2); }
 .detail-facts dd .sub { display: block; color: var(--text-muted); font-size: 12px; line-height: 16px; }
 .event-id { overflow-wrap: anywhere; }
+p .mono { overflow-wrap: anywhere; }
 .state-block { display: grid; gap: var(--space-3); justify-items: start; }
 .panel-title { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; }
 .alert-item .alert-title { margin: 0; font-size: 14px; line-height: 22px; font-weight: 500; }
@@ -846,13 +848,14 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <span class="caption">Received <time datetime="2026-09-29T17:58:00Z">17:58 UTC</time></span>
         </div>
         <h3><a class="title-link" href="/alerts/space_weather_level%2F1%2FR%2F18%2F2026-09-29T17%3A52%3A00Z%2F2026-09-29T17%3A57%3A41Z">R1 level from GOES-18 X-ray flux 1.06e-5 W m<sup>&minus;2</sup> (class M1.0) at <time datetime="2026-09-29T17:52:00Z">17:52 UTC</time></a></h3>
+        <span id="ack-desc-1" hidden>R1 level from GOES-18 X-ray flux 1.06e-5 W m&minus;2 (class M1.0) at 17:52 UTC, received 17:58 UTC</span>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
         <div class="ack-actions">
-          <button class="btn btn-primary" type="button">Acknowledge</button>
+          <button class="btn btn-primary" type="button" aria-describedby="ack-desc-1">Acknowledge</button>
         </div>
         <details class="disclosure" open>
-          <summary>Acknowledge with a note</summary>
-          <form class="ack-form" aria-label="Acknowledge with a note, R1 level from GOES-18 X-ray flux 1.06e-5 W m&minus;2 (class M1.0) at 17:52 UTC">
+          <summary aria-describedby="ack-desc-1">Acknowledge with a note</summary>
+          <form class="ack-form" aria-label="Acknowledge with a note, R1 level from GOES-18 X-ray flux 1.06e-5 W m&minus;2 (class M1.0) at 17:52 UTC, received 17:58 UTC">
             <label for="note-r1">Note, optional</label>
             <textarea id="note-r1" aria-describedby="note-r1-help note-r1-count" placeholder="What you checked">Flare seen on the GOES-18 plot.</textarea>
             <div class="note-meta">
@@ -874,10 +877,11 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
         </div>
         <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
+        <span id="ack-desc-2" hidden>OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC, received 05:21 UTC</span>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">06:02 UTC</time> by operator</p>
         <p class="ack-note">Reviewed; element ages 1.6 and 4.2 days.</p>
         <div class="ack-actions">
-          <button class="btn btn-secondary" type="button">Unacknowledge</button>
+          <button class="btn btn-secondary" type="button" aria-describedby="ack-desc-2">Unacknowledge</button>
         </div>
         <p class="visually-hidden" role="status"></p>
       </li>
@@ -888,13 +892,14 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <span class="caption">Received <time datetime="2026-09-29T16:47:00Z">16:47 UTC</time></span>
         </div>
         <h3><a class="title-link" href="/alerts/space_weather_level%2F1%2FR%2F18%2F2026-09-29T16%3A41%3A00Z%2F2026-09-29T16%3A46%3A40Z">R1 level from GOES-18 X-ray flux 1.21e-5 W m<sup>&minus;2</sup> (class M1.2) at <time datetime="2026-09-29T16:41:00Z">16:41 UTC</time></a></h3>
+        <span id="ack-desc-3" hidden>R1 level from GOES-18 X-ray flux 1.21e-5 W m&minus;2 (class M1.2) at 16:41 UTC, received 16:47 UTC</span>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Unacknowledged <time datetime="2026-09-29T16:59:00Z">16:59 UTC</time> by operator</p>
         <div class="ack-actions">
-          <button class="btn btn-primary" type="button">Acknowledge</button>
+          <button class="btn btn-primary" type="button" aria-describedby="ack-desc-3">Acknowledge</button>
         </div>
         <details class="disclosure">
-          <summary>Acknowledge with a note</summary>
-          <form class="ack-form" aria-label="Acknowledge with a note, R1 level from GOES-18 X-ray flux 1.21e-5 W m&minus;2 (class M1.2) at 16:41 UTC">
+          <summary aria-describedby="ack-desc-3">Acknowledge with a note</summary>
+          <form class="ack-form" aria-label="Acknowledge with a note, R1 level from GOES-18 X-ray flux 1.21e-5 W m&minus;2 (class M1.2) at 16:41 UTC, received 16:47 UTC">
             <label for="note-r1b">Note, optional</label>
             <textarea id="note-r1b" aria-describedby="note-r1b-help note-r1b-count" placeholder="What you checked"></textarea>
             <div class="note-meta">
@@ -998,7 +1003,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
         <div class="brand"><span class="view-name">Sign in not confirmed</span></div>
         <div class="session is-signing-in">
           <p class="who">Sign in state unknown</p>
-          <form class="signin-form" aria-label="Operator sign in">
+          <form class="signin-form" aria-label="Operator sign in, sign in not confirmed example">
             <div class="field"><label for="user-u">Username</label><input id="user-u" type="text" autocomplete="username" value="operator" aria-describedby="signin-u-msg"></div>
             <div class="field"><label for="pass-u">Password</label><input id="pass-u" type="password" autocomplete="current-password" value="example" aria-describedby="signin-u-msg"></div>
             <div class="ack-actions">
@@ -1018,7 +1023,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
         <div class="brand"><span class="view-name">Sign in form</span></div>
         <div class="session is-signing-in">
           <p class="who">Not signed in, read only</p>
-          <form class="signin-form" aria-label="Operator sign in">
+          <form class="signin-form" aria-label="Operator sign in, sign in form example">
             <div class="field"><label for="user">Username</label><input id="user" type="text" autocomplete="username" spellcheck="false" autocapitalize="none"></div>
             <div class="field"><label for="pass">Password</label><input id="pass" type="password" autocomplete="current-password"></div>
             <div class="ack-actions">
@@ -1034,7 +1039,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
         <div class="brand"><span class="view-name">Signing in</span></div>
         <div class="session is-signing-in">
           <p class="who">Not signed in, read only</p>
-          <form class="signin-form" aria-label="Operator sign in">
+          <form class="signin-form" aria-label="Operator sign in, signing in example">
             <div class="field"><label for="user-b">Username</label><input id="user-b" type="text" autocomplete="username" value="operator" readonly></div>
             <div class="field"><label for="pass-b">Password</label><input id="pass-b" type="password" autocomplete="current-password" value="example" readonly></div>
             <div class="ack-actions">
@@ -1157,7 +1162,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
         </div>
         <h3><a class="title-link" href="/alerts/space_weather_level%2F1%2FR%2F18%2F2026-09-29T17%3A52%3A00Z%2F2026-09-29T17%3A57%3A41Z">R1 level from GOES-18 X-ray flux 1.06e-5 W m<sup>&minus;2</sup> (class M1.0) at <time datetime="2026-09-29T17:52:00Z">17:52 UTC</time></a></h3>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
-        <div class="kept-note" role="group" aria-label="Note not saved, R1 level from GOES-18 X-ray flux 1.06e-5 W m&minus;2 (class M1.0) at 17:52 UTC">
+        <div class="kept-note" role="group" aria-label="Note not saved, R1 level from GOES-18 X-ray flux 1.06e-5 W m&minus;2 (class M1.0) at 17:52 UTC, received 17:58 UTC">
           <label for="note-kept">Note, not saved</label>
           <textarea id="note-kept" readonly aria-describedby="note-kept-count note-kept-line">Flare seen on the GOES-18 plot.</textarea>
           <span id="note-kept-count" class="note-counter">31 of 500 characters</span>
@@ -1175,12 +1180,13 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <span class="caption">Received <time datetime="2026-09-29T16:47:00Z">16:47 UTC</time></span>
         </div>
         <h3><a class="title-link" href="/alerts/space_weather_level%2F1%2FR%2F18%2F2026-09-29T16%3A41%3A00Z%2F2026-09-29T16%3A46%3A40Z">R1 level from GOES-18 X-ray flux 1.21e-5 W m<sup>&minus;2</sup> (class M1.2) at <time datetime="2026-09-29T16:41:00Z">16:41 UTC</time></a></h3>
+        <span id="ack-desc-4" hidden>R1 level from GOES-18 X-ray flux 1.21e-5 W m&minus;2 (class M1.2) at 16:41 UTC, received 16:47 UTC</span>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Unacknowledged <time datetime="2026-09-29T16:59:00Z">16:59 UTC</time> by operator</p>
         <div class="ack-actions">
-          <button class="btn btn-primary" type="button" aria-disabled="true">Acknowledge</button>
+          <button class="btn btn-primary" type="button" aria-describedby="ack-desc-4" aria-disabled="true">Acknowledge</button>
         </div>
         <details class="disclosure">
-          <summary>Acknowledge with a note</summary>
+          <summary aria-describedby="ack-desc-4">Acknowledge with a note</summary>
         </details>
         <p class="visually-hidden" role="status">Acknowledging.</p>
       </div>
@@ -1190,9 +1196,10 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <span class="caption">Received <time datetime="2026-09-29T16:47:00Z">16:47 UTC</time></span>
         </div>
         <h3><a class="title-link" href="/alerts/space_weather_level%2F1%2FR%2F18%2F2026-09-29T16%3A41%3A00Z%2F2026-09-29T16%3A46%3A40Z">R1 level from GOES-18 X-ray flux 1.21e-5 W m<sup>&minus;2</sup> (class M1.2) at <time datetime="2026-09-29T16:41:00Z">16:41 UTC</time></a></h3>
+        <span id="ack-desc-5" hidden>R1 level from GOES-18 X-ray flux 1.21e-5 W m&minus;2 (class M1.2) at 16:41 UTC, received 16:47 UTC</span>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T18:00:00Z">18:00 UTC</time> by operator</p>
         <div class="ack-actions">
-          <button class="btn btn-secondary" type="button">Unacknowledge</button>
+          <button class="btn btn-secondary" type="button" aria-describedby="ack-desc-5">Unacknowledge</button>
         </div>
         <p class="visually-hidden" role="status">Acknowledged at 18:00 UTC.</p>
       </div>
@@ -1206,12 +1213,13 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
         </div>
         <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
+        <span id="ack-desc-6" hidden>OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC, received 05:21 UTC</span>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
         <div class="ack-actions">
-          <button class="btn btn-primary" type="button">Acknowledge</button>
+          <button class="btn btn-primary" type="button" aria-describedby="ack-desc-6">Acknowledge</button>
         </div>
         <details class="disclosure">
-          <summary>Acknowledge with a note</summary>
+          <summary aria-describedby="ack-desc-6">Acknowledge with a note</summary>
         </details>
         <p class="inline-message" role="status"><strong>Not saved.</strong> The server refused the request.</p>
         <div class="ack-actions"><button class="btn btn-secondary" type="button">Try again</button></div>
@@ -1222,10 +1230,11 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
         </div>
         <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
+        <span id="ack-desc-7" hidden>OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC, received 05:21 UTC</span>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">06:02 UTC</time> by operator</p>
         <p class="ack-note">Reviewed; element ages 1.6 and 4.2 days.</p>
         <div class="ack-actions">
-          <button class="btn btn-secondary" type="button">Unacknowledge</button>
+          <button class="btn btn-secondary" type="button" aria-describedby="ack-desc-7">Unacknowledge</button>
         </div>
         <p class="inline-message" role="status"><strong>Not saved.</strong> This alert was already acknowledged, for example from an earlier press or another tab. The state above is current.</p>
       </div>
@@ -1235,12 +1244,13 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
         </div>
         <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
+        <span id="ack-desc-8" hidden>OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC, received 05:21 UTC</span>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
         <div class="ack-actions">
-          <button class="btn btn-primary" type="button">Acknowledge</button>
+          <button class="btn btn-primary" type="button" aria-describedby="ack-desc-8">Acknowledge</button>
         </div>
         <details class="disclosure">
-          <summary>Acknowledge with a note</summary>
+          <summary aria-describedby="ack-desc-8">Acknowledge with a note</summary>
         </details>
         <p class="inline-message" role="status"><strong>Not saved.</strong> The server says this alert cannot be acknowledged.</p>
       </div>
@@ -1254,12 +1264,13 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
         </div>
         <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
+        <span id="ack-desc-9" hidden>OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC, received 05:21 UTC</span>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
         <div class="ack-actions">
-          <button class="btn btn-primary" type="button">Acknowledge</button>
+          <button class="btn btn-primary" type="button" aria-describedby="ack-desc-9">Acknowledge</button>
         </div>
         <details class="disclosure">
-          <summary>Acknowledge with a note</summary>
+          <summary aria-describedby="ack-desc-9">Acknowledge with a note</summary>
         </details>
         <p class="inline-message" role="status"><strong>Not confirmed.</strong> The server could not be reached or had a problem, and the current state above does not show this alert as acknowledged. It was most likely not saved, but a delayed save can still go through later. Trying again never saves it twice.</p>
         <div class="ack-actions"><button class="btn btn-secondary" type="button">Try again</button></div>
@@ -1270,9 +1281,10 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
         </div>
         <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
+        <span id="ack-desc-10" hidden>OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC, received 05:21 UTC</span>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Acknowledged <time datetime="2026-09-29T06:02:00Z">06:02 UTC</time> by operator</p>
         <div class="ack-actions">
-          <button class="btn btn-secondary" type="button">Unacknowledge</button>
+          <button class="btn btn-secondary" type="button" aria-describedby="ack-desc-10">Unacknowledge</button>
         </div>
         <p class="inline-message" role="status"><strong>Not confirmed.</strong> The server could not be reached or had a problem, and the alert's current state could not be loaded, so it is not known whether it was unacknowledged. Trying again never saves it twice. Open the alert to see its state.</p>
         <div class="ack-actions"><button class="btn btn-secondary" type="button">Try again</button></div>
@@ -1305,13 +1317,14 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
           <span class="caption">Received <time datetime="2026-09-29T05:21:00Z">05:21 UTC</time></span>
         </div>
         <h3><a class="title-link" href="/alerts/close_approach%2F1%2F2026-09-29T05%3A20%3A09Z%2F1%2F57036%2F27958%2F2026-09-30T03%3A34%3A37.588Z">OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at <time datetime="2026-09-30T03:34:37.588Z">2026-09-30 03:34:37 UTC</time></a></h3>
+        <span id="ack-desc-11" hidden>OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC, received 05:21 UTC</span>
         <p class="ack-state"><svg class="icon" aria-hidden="true"><use href="#i-open"/></svg>Not acknowledged</p>
         <div class="ack-actions">
-          <button class="btn btn-primary" type="button">Acknowledge</button>
+          <button class="btn btn-primary" type="button" aria-describedby="ack-desc-11">Acknowledge</button>
         </div>
         <details class="disclosure" open>
-          <summary>Acknowledge with a note</summary>
-          <form class="ack-form" aria-label="Acknowledge with a note, OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC">
+          <summary aria-describedby="ack-desc-11">Acknowledge with a note</summary>
+          <form class="ack-form" aria-label="Acknowledge with a note, OBJECT AJ (57036) and SL-12 DEB (27958), miss distance 2 km at 2026-09-30 03:34:37 UTC, received 05:21 UTC">
             <label for="note-over">Note, optional</label>
             <textarea id="note-over" aria-invalid="true" aria-describedby="note-over-help note-over-count" placeholder="What you checked">Checked both element sets against the previous run. (The rest of a 512 character note.)</textarea>
             <div class="note-meta">
@@ -1908,12 +1921,14 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
     <!-- Acknowledgement history states, signed in operator. -->
     <figure>
       <div class="panel ack-panel">
+        <h4 class="panel-title">Acknowledgement</h4>
         <div class="ack-history">
           <h5 class="history-title" tabindex="-1">History</h5>
           <p class="secondary" role="status">Loading the history.</p>
         </div>
       </div>
       <div class="panel ack-panel">
+        <h4 class="panel-title">Acknowledgement</h4>
         <div class="ack-history state-block">
           <h5 class="history-title" tabindex="-1">History</h5>
           <p class="secondary" role="status">The history could not be loaded.</p>
@@ -1921,6 +1936,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
         </div>
       </div>
       <div class="panel ack-panel">
+        <h4 class="panel-title">Acknowledgement</h4>
         <div class="ack-history state-block">
           <h5 class="history-title" tabindex="-1">History</h5>
           <p class="line-held" role="status"><span class="visually-hidden">Loading the history.</span></p>
@@ -1928,6 +1944,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
         </div>
       </div>
       <div class="panel ack-panel">
+        <h4 class="panel-title">Acknowledgement</h4>
         <div class="ack-history">
           <h5 class="history-title" tabindex="-1">History</h5>
           <p class="visually-hidden" role="status"></p>
@@ -1946,6 +1963,7 @@ figcaption { color: var(--text-muted); font-size: 12px; line-height: 16px; }
         </div>
       </div>
       <div class="panel ack-panel">
+        <h4 class="panel-title">Acknowledgement</h4>
         <div class="ack-history">
           <h5 class="history-title" tabindex="-1">History</h5>
           <div class="list-end">
