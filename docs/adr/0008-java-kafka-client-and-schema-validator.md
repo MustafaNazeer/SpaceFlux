@@ -31,3 +31,4 @@ The service is a Spring Boot 4.1.1 application and already uses Jackson 3 (`tool
 
 * A Kafka upgrade in the Java service follows the Spring Boot parent version; the test broker image stays shared with `ingest`.
 * A risk-engine restart can publish one extra event per series that repeats a state a consumer already holds.
+* No exception type is exempt from retry in either risk-engine consumer, including the types Spring Kafka treats as fatal by default (such as `ClassCastException` or `DeserializationException`, matched through causes), which it would otherwise discard at once. A bug that throws one of them therefore stops that consumer, retrying the same batch every 60 seconds at most, rather than losing its events; on the `raw.gp` consumer this holds screening back across restarts until the bug is fixed. Nothing reports a stuck consumer yet except its logs.

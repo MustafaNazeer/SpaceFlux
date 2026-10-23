@@ -1,5 +1,6 @@
 package io.github.mustafanazeer.spaceflux.risk.kafka;
 
+import java.util.Map;
 import java.util.function.LongConsumer;
 
 import org.apache.kafka.clients.consumer.Consumer;
@@ -16,7 +17,8 @@ import org.springframework.util.backoff.ExponentialBackOff;
 
 /**
  * A batch whose alerts or dead letters could not be written is delivered again until the write succeeds. Spring
- * Kafka's default handler gives up after 9 retries and commits past the batch, which would lose its events (ADR 0008).
+ * Kafka's default handler gives up after 9 retries and commits past the batch, and discards a batch at once when the
+ * exception or any cause is a type it calls fatal, such as ClassCastException; either would lose its events (ADR 0008).
  * Schema and rule failures never reach this handler: they are dead lettered by the listener itself.
  */
 @Configuration
@@ -50,7 +52,9 @@ class KafkaConfig {
     }
 
     static DefaultErrorHandler waitingHandler(LongConsumer sleep) {
-        return new WaitingErrorHandler(retryUntilWritten(), sleep);
+        DefaultErrorHandler handler = new WaitingErrorHandler(retryUntilWritten(), sleep);
+        handler.setClassifications(Map.of(), true);
+        return handler;
     }
 
     static BackOff retryUntilWritten() {
