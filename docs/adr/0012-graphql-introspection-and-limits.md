@@ -121,3 +121,9 @@ A stored alert with a valid `rules_version` above 2147483647 made the alerts lis
 * **Not retyped yet:** `records_not_listed` and `rev_at_epoch` stay `Int` for now; their type is a separate decision.
 
 The change is visible to clients: the type name changes in the schema, while every value that was valid before is written exactly as before.
+
+## Amendment, 2026-10-23: the two `Int` counts and values a type cannot hold
+
+* **`records_not_listed` and `rev_at_epoch` stay `Int`.** A contract maximum would make a new major schema version ([ADR 0002](0002-event-schemas-and-serialization.md), decision 4), and a wider type would change the public schema for values no real input reaches. The limit is pinned by tests and stated in the [GraphQL reference](../api/graphql.md) instead.
+* **The risk engine's `records_not_listed` count stops at 2147483647** instead of wrapping to a negative number, which would fail the `alerts` schema and dead letter the run.
+* **A value its type cannot hold is an `INTERNAL_ERROR`.** graphql-java refuses such a value after its data fetcher returns, so the exception resolvers never see it, and writes its own error with the value's Java type in the message. `query-api` replaces that error with the same generic `INTERNAL_ERROR` as any unexpected failure, at the same path, and logs the original text (T5.5). This covers `Int`, `UInt32` and every scalar and enum, for queries and for each subscription event.
