@@ -147,8 +147,11 @@ final class AlertSocketHandler extends GraphQlWebSocketHandler {
     }
 
     /**
-     * A JSON object whose type a client sends, with an allowed id or none. Read with the same settings as Spring for
-     * GraphQL's own reader, so a repeated or escaped key gives both the same id.
+     * A JSON object whose type a client sends, with an allowed id or none, and a payload that is an object, or none
+     * where the type allows it. Spring for GraphQL casts a payload to a map and, of the types a client sends, requires
+     * one only for subscribe, where it also requires a query with text and checks the types of operationName,
+     * variables and extensions; each of these would otherwise fail at ERROR with a stack trace. Read with the same
+     * settings as Spring's own reader, so a repeated or escaped key gives both the same values.
      */
     static boolean accepted(String message) {
         JsonNode root;
@@ -160,10 +163,32 @@ final class AlertSocketHandler extends GraphQlWebSocketHandler {
         if (root == null || !root.isObject()) {
             return false;
         }
-        JsonNode type = root.get("type");
+        JsonNode typeNode = root.get("type");
         JsonNode id = root.get("id");
-        return type != null && type.isString() && CLIENT_TYPES.contains(type.asString())
-                && (id == null || id.isNull() || (id.isString() && OPERATION_ID.matcher(id.asString()).matches()));
+        JsonNode payload = root.get("payload");
+        if (typeNode == null || !typeNode.isString() || !CLIENT_TYPES.contains(typeNode.asString())) {
+            return false;
+        }
+        if (id != null && !id.isNull() && !(id.isString() && OPERATION_ID.matcher(id.asString()).matches())) {
+            return false;
+        }
+        if (!"subscribe".equals(typeNode.asString())) {
+            return absent(payload) || payload.isObject();
+        }
+        if (payload == null || !payload.isObject()) {
+            return false;
+        }
+        JsonNode query = payload.get("query");
+        JsonNode operationName = payload.get("operationName");
+        JsonNode variables = payload.get("variables");
+        JsonNode extensions = payload.get("extensions");
+        return query != null && query.isString() && !query.asString().isBlank()
+                && (absent(operationName) || operationName.isString())
+                && (absent(variables) || variables.isObject()) && (absent(extensions) || extensions.isObject());
+    }
+
+    private static boolean absent(JsonNode node) {
+        return node == null || node.isNull();
     }
 
     /** Tasks waiting on the timer. */

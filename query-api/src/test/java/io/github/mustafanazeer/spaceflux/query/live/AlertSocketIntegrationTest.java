@@ -675,6 +675,27 @@ class AlertSocketIntegrationTest {
         assertThat(output.getAll()).doesNotContain("FAKE line").doesNotContain("Closing session due to exception");
     }
 
+    /** Spring for GraphQL would fail reading the payload, log that at ERROR with a stack trace and close with 1011. */
+    @Test
+    void aPayloadThatIsNotAnObjectClosesWith4400AndNothingIsLogged(CapturedOutput output) throws Exception {
+        TestSocket s = open().init();
+
+        s.send("{\"type\":\"ping\",\"payload\":\"x\"}");
+
+        assertThat(s.closed(Duration.ofSeconds(5))).isEqualTo(4400);
+        assertThat(output.getAll()).doesNotContain("Closing session due to exception");
+    }
+
+    @Test
+    void aSubscribeWithoutAQueryClosesWith4400AndNothingIsLogged(CapturedOutput output) throws Exception {
+        TestSocket s = open().init();
+
+        s.send("{\"id\":\"1\",\"type\":\"subscribe\",\"payload\":{}}");
+
+        assertThat(s.closed(Duration.ofSeconds(5))).isEqualTo(4400);
+        assertThat(output.getAll()).doesNotContain("Closing session due to exception");
+    }
+
     @Test
     void aBadIdBeforeConnectionInitOrOnAPingClosesWith4400() throws Exception {
         TestSocket beforeInit = open();
