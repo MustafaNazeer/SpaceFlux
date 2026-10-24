@@ -151,7 +151,7 @@ There is one operator account ([ADR 0009](../adr/0009-alert-acknowledgement-auth
 
 `GET /api/auth/session`
 
-`200` with `{"username": "...", "expires_at": "..."}` while signed in, `401` otherwise. `expires_at` is when the 8 hour limit below ends the session: the login time plus 8 hours, written like every other time on this page. The dashboard reads it at startup and after a reload, so it can warn before that limit without having seen the login. It is the latest end, not a promise: the idle limit, a newer login or a logout can end the session sooner. The idle limit has no field, since every request moves it; the dashboard counts it from the last request it sent. Like every response that reaches the CSRF check, it sets the `XSRF-TOKEN` cookie (`Secure`, `SameSite=Strict`, readable by page script) when the request does not carry one, so the dashboard can call it before the login form. That cookie holds a random value, names no one, and keeps no state on the server.
+`200` with `{"username": "...", "expires_at": "..."}` while signed in, `401` otherwise. `expires_at` is when the 8 hour limit below ends the session: the login time plus 8 hours, written like every other time on this page. The dashboard reads it at startup and after a reload, so it can warn before that limit without having seen the login. It is the latest end, not a promise: the idle limit, a newer login or a logout can end the session sooner. The idle limit has no field, since every request moves it; the dashboard counts it from the last request it sent. Like every response that reaches the CSRF check, it sets the `XSRF-TOKEN` cookie (`Secure`, `SameSite=Strict`, readable by page script) when the request does not carry one, so the dashboard can call it before the login form and whenever it holds no token, as after a logout (below). That cookie holds a random value, names no one, and keeps no state on the server.
 
 `POST /api/auth/login`
 
@@ -162,6 +162,8 @@ A session ends after 30 minutes without a request (any request carrying its cook
 `POST /api/auth/logout`
 
 With the `X-XSRF-TOKEN` header. `204`, the session ended, and on HTTPS `Clear-Site-Data: "cookies"` (in the cloud this needs the ingress's forwarded protocol to be trusted, [ADR 0009](../adr/0009-alert-acknowledgement-auth.md), decision 8). Logging out without a session is also `204`.
+
+Logout also expires the `XSRF-TOKEN` cookie and sets no new one, and on HTTPS `Clear-Site-Data` removes it with every other cookie. A client that sends an unsafe request without that cookie, a second login from the same page included, is refused with `403`; the refusal sets a fresh cookie, but the request is not carried out. So after a logout, or whenever it holds no `XSRF-TOKEN` cookie, a client first calls `GET /api/auth/session` (`401` once signed out), which sets a fresh token, and then sends the unsafe request with that token in the `X-XSRF-TOKEN` header. The dashboard does this before every unsafe request to the API that it would otherwise send without a token ([ADR 0009](../adr/0009-alert-acknowledgement-auth.md), amendment of 2026-10-23).
 
 ## 8. Acknowledge an alert
 
