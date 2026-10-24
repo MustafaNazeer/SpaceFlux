@@ -1,7 +1,9 @@
 package io.github.mustafanazeer.spaceflux.query.read;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Component;
 import graphql.ExecutionResult;
 import graphql.GraphQLError;
 import graphql.SerializationError;
+import graphql.execution.NonNullableFieldWasNullError;
 import graphql.execution.instrumentation.Instrumentation;
 import graphql.execution.instrumentation.InstrumentationState;
 import graphql.execution.instrumentation.parameters.InstrumentationExecutionParameters;
@@ -48,7 +51,12 @@ class GraphQlErrors extends DataFetcherExceptionResolverAdapter implements Instr
             return CompletableFuture.completedFuture(result);
         }
         String executionId = String.valueOf(parameters.getExecutionInput().getExecutionId());
+        // One error per field: a query's non null error at that path is already skipped, but a subscription event's
+        // is not (graphql-java 25.0 AlternativeCallContext.addError), and its text names GraphQL types.
+        Set<List<Object>> replaced = result.getErrors().stream().filter(SerializationError.class::isInstance)
+                .map(GraphQLError::getPath).collect(Collectors.toSet());
         List<GraphQLError> errors = result.getErrors().stream()
+                .filter(e -> !(e instanceof NonNullableFieldWasNullError && replaced.contains(e.getPath())))
                 .map(e -> e instanceof SerializationError s ? internal(s, executionId) : e).toList();
         return CompletableFuture.completedFuture(result.transform(b -> b.errors(errors)));
     }

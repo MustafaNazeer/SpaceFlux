@@ -17,8 +17,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.tomcat.TomcatWebServer;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -30,6 +33,7 @@ import io.github.mustafanazeer.spaceflux.query.Browser;
 import jakarta.servlet.http.HttpSession;
 import org.apache.catalina.Context;
 import io.github.mustafanazeer.spaceflux.query.OperatorApp;
+import io.github.mustafanazeer.spaceflux.query.TestMysql;
 import io.github.mustafanazeer.spaceflux.query.auth.Viewer;
 import tools.jackson.databind.JsonNode;
 
@@ -37,10 +41,13 @@ import tools.jackson.databind.JsonNode;
  * The live alert subscription over WebSocket (ADR 0014): the handshake checks, the caps, one operation type per
  * transport, the message limits, the ADR 0012 limits for subscriptions, and what a subscriber receives.
  */
+@ExtendWith(OutputCaptureExtension.class)
 class AlertSocketIntegrationTest {
 
     static final String NOTICE = "subscription { alert_stored { kind rules_version event_id produced_at received_at "
             + "space_weather_level { scale state } close_approach { run_id miss_distance_m } } }";
+    static final String NOTICE_WITH_OBJECT = "subscription { alert_stored { event_id close_approach { run_id "
+            + "watchlist_object { catalog_number } } } }";
 
     static OperatorApp app;
     static final List<TestSocket> opened = new ArrayList<>();
@@ -414,6 +421,82 @@ class AlertSocketIntegrationTest {
         assertThat(messages(next)).isEmpty();
         assertThat(next.get("payload").get("data").get("alert_stored").get("event_id").asString())
                 .isEqualTo(eventId);
+    }
+
+    /** Stores a close approach, then edits its stored payload to hold a value the store would refuse. */
+    static String storeEdited(String from, String to) throws Exception {
+        String eventId = Alerts.store(app.context, Alerts.approach());
+        TestMysql.rootSql("UPDATE spaceflux.alert_event SET payload = REPLACE(payload, '" + from + "', '" + to
+                + "') WHERE event_id = '" + eventId + "'");
+        return eventId;
+    }
+
+    /** Removes an edited row, so no later test class lists it. */
+    static void forget(String eventId) throws Exception {
+        TestMysql.rootSql("DELETE FROM spaceflux.close_approach WHERE alert_seq IN (SELECT alert_seq FROM (SELECT "
+                + "alert_seq FROM spaceflux.alert_event WHERE event_id = '" + eventId + "') t)");
+        TestMysql.rootSql("DELETE FROM spaceflux.alert_event WHERE event_id = '" + eventId + "'");
+    }
+
+    /** graphql-java 25.0 fails an event whose null reaches alert_stored, which may not be null. */
+    @Test
+    void aValueOutOfRangeWhoseNullReachesTheRootEndsTheSubscriptionWithTheGenericError(CapturedOutput output)
+            throws Exception {
+        TestSocket s = open().init();
+        s.subscribe("1", NOTICE);
+        Thread.sleep(200);
+        String eventId = storeEdited("\"rules_version\":1,", "\"rules_version\":4294967296,");
+        try {
+            publish(eventId);
+            String text = s.nextText();
+
+            assertThat(text).isEqualTo("{\"id\":\"1\",\"payload\":[{\"message\":\"Subscription error\","
+                    + "\"locations\":[],\"extensions\":{\"classification\":\"INTERNAL_ERROR\"}}],\"type\":\"error\"}");
+            assertThat(output.getAll()).contains("Unresolved CompletionException for request id 1")
+                    .doesNotContain("4294967296");
+
+            s.subscribe("2", NOTICE);
+            Thread.sleep(200);
+            String after = Alerts.store(app.context, Alerts.approach());
+            publish(after);
+            JsonNode next = s.next();
+            assertThat(next.get("id").asString()).isEqualTo("2");
+            assertThat(next.get("payload").get("data").get("alert_stored").get("event_id").asString())
+                    .isEqualTo(after);
+        } finally {
+            forget(eventId);
+        }
+    }
+
+    @Test
+    void aValueOutOfRangeUnderANullableFieldArrivesWithTheGenericInternalError(CapturedOutput output)
+            throws Exception {
+        TestSocket s = open().init();
+        s.subscribe("1", NOTICE_WITH_OBJECT);
+        Thread.sleep(200);
+        String eventId = storeEdited("\"catalog_number\":57036,", "\"catalog_number\":2147483648,");
+        try {
+            publish(eventId);
+            String text = s.nextText();
+
+            JsonNode next = TestSocket.JSON.readTree(text);
+            assertThat(next.get("type").asString()).as(text).isEqualTo("next");
+            JsonNode notice = next.get("payload").get("data").get("alert_stored");
+            assertThat(notice.get("event_id").asString()).isEqualTo(eventId);
+            assertThat(notice.get("close_approach").isNull()).isTrue();
+            assertThat(next.get("payload").get("errors")).as(text).singleElement().satisfies(e -> {
+                assertThat(e.get("extensions").get("classification").asString()).isEqualTo("INTERNAL_ERROR");
+                assertThat(e.get("message").asString()).startsWith("INTERNAL_ERROR for ");
+                assertThat(e.get("path").toString())
+                        .isEqualTo("[\"alert_stored\",\"close_approach\",\"watchlist_object\",\"catalog_number\"]");
+            });
+            assertThat(text).doesNotContain("2147483648").doesNotContain("serialize").doesNotContain("Long")
+                    .doesNotContain("'Int'");
+            assertNoInternals(text);
+            assertThat(output.getAll()).contains("Unserializable value for executionId");
+        } finally {
+            forget(eventId);
+        }
     }
 
     @Test

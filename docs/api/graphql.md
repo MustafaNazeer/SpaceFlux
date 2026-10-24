@@ -45,6 +45,8 @@ subscription { alert_stored { kind event_id produced_at received_at space_weathe
 
 The `alerts` query stays the source of truth: a notice can be lost (a client that is not connected, a full queue, a restart between the store and the push), so the dashboard keeps polling the list once a minute, keys both by `event_id`, and ignores a notice for an alert it already shows. A notice is pushed only by the instance that stored the alert, which is complete while `query-api` runs as one replica.
 
+A stored value its GraphQL type cannot hold is answered in a notice as in a query: the nearest field that may be `null` is `null`, with one generic `INTERNAL_ERROR` at the field's path. When that nearest field would be `alert_stored` itself, which may not be `null`, the subscription ends with a protocol `error` message, `Subscription error`, and the client subscribes again ([ADR 0012](../adr/0012-graphql-introspection-and-limits.md), amendment of 2026-10-24).
+
 **Protocol.** GraphQL over WebSocket with the `graphql-transport-ws` subprotocol: the client sends `connection_init`, the server answers `connection_ack`, then the client sends one `subscribe`. The server sends a protocol `ping` every 30 seconds, which the client answers with `pong`. No SockJS or STOMP fallback exists.
 
 **Rules for a connection.**
