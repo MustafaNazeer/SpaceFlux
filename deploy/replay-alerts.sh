@@ -40,7 +40,9 @@ examples_dir="$repo_root/schemas/alerts/examples"
 # purpose: storing a level change also sets its series' current state, and the
 # G scale has one series, so a replayed 2024 Kp value would become the current
 # G level on the dashboard. The R and S examples are from GOES-16 and GOES-13,
-# whose series are separate from the current GOES satellites' series.
+# whose series are separate from the current GOES satellites' series. Storing
+# them does create those two old series, so the dashboard then shows each one
+# as stale, which is expected on a throwaway project.
 pool=(
   valid-close-approach.json
   valid-r-level.json
