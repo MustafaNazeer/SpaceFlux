@@ -57,6 +57,7 @@ A stored value its GraphQL type cannot hold is answered in a notice as in a quer
 | Connections per client address | 4 | `429` with `Retry-After: 30`, before the upgrade |
 | Connections across the service | 64 | `503` with `Retry-After: 30`, before the upgrade |
 | Subscriptions per connection | 1 | A second `subscribe` gets a protocol `error` message, `One subscription per connection.`, and the first keeps running |
+| Message | A JSON object whose `type` is `connection_init`, `ping`, `pong`, `subscribe` or `complete`, with an `id`, when it has one, of 1 to 64 ASCII letters, digits, hyphens or underscores | Anything else, a number as `id` included: close `4400` `Invalid message` before the message is acted on, even before `connection_init`. A message with no `id` is handled as before |
 | `connection_init` | within 5 seconds | Close `4408` |
 | Silence from the client | 75 seconds without any message, a `pong` included | Close `1001` |
 | A blocked send | 20 seconds | The connection is closed |

@@ -631,6 +631,78 @@ class AlertSocketIntegrationTest {
         return head + "x".repeat(length - head.length() - tail.length()) + tail;
     }
 
+    // Operation ids (Spring for GraphQL logs a subscribe id as sent)
+
+    @ParameterizedTest
+    @ValueSource(strings = {"a\nb", "", "a b", "1\u2028", "caf\u00e9", "a\u202eb"})
+    void aSubscribeWhoseIdIsOutsideTheAllowedSetClosesWith4400BeforeAnythingRuns(String id) throws Exception {
+        TestSocket s = open().init();
+
+        s.subscribe(id, NOTICE);
+
+        assertThat(s.closed(Duration.ofSeconds(5))).isEqualTo(4400);
+        assertThat(app.context.getBean(AlertNotices.class).subscribers()).isZero();
+    }
+
+    @Test
+    void anIdOf65CharactersOrANumberClosesWith4400() throws Exception {
+        TestSocket longId = open().init();
+        longId.subscribe("a".repeat(65), NOTICE);
+        TestSocket numberId = open().init();
+        numberId.send("{\"id\":5,\"type\":\"subscribe\",\"payload\":{\"query\":\"" + NOTICE + "\"}}");
+
+        assertThat(longId.closed(Duration.ofSeconds(5))).isEqualTo(4400);
+        assertThat(numberId.closed(Duration.ofSeconds(5))).isEqualTo(4400);
+    }
+
+    @Test
+    void aCompleteWhoseIdIsOutsideTheAllowedSetClosesWith4400() throws Exception {
+        TestSocket s = open().init();
+
+        s.send("{\"id\":\"a\\nb\",\"type\":\"complete\"}");
+
+        assertThat(s.closed(Duration.ofSeconds(5))).isEqualTo(4400);
+    }
+
+    /** Spring for GraphQL would log the type as sent, line breaks included, and close with 1011. */
+    @Test
+    void anUnknownTypeClosesWith4400AndNothingIsLogged(CapturedOutput output) throws Exception {
+        TestSocket s = open().init();
+
+        s.send("{\"id\":\"1\",\"type\":\"x\\nFAKE line\"}");
+
+        assertThat(s.closed(Duration.ofSeconds(5))).isEqualTo(4400);
+        assertThat(output.getAll()).doesNotContain("FAKE line").doesNotContain("Closing session due to exception");
+    }
+
+    @Test
+    void aBadIdBeforeConnectionInitOrOnAPingClosesWith4400() throws Exception {
+        TestSocket beforeInit = open();
+        beforeInit.subscribe("a\nb", NOTICE);
+        TestSocket onPing = open().init();
+        onPing.send("{\"id\":\"a b\",\"type\":\"ping\"}");
+
+        assertThat(beforeInit.closed(Duration.ofSeconds(5))).isEqualTo(4400);
+        assertThat(onPing.closed(Duration.ofSeconds(5))).isEqualTo(4400);
+    }
+
+    /** The dashboard's ids are 36 character UUIDs, well inside the limit. */
+    @Test
+    void anIdOf64LettersDigitsHyphensAndUnderscoresIsServed() throws Exception {
+        String id = "Az09-_" + "x".repeat(58);
+        TestSocket s = open().init();
+        s.subscribe(id, NOTICE);
+        Thread.sleep(200);
+        String eventId = Alerts.store(app.context, Alerts.approach());
+
+        publish(eventId);
+
+        JsonNode next = s.next();
+        assertThat(next.get("id").asString()).isEqualTo(id);
+        assertThat(next.get("payload").get("data").get("alert_stored").get("event_id").asString())
+                .isEqualTo(eventId);
+    }
+
     @Test
     void aTextMessageOf8192CharactersIsReadAndOneMoreClosesWith1009() throws Exception {
         TestSocket s = open().init();

@@ -5,9 +5,11 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -31,6 +33,8 @@ import org.springframework.web.socket.server.HandshakeHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
 import org.springframework.web.socket.server.support.WebSocketHttpRequestHandler;
 
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -48,6 +52,13 @@ final class AlertSocketHandler extends GraphQlWebSocketHandler {
     static final CloseStatus TOO_MANY_MESSAGES = new CloseStatus(CloseStatus.POLICY_VIOLATION.getCode(),
             "Too many messages.");
     static final CloseStatus NO_SLOT = new CloseStatus(CloseStatus.SERVICE_OVERLOAD.getCode(), "Try again later.");
+    /** The protocol's close for a message it does not accept, with the text Spring for GraphQL uses. */
+    static final CloseStatus INVALID_MESSAGE = new CloseStatus(4400, "Invalid message");
+    /** Spring for GraphQL logs an operation id as sent, so only ids that cannot shape a log line are accepted. */
+    static final Pattern OPERATION_ID = Pattern.compile("[A-Za-z0-9_-]{1,64}");
+    /** The message types a graphql-transport-ws client sends; Spring would log any other type as sent. */
+    static final Set<String> CLIENT_TYPES = Set.of("connection_init", "ping", "pong", "subscribe", "complete");
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     /** Every limit the handler applies, from configuration. */
     record Limits(String allowedOrigin, Duration retryAfter, Duration initTimeout, Duration readIdleTimeout,
@@ -116,6 +127,10 @@ final class AlertSocketHandler extends GraphQlWebSocketHandler {
             connection.close(TOO_MANY_MESSAGES);
             return;
         }
+        if (!accepted(message.getPayload())) {
+            connection.close(INVALID_MESSAGE);
+            return;
+        }
         super.handleTextMessage(session, message);
     }
 
@@ -129,6 +144,26 @@ final class AlertSocketHandler extends GraphQlWebSocketHandler {
                 connection.release();
             }
         }
+    }
+
+    /**
+     * A JSON object whose type a client sends, with an allowed id or none. Read with the same settings as Spring for
+     * GraphQL's own reader, so a repeated or escaped key gives both the same id.
+     */
+    static boolean accepted(String message) {
+        JsonNode root;
+        try {
+            root = JSON.readTree(message);
+        } catch (JacksonException e) {
+            return false;
+        }
+        if (root == null || !root.isObject()) {
+            return false;
+        }
+        JsonNode type = root.get("type");
+        JsonNode id = root.get("id");
+        return type != null && type.isString() && CLIENT_TYPES.contains(type.asString())
+                && (id == null || id.isNull() || (id.isString() && OPERATION_ID.matcher(id.asString()).matches()));
     }
 
     /** Tasks waiting on the timer. */

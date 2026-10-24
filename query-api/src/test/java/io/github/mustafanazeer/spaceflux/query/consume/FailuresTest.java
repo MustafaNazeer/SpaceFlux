@@ -36,6 +36,30 @@ class FailuresTest {
     }
 
     @Test
+    void c1ControlsAndFormatCharactersSuchAsBidiMarksAreEscaped() {
+        assertThat(Failures.oneLine("a\u0085b\u009bc\u202ed\u2066e\u200bf\ufeffg"))
+                .isEqualTo("a\\u0085b\\u009bc\\u202ed\\u2066e\\u200bf\\ufeffg");
+    }
+
+    /** A tag character takes two chars, each of which alone reads as a surrogate rather than a format character. */
+    @Test
+    void formatCharactersOutsideTheBasicPlaneAndLoneSurrogatesAreEscaped() {
+        assertThat(Failures.oneLine("a\udb40\udc01b\udb40\udc41c\ud800d"))
+                .isEqualTo("a\\udb40\\udc01b\\udb40\\udc41c\\ud800d");
+    }
+
+    /** Otherwise a literal backslash and n in the data would read the same as an escaped line break. */
+    @Test
+    void aBackslashIsEscapedSoAnEscapeIsNeverAmbiguous() {
+        assertThat(Failures.oneLine("a\\nb\nc")).isEqualTo("a\\\\nb\\nc");
+    }
+
+    @Test
+    void ordinaryTextOutsideAsciiIsKept() {
+        assertThat(Failures.oneLine("caf\u00e9 \u00b0C \u65e5\u672c")).isEqualTo("caf\u00e9 \u00b0C \u65e5\u672c");
+    }
+
+    @Test
     void anyOtherErrorIsDescribedByItsInnermostCause() {
         Exception e = new IllegalStateException("writing a dead letter failed",
                 new java.util.concurrent.TimeoutException("no ack\nafter 40 s"));

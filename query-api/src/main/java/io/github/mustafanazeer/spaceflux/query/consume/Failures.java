@@ -25,21 +25,34 @@ public final class Failures {
         return root.getClass().getSimpleName() + ": " + oneLine(root.getMessage());
     }
 
-    /** Escapes every control character but tab, and U+2028 and U+2029, so a message cannot shape the log. */
+    /**
+     * Escapes a backslash, every control and format character but tab (C0 and C1 controls, bidi marks, zero width and
+     * tag characters), U+2028 and U+2029, and a lone surrogate, so a message can neither shape the log nor read as an
+     * escape it is not. A character outside the Basic Multilingual Plane is escaped as its two UTF-16 units.
+     */
     public static String oneLine(String message) {
         String text = String.valueOf(message);
         StringBuilder out = new StringBuilder(text.length());
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (c == '\r') {
+        for (int i = 0; i < text.length();) {
+            int c = text.codePointAt(i);
+            int units = Character.charCount(c);
+            int type = Character.getType(c);
+            if (c == '\\') {
+                out.append("\\\\");
+            } else if (c == '\r') {
                 out.append("\\r");
             } else if (c == '\n') {
                 out.append("\\n");
-            } else if ((c < 0x20 && c != '\t') || c == 0x7f || c == 0x2028 || c == 0x2029) {
-                out.append(String.format("\\u%04x", (int) c));
+            } else if (c != '\t' && (type == Character.CONTROL || type == Character.FORMAT
+                    || type == Character.LINE_SEPARATOR || type == Character.PARAGRAPH_SEPARATOR
+                    || type == Character.SURROGATE)) {
+                for (int k = i; k < i + units; k++) {
+                    out.append(String.format("\\u%04x", (int) text.charAt(k)));
+                }
             } else {
-                out.append(c);
+                out.appendCodePoint(c);
             }
+            i += units;
         }
         return out.toString();
     }
