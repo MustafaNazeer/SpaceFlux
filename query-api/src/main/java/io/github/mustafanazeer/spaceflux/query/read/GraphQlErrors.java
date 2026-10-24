@@ -20,6 +20,7 @@ import graphql.execution.instrumentation.Instrumentation;
 import graphql.execution.instrumentation.InstrumentationState;
 import graphql.execution.instrumentation.parameters.InstrumentationExecutionParameters;
 import graphql.schema.DataFetchingEnvironment;
+import io.github.mustafanazeer.spaceflux.query.consume.Failures;
 import io.github.mustafanazeer.spaceflux.query.web.ApiErrors;
 
 /**
@@ -62,7 +63,9 @@ class GraphQlErrors extends DataFetcherExceptionResolverAdapter implements Instr
     }
 
     private static GraphQLError internal(SerializationError e, String executionId) {
-        LOG.error("Unserializable value for executionId {}: {}", executionId, e.getMessage());
+        // On WebSocket the execution id is the client's own subscribe id, and an enum's message quotes a stored string.
+        LOG.error("Unserializable value for executionId {}: {}", Failures.oneLine(executionId),
+                Failures.oneLine(e.getMessage()));
         return GraphQLError.newError().errorType(ErrorType.INTERNAL_ERROR)
                 .message(ErrorType.INTERNAL_ERROR + " for " + executionId).path(e.getPath())
                 .locations(e.getLocations()).build();

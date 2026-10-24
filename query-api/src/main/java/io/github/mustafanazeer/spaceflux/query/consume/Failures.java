@@ -2,7 +2,7 @@ package io.github.mustafanazeer.spaceflux.query.consume;
 
 import java.sql.SQLException;
 
-/** How a consumer writes a failure it will retry into its log. */
+/** How a failure, or any text that can echo stored or client data, is written into the log. */
 public final class Failures {
 
     private Failures() {
@@ -26,7 +26,7 @@ public final class Failures {
     }
 
     /** Escapes every control character but tab, and U+2028 and U+2029, so a message cannot shape the log. */
-    private static String oneLine(String message) {
+    public static String oneLine(String message) {
         String text = String.valueOf(message);
         StringBuilder out = new StringBuilder(text.length());
         for (int i = 0; i < text.length(); i++) {
