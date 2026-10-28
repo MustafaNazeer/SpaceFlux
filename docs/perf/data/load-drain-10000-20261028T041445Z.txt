@@ -1,0 +1,10 @@
+query-api ingest drain, local Compose project spaceflux-load, 2026-10-28T04:16:37Z
+commit 610f43f
+cpu Intel(R) Core(TM) i5-9400H CPU @ 2.50GHz, 8 processors, memory 14.9 GiB
+docker 29.1.3, images: kafka=apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837 sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837 mysql=mysql:8.4.11@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242 sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242 query-api=spaceflux-load-query-api sha256:f91447637eb972bfe138fa4e8296156002f793fb28d390623f33ecde9299dc3e
+load average just before query-api started 4.55 2.69 1.80, at end 3.53 2.78 1.91
+dataset: 10000 generated events from gen_alerts.py, seed 1, space weather share 0.1, one partition
+stored 10000 (close_approach=8977 space_weather_level=1023), sent to alerts.dlq 0, consumer lag after the drain 0
+query-api started 2026-10-28T04:15:17.883453Z, first stored 2026-10-28T04:15:24.646938Z, last stored 2026-10-28T04:16:34.156263Z
+start up to the first stored event: 6.763 s
+drain, first to last stored: 69.5093 s, 143.9 events per second

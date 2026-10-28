@@ -1,0 +1,141 @@
+query-api read latency, local Compose project spaceflux-load, started 2026-10-28T04:49:03Z
+commit 5c4b769
+cpu Intel(R) Core(TM) i5-9400H CPU @ 2.50GHz, 8 processors, memory 14.9 GiB
+docker 29.1.3, k6 grafana/k6:2.2.0@sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6, images: mysql=mysql:8.4.11@sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242 sha256:6ea90827b1100f8f2ae306a539f86d2c264a26ed435a2a9f75551dd5c3aeb242 query-api=spaceflux-load-query-api sha256:dd326973d9a1b31375a573a15c8219ce6101c56a192d5e1064f69ab0fa0fc2a0
+load average at start 3.31 2.71 2.38, at end 1.20 1.99 2.17
+dataset: 50000 stored generated events (close_approach=44990 space_weather_level=5010), loaded by the ingest-drain.sh run in load-drain-50000-20261028T044447Z.txt
+that run's dataset: 50000 generated events from gen_alerts.py, seed 1, space weather share 0.1, one partition
+load: 15 s warm up at the lowest rate, not reported; then constant arrival rate at 20,50,100 requests per second, 60 s each, one after another; equal thirds of GraphQL recent alerts (20), REST alert by id, REST current space weather; 4 s request timeout
+{
+  "rates": [
+    20,
+    50,
+    100
+  ],
+  "duration_s": 60,
+  "warmup": {
+    "rate_per_s": 20,
+    "duration_s": 15,
+    "iterations": 301
+  },
+  "event_ids": 50000,
+  "scenarios": [
+    {
+      "scenario": "rate_20",
+      "target_per_s": 20,
+      "iterations": 1200,
+      "dropped_iterations": 0,
+      "unaccounted": 0,
+      "endpoints": [
+        {
+          "endpoint": "graphql_alerts",
+          "requests": 400,
+          "errors": 0,
+          "error_rate": 0,
+          "p50_ms": 10.3212545,
+          "p95_ms": 14.776116949999995,
+          "p99_ms": 19.652007509999994,
+          "max_ms": 23.041776
+        },
+        {
+          "endpoint": "rest_alert_by_id",
+          "requests": 400,
+          "errors": 0,
+          "error_rate": 0,
+          "p50_ms": 3.937651,
+          "p95_ms": 5.1930556999999995,
+          "p99_ms": 5.87520324,
+          "max_ms": 12.754163
+        },
+        {
+          "endpoint": "rest_space_weather_current",
+          "requests": 400,
+          "errors": 0,
+          "error_rate": 0,
+          "p50_ms": 3.4470324999999997,
+          "p95_ms": 4.612995149999998,
+          "p99_ms": 5.606254739999996,
+          "max_ms": 15.706088
+        }
+      ]
+    },
+    {
+      "scenario": "rate_50",
+      "target_per_s": 50,
+      "iterations": 3001,
+      "dropped_iterations": 0,
+      "unaccounted": -1,
+      "endpoints": [
+        {
+          "endpoint": "graphql_alerts",
+          "requests": 1001,
+          "errors": 0,
+          "error_rate": 0,
+          "p50_ms": 9.415123,
+          "p95_ms": 12.785608,
+          "p99_ms": 16.055509,
+          "max_ms": 22.934648
+        },
+        {
+          "endpoint": "rest_alert_by_id",
+          "requests": 1000,
+          "errors": 0,
+          "error_rate": 0,
+          "p50_ms": 3.3496045,
+          "p95_ms": 4.01626745,
+          "p99_ms": 4.450657109999999,
+          "max_ms": 8.205045
+        },
+        {
+          "endpoint": "rest_space_weather_current",
+          "requests": 1000,
+          "errors": 0,
+          "error_rate": 0,
+          "p50_ms": 2.8822134999999998,
+          "p95_ms": 3.4849395499999996,
+          "p99_ms": 3.85891307,
+          "max_ms": 14.02584
+        }
+      ]
+    },
+    {
+      "scenario": "rate_100",
+      "target_per_s": 100,
+      "iterations": 6001,
+      "dropped_iterations": 0,
+      "unaccounted": -1,
+      "endpoints": [
+        {
+          "endpoint": "graphql_alerts",
+          "requests": 2001,
+          "errors": 0,
+          "error_rate": 0,
+          "p50_ms": 8.039675,
+          "p95_ms": 9.931186,
+          "p99_ms": 13.899794,
+          "max_ms": 16.643759
+        },
+        {
+          "endpoint": "rest_alert_by_id",
+          "requests": 2000,
+          "errors": 0,
+          "error_rate": 0,
+          "p50_ms": 2.873863,
+          "p95_ms": 3.3192866,
+          "p99_ms": 4.516900880000001,
+          "max_ms": 7.373149
+        },
+        {
+          "endpoint": "rest_space_weather_current",
+          "requests": 2000,
+          "errors": 0,
+          "error_rate": 0,
+          "p50_ms": 2.541165,
+          "p95_ms": 2.8773185,
+          "p99_ms": 3.1020200100000004,
+          "max_ms": 6.367368
+        }
+      ]
+    }
+  ]
+}
