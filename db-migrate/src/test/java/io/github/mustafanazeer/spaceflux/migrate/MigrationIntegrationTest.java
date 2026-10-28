@@ -119,8 +119,8 @@ class MigrationIntegrationTest {
     static List<String> rootSql(String sql) throws Exception {
         String quoted = "'" + sql.replace("'", "'\\''") + "'";
         ExecResult result = MYSQL.execInContainer("bash", "-c",
-                "mysql --defaults-extra-file=<(printf '[client]\\npassword=%s\\n' \"$(< /run/secrets/mysql_root_password)\")"
-                        + " -uroot -N -B --raw -e " + quoted);
+                "mysql --defaults-extra-file=/dev/fd/3 -uroot -N -B --raw -e " + quoted
+                        + " 3<<< \"$(printf '[client]\\npassword=%s\\n' \"$(< /run/secrets/mysql_root_password)\")\"");
         assertThat(result.getExitCode()).as(result.getStderr()).isZero();
         String out = result.getStdout().strip();
         return out.isEmpty() ? List.of() : List.of(out.split("\n"));

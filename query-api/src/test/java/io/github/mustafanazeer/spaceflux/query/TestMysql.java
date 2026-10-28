@@ -129,8 +129,8 @@ public final class TestMysql {
     public static String rootQuery(String sql) throws Exception {
         String quoted = "'" + sql.replace("'", "'\\''") + "'";
         ExecResult result = MYSQL.execInContainer("bash", "-c",
-                "mysql --defaults-extra-file=<(printf '[client]\\npassword=%s\\n' \"$(< /run/secrets/mysql_root_password)\")"
-                        + " -uroot -N -B -e " + quoted);
+                "mysql --defaults-extra-file=/dev/fd/3 -uroot -N -B -e " + quoted
+                        + " 3<<< \"$(printf '[client]\\npassword=%s\\n' \"$(< /run/secrets/mysql_root_password)\")\"");
         assertThat(result.getExitCode()).as(result.getStderr()).isZero();
         return result.getStdout().strip();
     }

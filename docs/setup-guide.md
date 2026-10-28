@@ -115,7 +115,7 @@ The provider base URLs can be overridden only with their correct values (`https:
 On its first start with an empty data volume, `mysql` runs `deploy/mysql/initdb/10-users.sh`, which creates three accounts from the files in `deploy/secrets/`: `spaceflux_migrate`, which can change the schema, and `spaceflux_consumer` and `spaceflux_api`, which `query-api` uses and which get their table privileges from the last migration. Every account must connect over TLS, and the server refuses unencrypted connections; it generates its own certificate on first start. Server settings are in `deploy/mysql/conf.d/spaceflux.cnf`. `root` exists only as `root@localhost`, X Protocol is off, and the database publishes no port: only services on the Compose `database` network (`mysql`, `migrate` and `query-api`) reach it. For a look by hand, this reads the root password from its secret file without putting it on a command line:
 
 ```sh
-docker compose -f deploy/compose.yaml exec mysql bash -c 'mysql --defaults-extra-file=<(printf "[client]\npassword=%s\n" "$(< /run/secrets/mysql_root_password)") -uroot spaceflux'
+docker compose -f deploy/compose.yaml exec mysql bash -c 'mysql --defaults-extra-file=/dev/fd/3 -uroot spaceflux 3<<< "$(printf "[client]\npassword=%s\n" "$(< /run/secrets/mysql_root_password)")"'
 ```
 
 The account script runs only on the first start, while the data volume is empty. If that first start fails, the volume is already initialized and later starts come up without the accounts, so remove the volume and start again.

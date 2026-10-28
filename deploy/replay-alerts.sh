@@ -134,7 +134,7 @@ stored_ids() {
   list="$(IFS=,; printf '%s' "${ids[*]}")"
   printf 'SELECT event_id FROM alert_event WHERE event_id IN (%s) ORDER BY alert_seq DESC;\n' "$list" |
     compose exec -T mysql bash -c \
-      'mysql --defaults-extra-file=<(printf "[client]\npassword=%s\n" "$(< /run/secrets/mysql_root_password)") -uroot -N -B spaceflux'
+      'mysql --defaults-extra-file=/dev/fd/3 -uroot -N -B spaceflux 3<<< "$(printf "[client]\npassword=%s\n" "$(< /run/secrets/mysql_root_password)")"'
 }
 
 is_stored() {

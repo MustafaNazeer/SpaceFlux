@@ -138,7 +138,7 @@ consume() {
 }
 sql() {
   compose exec -T mysql bash -c \
-    'mysql --defaults-extra-file=<(printf "[client]\npassword=%s\n" "$(< /run/secrets/mysql_root_password)") -uroot -N -B spaceflux'
+    'mysql --defaults-extra-file=/dev/fd/3 -uroot -N -B spaceflux 3<<< "$(printf "[client]\npassword=%s\n" "$(< /run/secrets/mysql_root_password)")"'
 }
 api=http://127.0.0.1:8081
 ```
