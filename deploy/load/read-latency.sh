@@ -56,9 +56,12 @@ drain_stored="$(sed -n 's/^stored \([0-9][0-9]*\) (.*/\1/p' -- "$drain" | head -
 [ -n "$drain_stored" ] || die "$drain has no stored count"
 
 compose() { docker compose -p "$project" -f "$compose_file" --profile core "$@"; }
+# mysqld is the container's first process and never reaps an orphan, so a process
+# substitution here would leave one zombie per call until the pid limit stops the
+# container forking. A here-string runs no process of its own.
 sql() {
   compose exec -T mysql bash -c \
-    'mysql --defaults-extra-file=<(printf "[client]\npassword=%s\n" "$(< /run/secrets/mysql_root_password)") -uroot -N -B spaceflux'
+    'mysql --defaults-extra-file=/dev/fd/3 -uroot -N -B spaceflux 3<<< "$(printf "[client]\npassword=%s\n" "$(< /run/secrets/mysql_root_password)")"'
 }
 
 # The checks run before and after k6, so numbers are never written for a stack

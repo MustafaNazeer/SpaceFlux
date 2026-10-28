@@ -46,9 +46,12 @@ done
 [ -d "$(dirname "$out")" ] && [ -w "$(dirname "$out")" ] || die "the directory of $out does not exist or is not writable"
 
 compose() { docker compose -p "$project" -f "$compose_file" --profile core "$@"; }
+# mysqld is the container's first process and never reaps an orphan, so a process
+# substitution here would leave one zombie per call until the pid limit stops the
+# container forking. A here-string runs no process of its own.
 sql() {
   compose exec -T mysql bash -c \
-    'mysql --defaults-extra-file=<(printf "[client]\npassword=%s\n" "$(< /run/secrets/mysql_root_password)") -uroot -N -B spaceflux'
+    'mysql --defaults-extra-file=/dev/fd/3 -uroot -N -B spaceflux 3<<< "$(printf "[client]\npassword=%s\n" "$(< /run/secrets/mysql_root_password)")"'
 }
 kafka_tool() { compose exec -T -e KAFKA_HEAP_OPTS=-Xmx128m kafka "$@"; }
 end_offset() {
