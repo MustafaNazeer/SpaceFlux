@@ -70,7 +70,7 @@ To build, test, and run it, see [docs/setup-guide.md](docs/setup-guide.md).
 | `assistant` | Java, Spring AI | Planned | Retrieval over space weather text plus tool calls to `query-api` through a read only MCP tool server, with citations |
 | `dashboard` | Angular | Planned | Read only operator console showing alerts, passes, and space weather context |
 
-Supporting pieces that exist today: Kafka topics with dead letter topics, JSON Schema files for every event, MySQL with Flyway migrations for the catalog, alerts, and acknowledgements, and the local Compose stack. Planned: MongoDB Atlas for raw documents and vector search, OpenTelemetry tracing across Kafka, Prometheus and Grafana, Terraform for an on demand AWS environment (EKS, ECR, Secrets Manager), and GitHub Actions for CI.
+Supporting pieces that exist today: Kafka topics with dead letter topics, JSON Schema files for every event, MySQL with Flyway migrations for the catalog, alerts, and acknowledgements, the local Compose stack, and GitHub Actions running every test suite on each push. Planned: MongoDB Atlas for raw documents and vector search, OpenTelemetry tracing across Kafka, Prometheus and Grafana, and Terraform for an on demand AWS environment (EKS, ECR, Secrets Manager).
 
 The full design, including why each service scales differently and how delivery, errors, and security are handled, is in [docs/architecture.md](docs/architecture.md). Decisions with lasting weight are recorded as ADRs in [docs/adr/](docs/adr/).
 
@@ -78,7 +78,7 @@ The full design, including why each service scales differently and how delivery,
 
 * The MongoDB archiver for raw feed documents, inside `query-api`
 * GraphQL on `query-api` and an Angular dashboard with a live alert subscription
-* CI that builds, tests, and pushes the container images, and a Terraform environment on EKS that is brought up for demos and torn down afterwards
+* CI that builds and pushes the container images, and a Terraform environment on EKS that is brought up for demos and torn down afterwards
 * DONKI and Space-Track conjunction data ingest (conjunction data is used for flags only and is never republished)
 * The retrieval grounded assistant, the MCP tool server, and a committed evaluation suite that gates assistant changes in CI
 * Load tests with published, reproducible results

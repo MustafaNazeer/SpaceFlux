@@ -13,6 +13,8 @@ No accounts or keys are needed. Both feeds ingested today, CelesTrak and NOAA SW
 
 ## Running the tests
 
+GitHub Actions runs the full versions of these commands (every Java module, and `ingest` with its Kafka integration tests) on every push, in [.github/workflows/test.yml](../.github/workflows/test.yml).
+
 ### ingest
 
 The tests read recorded feed responses from `ingest/testdata/` and the schema files from `schemas/` by relative path, so run them from the `ingest/` directory.
