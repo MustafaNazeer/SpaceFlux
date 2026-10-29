@@ -39,7 +39,7 @@ The integration tests start a single node `apache/kafka:4.3.1` container through
 
 ### Java modules
 
-The root `pom.xml` has five modules: `kafka-contracts` (the topic schema checks and dead letter building that the Java services share), `orbit-core` (the element set conversion, Orekit data setup and SGP4 propagation, verified against the published SGP4 test cases), `risk-engine`, `db-migrate` (the database migrations and the program the `migrate` container runs), and `query-api`. Run Maven from the repository root, so the reactor also builds `kafka-contracts` and `orbit-core`, which the services depend on and which are not published anywhere. The tests also read files outside their own module: the schema files in `schemas/`, the MySQL settings and account script in `deploy/mysql/`, and the migrations in `db-migrate/`.
+The root `pom.xml` has six modules: `kafka-contracts` (the topic schema checks and dead letter building that the Java services share), `orbit-core` (the element set conversion, Orekit data setup and SGP4 propagation, verified against the published SGP4 test cases), `risk-engine`, `db-migrate` (the database migrations and the program the `migrate` container runs), `query-api`, and `mcp-server` (the read only MCP tools over `query-api`). Run Maven from the repository root, so the reactor also builds `kafka-contracts` and `orbit-core`, which the services depend on and which are not published anywhere. The tests also read files outside their own module: the schema files in `schemas/`, the MySQL settings and account script in `deploy/mysql/`, and the migrations in `db-migrate/`.
 
 Every module:
 
@@ -53,9 +53,10 @@ One module, with the modules it depends on:
 ./mvnw -B -pl risk-engine -am verify
 ./mvnw -B -pl db-migrate -am verify
 ./mvnw -B -pl query-api -am verify
+./mvnw -B -pl mcp-server -am verify
 ```
 
-This compiles each module and runs its tests. The `orbit-core` tests include the SGP4 verification cases. The `risk-engine` tests include the screening cross check against a brute force scan, the storm rules against recorded storm periods, and integration tests against an `apache/kafka:4.3.1` container. The `db-migrate` tests apply the migrations to a `mysql:8.4.11` container started with the committed `spaceflux.cnf` and account script, then check the accounts, their grants, and the server settings. The `query-api` database tests run against the same MySQL setup, migrated with the same migrations, and its two consumer integration tests also start a Kafka container. All of these containers are started through Testcontainers, so the Docker daemon has to be running; only the `kafka-contracts` suite runs entirely without Docker. The first run downloads Maven, the dependencies, and the images, so it takes longer.
+This compiles each module and runs its tests. The `orbit-core` tests include the SGP4 verification cases. The `risk-engine` tests include the screening cross check against a brute force scan, the storm rules against recorded storm periods, and integration tests against an `apache/kafka:4.3.1` container. The `db-migrate` tests apply the migrations to a `mysql:8.4.11` container started with the committed `spaceflux.cnf` and account script, then check the accounts, their grants, and the server settings. The `query-api` database tests run against the same MySQL setup, migrated with the same migrations, and its two consumer integration tests also start a Kafka container. All of these containers are started through Testcontainers, so the Docker daemon has to be running; only the `kafka-contracts` and `mcp-server` suites run entirely without Docker; the `mcp-server` tests start the service in front of a stub `query-api` and call it with the MCP Java SDK's client. The first run downloads Maven, the dependencies, and the images, so it takes longer.
 
 The query plans in [docs/data/plans](data/plans/README.md) are taken by a separate, much longer run of the `plans` profile, described there; the normal build runs the same test over less data and writes nothing.
 
@@ -69,7 +70,7 @@ MySQL needs four passwords before its first start. Write them once:
 deploy/mysql/make-secrets.sh
 ```
 
-It puts one random 40 character password per account in `deploy/secrets/`, which git ignores, and never replaces a file that already exists, because the accounts are created only when the MySQL data volume is empty. Then start the stack:
+It puts one random 40 character password per account in `deploy/secrets/`, which git ignores, and never replaces a file that already exists, because the accounts are created only when the MySQL data volume is empty. It also writes `mcp_server_token`, the token the MCP tool server asks for. If you ran it before that file existed, run it again: it adds the token and leaves the passwords alone. Then start the stack:
 
 ```sh
 docker compose -f deploy/compose.yaml --profile core up --build
@@ -82,6 +83,16 @@ docker compose -f deploy/compose.yaml --profile core down
 ```
 
 Kafka's data lives in a named volume, so events already published are still there the next time the stack starts. The risk engine's screening consumer reads `raw.gp` from the beginning on every start, so after a restart it screens the newest batch it finds there again and republishes that run under the same run id, even when `ingest` makes no new CelesTrak request. The content can differ from the first time if an element set arrived late for that run; see [ADR 0007](adr/0007-alerts-topic.md) decision 12.
+
+### The MCP tool server
+
+`mcp-server` runs in its own `tools` profile, next to the `core` services:
+
+```sh
+docker compose -f deploy/compose.yaml --profile core --profile tools up --build
+```
+
+It publishes no port. It sits on the internal `tools` network, which only `query-api` shares, and answers `POST /mcp` only with `Authorization: Bearer` and the token in `deploy/secrets/mcp_server_token`. The tools are listed in [mcp-server/README.md](../mcp-server/README.md); [ADR 0015](adr/0015-mcp-tool-server.md) explains the limits. Stop both profiles with the same two `--profile` flags on `down`.
 
 ### Restarting without a new CelesTrak request
 

@@ -67,6 +67,7 @@ To build, test, and run it, see [docs/setup-guide.md](docs/setup-guide.md).
 | `risk-engine` | Java, Spring Boot, Orekit | Built | Consumes orbital and space weather events, runs SGP4 propagation and close approach screening, applies storm rules, emits alerts |
 | `query-api` | Java, Spring Boot | Built (REST); GraphQL and the archiver planned | Stores alerts and the catalog in MySQL from Kafka, serves them over REST, and holds alert acknowledgement; GraphQL, reads from MongoDB, and the archiver that stores raw feed documents are planned |
 | `db-migrate` | Java, Flyway | Built | One shot container that applies the MySQL migrations as the migration user, then exits |
+| `mcp-server` | Java, Spring AI | Built | Read only MCP tools for the assistant, one for each read endpoint of `query-api`, behind a bearer token on an internal network |
 | `assistant` | Java, Spring AI | Planned | Retrieval over space weather text plus tool calls to `query-api` through a read only MCP tool server, with citations |
 | `dashboard` | Angular | Planned | Read only operator console showing alerts, passes, and space weather context |
 
@@ -80,12 +81,12 @@ The full design, including why each service scales differently and how delivery,
 * GraphQL on `query-api` and an Angular dashboard with a live alert subscription
 * CI that builds and pushes the container images, and a Terraform environment on EKS that is brought up for demos and torn down afterwards
 * DONKI and Space-Track conjunction data ingest (conjunction data is used for flags only and is never republished)
-* The retrieval grounded assistant, the MCP tool server, and a committed evaluation suite that gates assistant changes in CI
+* The retrieval grounded assistant and a committed evaluation suite that gates assistant changes in CI
 * Load tests with published, reproducible results
 
 ## Security
 
-Secrets never live in images, logs, or commits. The `ingest`, `risk-engine`, `migrate`, and `query-api` containers run as a non root user on a read only filesystem with all Linux capabilities dropped; the ingest health port and the query API are bound to localhost, and the risk engine publishes no ports. MySQL publishes no port, accepts network connections only over TLS, and gives each purpose its own user: migrations, the Kafka consumers, and the HTTP handlers, whose only write is appending an acknowledgement. Every read endpoint is open and read only; acknowledging an alert needs the operator's session and a CSRF token ([ADR 0009](docs/adr/0009-alert-acknowledgement-auth.md)). The planned dashboard is read only apart from acknowledgement, and all feed text will be treated as untrusted input to the planned assistant. See the [threat model](docs/security/threat-model.md) and the [hardening checklist](docs/security/hardening-checklist.md).
+Secrets never live in images, logs, or commits. The `ingest`, `risk-engine`, `migrate`, and `query-api` containers run as a non root user on a read only filesystem with all Linux capabilities dropped; the ingest health port and the query API are bound to localhost, and the risk engine publishes no ports. MySQL publishes no port, accepts network connections only over TLS, and gives each purpose its own user: migrations, the Kafka consumers, and the HTTP handlers, whose only write is appending an acknowledgement. Every read endpoint is open and read only; acknowledging an alert needs the operator's session and a CSRF token ([ADR 0009](docs/adr/0009-alert-acknowledgement-auth.md)). The MCP tool server publishes no port, sits on an internal network with `query-api` alone, needs a bearer token on every request, and calls `query-api` with no credential, so it can read what any viewer can and write nothing ([ADR 0015](docs/adr/0015-mcp-tool-server.md)). The planned dashboard is read only apart from acknowledgement, and all feed text will be treated as untrusted input to the planned assistant. See the [threat model](docs/security/threat-model.md) and the [hardening checklist](docs/security/hardening-checklist.md).
 
 ## Data sources
 
