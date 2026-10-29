@@ -22,6 +22,7 @@
     <module>risk-engine</module>
     <module>db-migrate</module>
     <module>query-api</module>
+    <module>mcp-server</module>
   </modules>
 
   <properties>

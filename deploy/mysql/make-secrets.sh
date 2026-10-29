@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Writes one random password per MySQL account into deploy/secrets/, for the Compose stack.
+# Writes one random password per MySQL account, and the token callers of the MCP tool server present, into
+# deploy/secrets/, for the Compose stack.
 # Existing files are kept, so running it again never changes a password the data volume already uses.
 # Compose mounts file secrets as they are, and the MySQL and migrate containers read them as their own
 # non root users, so the files are world readable inside a directory only this user can enter.
@@ -8,7 +9,7 @@ set +x
 dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/secrets"
 mkdir -p "$dir"
 chmod 700 "$dir"
-for name in mysql_root_password mysql_migrate_password mysql_consumer_password mysql_api_password; do
+for name in mysql_root_password mysql_migrate_password mysql_consumer_password mysql_api_password mcp_server_token; do
 	file="$dir/$name"
 	if [ -e "$file" ]; then
 		echo "kept $name"

@@ -12,6 +12,8 @@
 !db-migrate/src/main/
 !query-api/pom.xml
 !query-api/src/main/
+!mcp-server/pom.xml
+!mcp-server/src/main/
 ingest/testdata/
 **/.env
 **/.env.*

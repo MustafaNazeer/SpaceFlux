@@ -213,8 +213,9 @@ services:
       JAVA_TOOL_OPTIONS: -Dorg.xerial.snappy.tempdir=/native -DZstdTempFolder=/native
     # Never the migration password: only the migrate container holds it.
     secrets: [mysql_consumer_password, mysql_api_password]
-    # The database network reaches MySQL; the default network reaches Kafka.
-    networks: [database, default]
+    # The database network reaches MySQL; the default network reaches Kafka; the tools network is how the MCP tool
+    # server reaches it.
+    networks: [database, default, tools]
     # Loopback only, so the API can be called from this machine and nowhere else.
     ports:
       - "127.0.0.1:8081:8080"
@@ -229,10 +230,39 @@ services:
     security_opt: ["no-new-privileges:true"]
     restart: "no"
 
+  # The MCP tool server (ADR 0015): read only tools over query-api for the assistant. Its own profile, so the core
+  # stack runs without its token. No published port: only services on the tools network reach it, and every request
+  # needs the token in deploy/secrets/mcp_server_token.
+  mcp-server:
+    profiles: [tools]
+    logging: *logging
+    build:
+      context: ..
+      dockerfile: mcp-server/Dockerfile
+    depends_on:
+      query-api:
+        condition: service_started
+    environment:
+      QUERY_API_URL: http://query-api:8080
+    secrets: [mcp_server_token]
+    networks: [tools]
+    mem_limit: 384m
+    memswap_limit: 384m
+    pids_limit: 128
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: "no"
+
 networks:
   default:
   # No route out: nothing on it needs the internet. query-api also joins default for Kafka.
   database:
+    internal: true
+  # No route out either: the tool server reaches query-api and nothing else.
+  tools:
     internal: true
 
 secrets:
@@ -244,6 +274,8 @@ secrets:
     file: ./secrets/mysql_consumer_password
   mysql_api_password:
     file: ./secrets/mysql_api_password
+  mcp_server_token:
+    file: ./secrets/mcp_server_token
 
 volumes:
   kafka-data:

@@ -9,6 +9,7 @@ COPY orbit-core/pom.xml orbit-core/
 COPY risk-engine/pom.xml risk-engine/
 COPY db-migrate/pom.xml db-migrate/
 COPY query-api/pom.xml query-api/
+COPY mcp-server/pom.xml mcp-server/
 RUN mvn -B -q -pl risk-engine -am dependency:go-offline
 COPY schemas/ schemas/
 COPY kafka-contracts/src/main/ kafka-contracts/src/main/
