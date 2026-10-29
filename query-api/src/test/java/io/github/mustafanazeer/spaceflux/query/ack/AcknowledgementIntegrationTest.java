@@ -225,6 +225,29 @@ public class AcknowledgementIntegrationTest {
         assertThat(rows(id)).isZero();
     }
 
+    /**
+     * SEC-ACK-07: the MCP tool server calls with no credential and no cookie (ADR 0015, decision 5). Even with a
+     * bearer token and an XSRF pair it made up itself, which passes the XSRF check, such a request is refused before
+     * any query, because only the operator's session may write.
+     */
+    @Test
+    void theToolServersIdentityCannotAcknowledge() throws Exception {
+        String id = stored("valid-close-approach.json");
+        long before = apiStatements();
+
+        HttpResponse<String> r = Browser.HTTP.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(
+                app.base + "/api/alerts/acknowledgements?event_id=" + q(id)))
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(ACK))
+                .header("Content-Type", "application/json").header("Accept", "application/json")
+                .header("Authorization", "Bearer " + "t".repeat(40))
+                .header("Cookie", "XSRF-TOKEN=made-up").header("X-XSRF-TOKEN", "made-up").build(),
+                HttpResponse.BodyHandlers.ofString());
+
+        assertProblem(r, 401);
+        assertThat(apiStatements()).isEqualTo(before);
+        assertThat(rows(id)).isZero();
+    }
+
     @Test
     void aSessionANewerLoginReplacedCannotWriteAndReadsTheViewersForm() throws Exception {
         String id = stored("valid-close-approach.json");

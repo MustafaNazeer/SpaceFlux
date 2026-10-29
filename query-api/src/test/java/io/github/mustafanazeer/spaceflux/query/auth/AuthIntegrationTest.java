@@ -275,8 +275,8 @@ class AuthIntegrationTest {
         b.get("/api/auth/session");
         String[] gets = {"/api/auth/session", "/api/space-weather/current", "/api/watchlist", "/api/screening/current",
             "/api/space-weather/history?scale=G&from=2026-01-01T00:00:00Z&to=2026-01-02T00:00:00Z",
-            "/api/alerts/by-id?event_id=x", "/api/alerts/acknowledgements?event_id=x", "/api/catalog/25544",
-            "/api/no-such-path", "/error", "/login"};
+            "/api/alerts/by-id?event_id=x", "/api/alerts/recent", "/api/alerts/acknowledgements?event_id=x",
+            "/api/catalog/25544", "/api/no-such-path", "/error", "/login"};
         List<HttpResponse<String>> responses = new ArrayList<>();
         for (String path : gets) {
             responses.add(b.get(path));

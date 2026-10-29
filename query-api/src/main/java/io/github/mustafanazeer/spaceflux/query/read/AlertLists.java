@@ -18,8 +18,8 @@ import io.github.mustafanazeer.spaceflux.query.web.ApiErrors;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The recent alerts list and an object's close approaches (docs/data/mysql-schema.md, Q3 and Q6), served by GraphQL
- * only. Each part of a UNION reads at most {@code fetch} rows from its own index, and {@code fetch} is the page size
+ * The recent alerts list and an object's close approaches (docs/data/mysql-schema.md, Q3 and Q6). GraphQL serves both,
+ * and REST serves Q3 at {@code GET /api/alerts/recent}. Each part of a UNION reads at most {@code fetch} rows from its own index, and {@code fetch} is the page size
  * plus one, so a full extra row says another page exists. Q3 filtered by kind runs only that kind's part. The index
  * each part uses is proven in AlertListPlansIntegrationTest.
  */

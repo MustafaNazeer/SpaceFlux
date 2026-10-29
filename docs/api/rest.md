@@ -3,7 +3,7 @@
 * **Status:** accepted, 2026-10-04.
 * **Served by:** `query-api`, under the `/api` prefix, read only for anonymous viewers ([ADR 0009](../adr/0009-alert-acknowledgement-auth.md), decision 6). Conventions are in [ADR 0010](../adr/0010-query-api-stack.md), decision 6 and its amendment: `snake_case` fields with the contract names, keyset paging, RFC 9457 problem details, and an `X-Correlation-Id` header on every response.
 
-This page covers seven read endpoints, the operator's session, and acknowledgement. The recent alerts list and an object's close approaches are served by the [GraphQL API](graphql.md) only; the paged catalog and an object's full coverage come later.
+This page covers eight read endpoints, the operator's session, and acknowledgement. An object's close approaches are served by the [GraphQL API](graphql.md) only; the paged catalog and an object's full coverage come later.
 
 ## Common rules
 
@@ -257,6 +257,18 @@ Azimuth is from north, clockwise towards east, in degrees from 0 up to 360. Time
 ```
 
 The example is the first pass of the recorded ISS element set from a request at 2026-09-27T05:00:00Z, with its angles shortened; the API writes every digit it computes. `404` when the number is not on the watchlist, since passes are computed for watchlist objects only; `400` for a `catalog_number` that is not a whole number from 0 to 999999999. Each request costs a fraction of a second of computation; like the rest of the API, the endpoint is not exposed beyond loopback until a per client rate limit is in place.
+
+## 11. Recent alerts
+
+`GET /api/alerts/recent?limit=...&after=...&kind=...`
+
+Close approaches and the space weather events that enter, change or leave a level, newest first, paged; refreshes are never listed. This is the list GraphQL's `alerts` field returns, read by the same query ([MySQL schema](../data/mysql-schema.md#q3-the-recent-alerts), Q3), so the two answer with the same items in the same order and the same `next`. `kind`, `close_approach` or `space_weather_level`, keeps one kind; any other value is `400`. A cursor pages only the list it was returned for: one returned with a `kind` is refused without it, and the other way round, with `400`.
+
+Each item is the stored event's fields (`schema_version`, `kind`, `rules_version`, `event_id`, `produced_at`, and `close_approach` or `space_weather_level`), then `received_at` and `acknowledgement`. Unlike `event` in section 4, the event is read and written again by the API, so its numbers are written by the API, as the numbers rule above says.
+
+```json
+{ "items": [ { "schema_version": 1, "kind": "close_approach", "event_id": "...", "produced_at": "...", "close_approach": { }, "received_at": "...", "acknowledgement": { "action": "acknowledge", "acted_at": "..." } } ], "next": "..." }
+```
 
 ## Tests
 

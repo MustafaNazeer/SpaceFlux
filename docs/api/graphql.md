@@ -24,7 +24,7 @@ GraphQL serves the same reads as the [REST API](rest.md), shaped by the client i
 | `space_weather_history(scale, satellite, from, to, limit, after)` | One scale over at most 7 days, oldest first, paged | section 2 |
 | `screening_current` | The current run, its typed summary and its approaches, or `null` | section 3 |
 | `alert(event_id)` | One stored event, typed by kind, with `received_at` and its acknowledgement, or `null` | section 4 |
-| `alerts(limit, after, kind)` | Recent alerts, newest first, paged; `kind` keeps one kind | none |
+| `alerts(limit, after, kind)` | Recent alerts, newest first, paged; `kind` keeps one kind | section 11 |
 | `catalog_object(norad_cat_id)` | One catalog row, or `null`; its `close_approaches(limit, after)` in either role, newest first | section 5 |
 | `watchlist` | Every watchlist object with its catalog row | section 6 |
 | `watchlist { passes }` | One watchlist object's passes over the next 24 hours, computed on request; `null` where REST leaves a field out. `passes` itself is `null` when its computation fails, with one `INTERNAL_ERROR` error at that field's path and a generic message, and the rest of `watchlist` still answers. The clock is read once per request, so every object in one request shares the same `window_start` | section 10 |
