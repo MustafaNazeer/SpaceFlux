@@ -6,7 +6,7 @@ Designed around data from CelesTrak, NOAA SWPC, and NASA DONKI, which are public
 
 ## Status
 
-**Work in progress. The ingest service, the risk engine, and the REST side of the query API are built; GraphQL, the MongoDB archive, the dashboard, and the assistant are not.** Everything else in this README is planned and is marked that way. Features, benchmarks, and evaluation results are added here only once they exist in the code and can be reproduced from a committed script and dataset.
+**Work in progress. The ingest service, the risk engine, the query API (REST and GraphQL), the read only MCP tool server, and the Angular dashboard are built; the MongoDB archive and the assistant are not.** Everything else in this README is planned and is marked that way. Features, benchmarks, and evaluation results are added here only once they exist in the code and can be reproduced from a committed script and dataset.
 
 ### Built: the ingest service
 
@@ -28,10 +28,11 @@ Every event is checked against its topic schema before it is written, and a reco
 
 ### Built: the query API and MySQL
 
-`query-api` is a Java 21 Spring Boot service that owns a MySQL 8.4 database and serves it over REST. The stack is set out in [ADR 0010](docs/adr/0010-query-api-stack.md), and the tables, users, and indexes in [docs/data/mysql-schema.md](docs/data/mysql-schema.md) and [docs/data/indexes.md](docs/data/indexes.md).
+`query-api` is a Java 21 Spring Boot service that owns a MySQL 8.4 database and serves it over REST and GraphQL. The stack is set out in [ADR 0010](docs/adr/0010-query-api-stack.md), and the tables, users, and indexes in [docs/data/mysql-schema.md](docs/data/mysql-schema.md) and [docs/data/indexes.md](docs/data/indexes.md).
 
 * **Storing the pipeline's output.** Two Kafka consumers, each in its own consumer group, write to MySQL. The alerts consumer stores every `alerts` event with its exact text, the rows of its kind, and the current state of each space weather series. The catalog consumer reads `raw.gp` independently of the risk engine and keeps the newest element set per object. Both validate every record against its schema, send failures to the topic's dead letter topic, and commit a Kafka offset only after the database transaction for that record has committed, so a redelivered record changes nothing.
 * **Read endpoints.** Current space weather for each scale, space weather history, the current screening run with its close approaches, one alert by ID, one catalog object, and the watchlist. They need no account, page by key rather than offset, and answer errors as RFC 9457 problem details. The contract is in [docs/api/rest.md](docs/api/rest.md); every endpoint has a contract test against a migrated database, and every query's index is proven with `EXPLAIN`. A list of the newest alerts and a paged catalog are not built yet.
+* **GraphQL.** The same reads as REST in one request at `POST /api/graphql`, with no mutations, and a live alert subscription over WebSocket. The contract is in [docs/api/graphql.md](docs/api/graphql.md), the limits in [ADR 0012](docs/adr/0012-graphql-introspection-and-limits.md), and the subscription in [ADR 0014](docs/adr/0014-live-alert-subscription.md).
 * **Alert acknowledgement**, the only write path in the system ([ADR 0009](docs/adr/0009-alert-acknowledgement-auth.md)). One operator account signs in through form login to a server side session whose cookie page script cannot read, with CSRF protection on every write. The password is stored only as a bcrypt hash, at the cost measured nearest one second per check on my laptop ([docs/perf/bcrypt-cost.md](docs/perf/bcrypt-cost.md)), and failed logins are slowed by backoff rather than locking the account. Acknowledgements are append only rows: the database user behind the HTTP handlers can insert into that one table and write nothing else anywhere. Anonymous viewers see whether and when an alert was acknowledged, never the note or who acknowledged it.
 * **Migrations.** The schema is built by Flyway migrations from a separate one shot `migrate` container, built from the `db-migrate` module, that runs as the migration user and exits before `query-api` starts, so the running service never holds a credential that can change the schema. `query-api` uses two connection pools, one per database user, over TLS, and refuses to start if either user's grants differ from the reviewed list.
 
@@ -56,7 +57,7 @@ To build, test, and run it, see [docs/setup-guide.md](docs/setup-guide.md).
 1. Poll public orbital and space weather feeds and publish every payload as a versioned event on Kafka. (Built for CelesTrak and SWPC.)
 2. Propagate orbits for a watchlist of satellites (starting with the ISS) and screen them for close approaches against the public catalog. (Built against the `stations` group.)
 3. Map space weather observations onto the NOAA Space Weather Scales and publish each series' derived state (a level, none, no data, or ended) as an event on the `alerts` topic when it changes, is revised, or is refreshed. (Built.)
-4. Serve the catalog, alerts, and space weather context to an operator dashboard over REST and GraphQL, with a live alert subscription, and let one operator acknowledge alerts. (The REST read endpoints listed above and acknowledgement are built; GraphQL and the subscription are not.)
+4. Serve the catalog, alerts, and space weather context to an operator dashboard over REST and GraphQL, with a live alert subscription, and let one operator acknowledge alerts. (Built: the REST and GraphQL reads, the live alert subscription, and acknowledgement.)
 5. Answer questions about current conditions through an LLM assistant that retrieves space weather reports, pulls live numbers through read only tools, and cites its sources.
 
 ## Components
@@ -65,11 +66,11 @@ To build, test, and run it, see [docs/setup-guide.md](docs/setup-guide.md).
 |---|---|---|---|
 | `ingest` | Go | Built | One poller per feed with its own interval and backoff; validates, deduplicates, and publishes raw events |
 | `risk-engine` | Java, Spring Boot, Orekit | Built | Consumes orbital and space weather events, runs SGP4 propagation and close approach screening, applies storm rules, emits alerts |
-| `query-api` | Java, Spring Boot | Built (REST); GraphQL and the archiver planned | Stores alerts and the catalog in MySQL from Kafka, serves them over REST, and holds alert acknowledgement; GraphQL, reads from MongoDB, and the archiver that stores raw feed documents are planned |
+| `query-api` | Java, Spring Boot | Built (REST and GraphQL); the archiver planned | Stores alerts and the catalog in MySQL from Kafka, serves them over REST and GraphQL with a live alert subscription, and holds alert acknowledgement; reads from MongoDB and the archiver that stores raw feed documents are planned |
 | `db-migrate` | Java, Flyway | Built | One shot container that applies the MySQL migrations as the migration user, then exits |
 | `mcp-server` | Java, Spring AI | Built | Read only MCP tools for the assistant, one for each read endpoint of `query-api`, behind a bearer token on an internal network |
 | `assistant` | Java, Spring AI | Planned | Retrieval over space weather text plus tool calls to `query-api` through a read only MCP tool server, with citations |
-| `dashboard` | Angular | Planned | Read only operator console showing alerts, passes, and space weather context |
+| `dashboard` | Angular | Built | Operator console showing alerts and space weather context, with live alerts over the subscription; read only apart from one operator signing in to acknowledge alerts. Runs from the Angular development server, outside the Compose stack |
 
 Supporting pieces that exist today: Kafka topics with dead letter topics, JSON Schema files for every event, MySQL with Flyway migrations for the catalog, alerts, and acknowledgements, the local Compose stack, and GitHub Actions running every test suite on each push. Planned: MongoDB Atlas for raw documents and vector search, OpenTelemetry tracing across Kafka, Prometheus and Grafana, and Terraform for an on demand AWS environment (EKS, ECR, Secrets Manager).
 
@@ -78,7 +79,6 @@ The full design, including why each service scales differently and how delivery,
 ## Planned
 
 * The MongoDB archiver for raw feed documents, inside `query-api`
-* GraphQL on `query-api` and an Angular dashboard with a live alert subscription
 * CI that builds and pushes the container images, and a Terraform environment on EKS that is brought up for demos and torn down afterwards
 * DONKI and Space-Track conjunction data ingest (conjunction data is used for flags only and is never republished)
 * The retrieval grounded assistant and a committed evaluation suite that gates assistant changes in CI
@@ -86,7 +86,7 @@ The full design, including why each service scales differently and how delivery,
 
 ## Security
 
-Secrets never live in images, logs, or commits. The `ingest`, `risk-engine`, `migrate`, and `query-api` containers run as a non root user on a read only filesystem with all Linux capabilities dropped; the ingest health port and the query API are bound to localhost, and the risk engine publishes no ports. MySQL publishes no port, accepts network connections only over TLS, and gives each purpose its own user: migrations, the Kafka consumers, and the HTTP handlers, whose only write is appending an acknowledgement. Every read endpoint is open and read only; acknowledging an alert needs the operator's session and a CSRF token ([ADR 0009](docs/adr/0009-alert-acknowledgement-auth.md)). The MCP tool server publishes no port, sits on an internal network with `query-api` alone, needs a bearer token on every request, and calls `query-api` with no credential, so it can read what any viewer can and write nothing ([ADR 0015](docs/adr/0015-mcp-tool-server.md)). The planned dashboard is read only apart from acknowledgement, and all feed text will be treated as untrusted input to the planned assistant. See the [threat model](docs/security/threat-model.md) and the [hardening checklist](docs/security/hardening-checklist.md).
+Secrets never live in images, logs, or commits. The `ingest`, `risk-engine`, `migrate`, and `query-api` containers run as a non root user on a read only filesystem with all Linux capabilities dropped; the ingest health port and the query API are bound to localhost, and the risk engine publishes no ports. MySQL publishes no port, accepts network connections only over TLS, and gives each purpose its own user: migrations, the Kafka consumers, and the HTTP handlers, whose only write is appending an acknowledgement. Every read endpoint is open and read only; acknowledging an alert needs the operator's session and a CSRF token ([ADR 0009](docs/adr/0009-alert-acknowledgement-auth.md)). The MCP tool server publishes no port, sits on an internal network with `query-api` alone, needs a bearer token on every request, and calls `query-api` with no credential, so it can read what any viewer can and write nothing ([ADR 0015](docs/adr/0015-mcp-tool-server.md)). The dashboard is read only apart from acknowledgement, and all feed text will be treated as untrusted input to the planned assistant. See the [threat model](docs/security/threat-model.md) and the [hardening checklist](docs/security/hardening-checklist.md).
 
 ## Data sources
 
